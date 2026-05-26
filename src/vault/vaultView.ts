@@ -1,14 +1,25 @@
+import * as path from 'node:path';
+
 import * as vscode from 'vscode';
 
+import { moveVaultEntry } from './moveEntry';
 import { VaultManager } from './vaultManager';
-import { VaultNode, readVaultTree } from './vaultTree';
+import { VaultNode, VaultNodeKind, readVaultTree } from './vaultTree';
 
 interface InboundMessage {
-  type: 'ready' | 'openNote' | 'configureVault';
+  type: 'ready' | 'openNote' | 'configureVault' | 'selectionChanged' | 'moveEntry';
   path?: string;
+  kind?: VaultNodeKind;
+  source?: string;
+  targetDir?: string;
 }
 
 type OutboundMessage = { type: 'tree'; tree: VaultNode } | { type: 'noVault' };
+
+interface Selection {
+  absPath: string;
+  kind: VaultNodeKind;
+}
 
 const REFRESH_DEBOUNCE_MS = 100;
 const NONCE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -42,6 +53,7 @@ export class VaultViewProvider implements vscode.WebviewViewProvider, vscode.Dis
   private readonly disposables: vscode.Disposable[] = [];
   private watcher: vscode.FileSystemWatcher | undefined;
   private refreshScheduled = false;
+  private selection: Selection | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -50,10 +62,35 @@ export class VaultViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     this.rebuildWatcher();
     this.disposables.push(
       vaultManager.onDidChangeVault(() => {
+        this.selection = undefined;
         this.rebuildWatcher();
         void this.postState();
       })
     );
+  }
+
+  // resolve the directory a new note or folder should land in, callers fall back to root when undefined
+  getCreateTargetDir(): string | undefined {
+    if (!this.selection) {
+      return undefined;
+    }
+    if (this.selection.kind === 'folder') {
+      return this.selection.absPath;
+    }
+    return path.dirname(this.selection.absPath);
+  }
+
+  // coalesce bursts of fs events into a single debounced tree refresh
+  refresh(): void {
+    if (this.refreshScheduled) {
+      return;
+    }
+
+    this.refreshScheduled = true;
+    setTimeout(() => {
+      this.refreshScheduled = false;
+      void this.postState();
+    }, REFRESH_DEBOUNCE_MS);
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -92,20 +129,10 @@ export class VaultViewProvider implements vscode.WebviewViewProvider, vscode.Dis
 
     const pattern = new vscode.RelativePattern(root, '**');
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
-    const refresh = (): void => this.scheduleRefresh();
-    this.disposables.push(this.watcher.onDidCreate(refresh), this.watcher.onDidDelete(refresh));
-  }
-
-  // coalesce bursts of fs events into a single refresh
-  private scheduleRefresh(): void {
-    if (this.refreshScheduled) {
-      return;
-    }
-    this.refreshScheduled = true;
-    setTimeout(() => {
-      this.refreshScheduled = false;
-      void this.postState();
-    }, REFRESH_DEBOUNCE_MS);
+    this.disposables.push(
+      this.watcher.onDidCreate(() => this.refresh()),
+      this.watcher.onDidDelete(() => this.refresh())
+    );
   }
 
   // push either the current tree or the empty-state marker
@@ -121,6 +148,19 @@ export class VaultViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     await this.view.webview.postMessage(msg);
   }
 
+  // run a drag-drop move through the service, refresh the tree only on a real move
+  private async applyMove(source: string, targetDir: string): Promise<void> {
+    const root = this.vaultManager.getVaultRoot();
+    if (!root) {
+      return;
+    }
+
+    const moved = await moveVaultEntry(root, source, targetDir);
+    if (moved) {
+      this.refresh();
+    }
+  }
+
   private async handle(msg: InboundMessage): Promise<void> {
     if (msg.type === 'ready') {
       await this.postState();
@@ -132,6 +172,21 @@ export class VaultViewProvider implements vscode.WebviewViewProvider, vscode.Dis
     }
     if (msg.type === 'configureVault') {
       await vscode.commands.executeCommand('promptStudio.configureVault');
+      return;
+    }
+    if (msg.type === 'selectionChanged') {
+      this.selection =
+        typeof msg.path === 'string' && (msg.kind === 'folder' || msg.kind === 'note')
+          ? { absPath: msg.path, kind: msg.kind }
+          : undefined;
+      return;
+    }
+    if (
+      msg.type === 'moveEntry' &&
+      typeof msg.source === 'string' &&
+      typeof msg.targetDir === 'string'
+    ) {
+      await this.applyMove(msg.source, msg.targetDir);
     }
   }
 

@@ -6,12 +6,35 @@
   let tree = null;
   let selectedPath = null;
   let didAutoExpandRoot = false;
+  let draggingPath = null;
 
   // track window focus so active vs inactive selection styling stays in sync
   document.addEventListener('focusin', () => document.body.classList.add('focused'));
   document.addEventListener('focusout', () => document.body.classList.remove('focused'));
   window.addEventListener('focus', () => document.body.classList.add('focused'));
   window.addEventListener('blur', () => document.body.classList.remove('focused'));
+
+  root.addEventListener('dragover', (e) => {
+    if (!draggingPath) return;
+    const targetDir = resolveDropTarget(e.target);
+    if (!targetDir) return;
+    e.preventDefault();
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+    highlightDropTarget(targetDir);
+  });
+  root.addEventListener('dragleave', (e) => {
+    if (e.target === root) clearDropTargets();
+  });
+  root.addEventListener('drop', (e) => {
+    if (!draggingPath) return;
+    const targetDir = resolveDropTarget(e.target);
+    if (!targetDir) return;
+    e.preventDefault();
+    const source = draggingPath;
+    draggingPath = null;
+    clearDropTargets();
+    vscode.postMessage({ type: 'moveEntry', source: source, targetDir: targetDir });
+  });
 
   window.addEventListener('message', (event) => {
     const msg = event.data;
@@ -66,7 +89,9 @@
     row.className = 'row ' + node.kind + (isRoot ? ' root' : '');
     row.style.paddingLeft = (6 + depth * 14) + 'px';
     row.dataset.path = node.absPath;
+    row.dataset.kind = node.kind;
     row.tabIndex = 0;
+    row.draggable = !isRoot;
     row.setAttribute('role', 'treeitem');
     if (node.kind === 'folder') {
       row.setAttribute('aria-expanded', expanded.has(node.absPath) ? 'true' : 'false');
@@ -79,16 +104,32 @@
 
     row.addEventListener('click', (e) => {
       e.stopPropagation();
-      select(node.absPath);
+      select(node.absPath, node.kind);
       if (node.kind === 'folder') toggle(node.absPath);
       else openNote(node.absPath);
     });
     row.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
+        select(node.absPath, node.kind);
         if (node.kind === 'folder') toggle(node.absPath);
         else openNote(node.absPath);
       }
+    });
+    row.addEventListener('dragstart', (e) => {
+      if (isRoot) {
+        e.preventDefault();
+        return;
+      }
+      draggingPath = node.absPath;
+      if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', node.absPath);
+        e.dataTransfer.effectAllowed = 'move';
+      }
+    });
+    row.addEventListener('dragend', () => {
+      draggingPath = null;
+      clearDropTargets();
     });
 
     root.appendChild(row);
@@ -135,7 +176,7 @@
     render();
   }
 
-  function select(absPath) {
+  function select(absPath, kind) {
     selectedPath = absPath;
     for (const el of root.querySelectorAll('.row.selected')) {
       el.classList.remove('selected');
@@ -146,6 +187,7 @@
         break;
       }
     }
+    vscode.postMessage({ type: 'selectionChanged', path: absPath, kind: kind });
   }
 
   function openNote(absPath) {
@@ -154,6 +196,42 @@
 
   function stripMdExt(name) {
     return name.replace(/\.md$/i, '');
+  }
+
+  // resolve which folder a drop event lands in, null when the gesture is invalid
+  function resolveDropTarget(element) {
+    const row = element && element.closest ? element.closest('.row') : null;
+    if (row) {
+      if (row.dataset.kind !== 'folder') return null;
+      const folderPath = row.dataset.path;
+      if (folderPath === draggingPath) return null;
+      if (pathContains(draggingPath, folderPath)) return null;
+      return folderPath;
+    }
+    return tree ? tree.absPath : null;
+  }
+
+  function highlightDropTarget(targetPath) {
+    clearDropTargets();
+    for (const el of root.querySelectorAll('.row')) {
+      if (el.dataset.path === targetPath) {
+        el.classList.add('drop-target');
+        break;
+      }
+    }
+  }
+
+  function clearDropTargets() {
+    for (const el of root.querySelectorAll('.drop-target')) {
+      el.classList.remove('drop-target');
+    }
+  }
+
+  // true when descendant equals or sits beneath ancestor, separator-agnostic
+  function pathContains(ancestor, descendant) {
+    if (!ancestor || !descendant) return false;
+    if (descendant === ancestor) return true;
+    return descendant.startsWith(ancestor + '/') || descendant.startsWith(ancestor + '\\');
   }
 
   vscode.postMessage({ type: 'ready' });

@@ -28,13 +28,17 @@ notes:
 
 ## Status
 
-Early development. The current build ships a sidebar tree backed by a configurable vault location. Open the activity-bar icon, click **Configure Vault** (or run **Prompt Studio: Configure Vault** from the command palette), then pick one of three locations:
+Early development. The current build ships a sidebar tree backed by a configurable vault location, plus title-bar buttons to create notes and folders. Open the activity-bar icon, click **Configure Vault** (or run **Prompt Studio: Configure Vault** from the command palette), then pick one of three locations:
 
 1. **Per-workspace default.** A vault is auto-created under the extension's global storage at `<extension storage>/<basename>-<hash>` (e.g. `myproject-a1b2c3d4`, derived from a short hash of the workspace path). Your project files stay untouched.
 2. **Custom folder.** Any absolute path on disk.
 3. **Folder inside this workspace.** A subfolder of the current workspace, e.g. `<workspace>/prompts`, so the vault is versioned alongside your code.
 
-The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default"). The view reacts to setting changes immediately. No context menus, wikilinks, prompts, or visual mode yet.
+The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default"). The view reacts to setting changes immediately.
+
+Once a vault is set, the view title shows **New Note** and **New Folder** buttons (also available as **Prompt Studio: New Note** and **Prompt Studio: New Folder** in the command palette). New entries land in the currently selected folder, or in the parent folder of the selected note, or at the vault root if nothing is selected.
+
+Notes and folders can be **dragged** onto any folder row to move them, or onto the vault root row to lift them to the top level. Moves into a folder's own descendants or onto a name that already exists are rejected. No wikilinks, prompts, or visual mode yet.
 
 ## Develop
 

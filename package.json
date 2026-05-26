@@ -8,6 +8,10 @@
     "vscode": "^1.85.0"
   },
   "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ge0rg3/vscode-prompt-studio.git"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],
@@ -27,6 +31,16 @@
         "command": "promptStudio.configureVault",
         "title": "Prompt Studio: Configure Vault",
         "icon": "$(gear)"
+      },
+      {
+        "command": "promptStudio.newNote",
+        "title": "Prompt Studio: New Note",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "promptStudio.newFolder",
+        "title": "Prompt Studio: New Folder",
+        "icon": "$(new-folder)"
       }
     ],
     "viewsContainers": {
@@ -50,9 +64,29 @@
     "menus": {
       "view/title": [
         {
+          "command": "promptStudio.newNote",
+          "when": "view == promptStudio.vault && promptStudio.hasVault",
+          "group": "navigation@1"
+        },
+        {
+          "command": "promptStudio.newFolder",
+          "when": "view == promptStudio.vault && promptStudio.hasVault",
+          "group": "navigation@2"
+        },
+        {
           "command": "promptStudio.configureVault",
           "when": "view == promptStudio.vault",
           "group": "navigation@99"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "promptStudio.newNote",
+          "when": "promptStudio.hasVault"
+        },
+        {
+          "command": "promptStudio.newFolder",
+          "when": "promptStudio.hasVault"
         }
       ]
     }

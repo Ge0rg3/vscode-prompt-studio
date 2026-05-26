@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
 import { registerConfigureVault } from './vault/configureVault';
+import { registerCreateFolder, registerCreateNote } from './vault/createEntries';
 import { VaultManager } from './vault/vaultManager';
 import { VaultViewProvider } from './vault/vaultView';
 
@@ -13,6 +14,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(VaultViewProvider.viewType, vaultView),
-    registerConfigureVault(vaultManager, context.globalStorageUri.fsPath)
+    registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
+    registerCreateNote(vaultManager, vaultView),
+    registerCreateFolder(vaultManager, vaultView)
   );
 }

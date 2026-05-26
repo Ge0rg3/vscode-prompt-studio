@@ -68,6 +68,11 @@ body.focused .row.selected {
   letter-spacing: 0.01em;
 }
 
+.row.drop-target {
+  background: var(--vscode-list-dropBackground, var(--vscode-list-activeSelectionBackground));
+  box-shadow: 0 0 0 1px var(--vscode-focusBorder) inset;
+}
+
 .chevron,
 .icon {
   flex-shrink: 0;
