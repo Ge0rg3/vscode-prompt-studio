@@ -12,6 +12,23 @@
     "onStartupFinished"
   ],
   "contributes": {
+    "configuration": {
+      "title": "Prompt Studio",
+      "properties": {
+        "promptStudio.vaultPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute path to the vault folder. Leave empty to use a per-workspace vault stored under the extension's global storage. Run **Prompt Studio: Configure Vault** for a guided picker."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "promptStudio.configureVault",
+        "title": "Prompt Studio: Configure Vault",
+        "icon": "$(gear)"
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -29,6 +46,15 @@
           "name": "Vault"
         }
       ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "promptStudio.configureVault",
+          "when": "view == promptStudio.vault",
+          "group": "navigation@99"
+        }
+      ]
     }
   },
   "scripts": {
@@ -42,6 +68,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.5.0"

@@ -28,7 +28,13 @@ notes:
 
 ## Status
 
-Early development. The current build is a scaffold: the activity-bar icon opens a sidebar panel that just says `prompt studio`.
+Early development. The current build ships a sidebar tree backed by a configurable vault location. Open the activity-bar icon, click **Configure Vault** (or run **Prompt Studio: Configure Vault** from the command palette), then pick one of three locations:
+
+1. **Per-workspace default.** A vault is auto-created under the extension's global storage at `<extension storage>/<basename>-<hash>` (e.g. `myproject-a1b2c3d4`, derived from a short hash of the workspace path). Your project files stay untouched.
+2. **Custom folder.** Any absolute path on disk.
+3. **Folder inside this workspace.** A subfolder of the current workspace, e.g. `<workspace>/prompts`, so the vault is versioned alongside your code.
+
+The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default"). The view reacts to setting changes immediately. No context menus, wikilinks, prompts, or visual mode yet.
 
 ## Develop
 
