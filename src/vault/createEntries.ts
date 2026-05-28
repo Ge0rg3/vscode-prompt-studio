@@ -2,58 +2,26 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
-import { VaultManager } from './vaultManager';
-import { VaultNode } from './vaultTreeDataProvider';
-
-const NOTE_EXT = '.md';
-const INVALID_NAME = /[\\/:*?"<>|]/;
+import { pathExists } from '../common/utils/fs';
+import { VaultManager } from '../common/vaultManager';
+import { VaultNode } from '../common/vaultNode';
+import { ensureNoteExt, validateEntryName } from './entryName';
 
 // --- helpers ---
 
-// reject empties, path separators, and OS-reserved characters
-function validateEntryName(input: string): string | undefined {
-  const trimmed = input.trim();
-  if (!trimmed) {
-    return 'A name is required';
-  }
-  if (INVALID_NAME.test(trimmed)) {
-    return 'Name must not contain / \\ : * ? " < > |';
-  }
-  return undefined;
-}
-
-// append .md if the user did not type the extension
-function ensureNoteExt(name: string): string {
-  return name.toLowerCase().endsWith(NOTE_EXT) ? name : `${name}${NOTE_EXT}`;
-}
-
-// pick the directory new entries should land in, context-menu arg wins over current selection
+// pick the directory new entries should land in, context node wins over vault root
 function resolveParentDir(
   vaultManager: VaultManager,
-  treeView: vscode.TreeView<VaultNode>,
   contextNode: VaultNode | undefined
 ): string | undefined {
   const root = vaultManager.getVaultRoot();
   if (!root) {
     return undefined;
   }
-
-  const target = contextNode ?? treeView.selection[0];
-  if (!target) {
+  if (!contextNode) {
     return root;
   }
-
-  return target.kind === 'folder' ? target.absPath : path.dirname(target.absPath);
-}
-
-// stat the uri, return true only when it resolves
-async function pathExists(uri: vscode.Uri): Promise<boolean> {
-  try {
-    await vscode.workspace.fs.stat(uri);
-    return true;
-  } catch {
-    return false;
-  }
+  return contextNode.kind === 'folder' ? contextNode.absPath : path.dirname(contextNode.absPath);
 }
 
 // surface a warning and bail when no vault is configured
@@ -67,14 +35,11 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
 
 // --- exports ---
 
-export function registerCreateNote(
-  vaultManager: VaultManager,
-  treeView: vscode.TreeView<VaultNode>
-): vscode.Disposable {
+export function registerCreateNote(vaultManager: VaultManager): vscode.Disposable {
   return vscode.commands.registerCommand(
     'promptStudio.newNote',
     async (contextNode?: VaultNode) => {
-      const parentDir = resolveParentDir(vaultManager, treeView, contextNode);
+      const parentDir = resolveParentDir(vaultManager, contextNode);
       if (!ensureVault(parentDir)) {
         return;
       }
@@ -104,14 +69,11 @@ export function registerCreateNote(
   );
 }
 
-export function registerCreateFolder(
-  vaultManager: VaultManager,
-  treeView: vscode.TreeView<VaultNode>
-): vscode.Disposable {
+export function registerCreateFolder(vaultManager: VaultManager): vscode.Disposable {
   return vscode.commands.registerCommand(
     'promptStudio.newFolder',
     async (contextNode?: VaultNode) => {
-      const parentDir = resolveParentDir(vaultManager, treeView, contextNode);
+      const parentDir = resolveParentDir(vaultManager, contextNode);
       if (!ensureVault(parentDir)) {
         return;
       }

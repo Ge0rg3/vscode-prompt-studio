@@ -2,24 +2,8 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
-// --- helpers ---
-
-// true when descendant equals or sits beneath ancestor, inputs must already be resolved
-function pathContains(ancestor: string, descendant: string): boolean {
-  return descendant === ancestor || descendant.startsWith(ancestor + path.sep);
-}
-
-// stat the uri, return true only when it resolves
-async function pathExists(uri: vscode.Uri): Promise<boolean> {
-  try {
-    await vscode.workspace.fs.stat(uri);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// --- exports ---
+import { pathExists } from '../common/utils/fs';
+import { isWithin } from '../common/utils/paths';
 
 // move sourcePath into targetDir, no-op when already there, surface a UI error on conflict
 export async function moveVaultEntry(
@@ -31,13 +15,13 @@ export async function moveVaultEntry(
   const resolvedSource = path.resolve(sourcePath);
   const resolvedTarget = path.resolve(targetDir);
 
-  if (!pathContains(resolvedRoot, resolvedSource) || resolvedSource === resolvedRoot) {
+  if (!isWithin(resolvedSource, resolvedRoot) || resolvedSource === resolvedRoot) {
     return false;
   }
-  if (!pathContains(resolvedRoot, resolvedTarget)) {
+  if (!isWithin(resolvedTarget, resolvedRoot)) {
     return false;
   }
-  if (pathContains(resolvedSource, resolvedTarget)) {
+  if (isWithin(resolvedTarget, resolvedSource)) {
     void vscode.window.showErrorMessage('Cannot move a folder into itself.');
     return false;
   }

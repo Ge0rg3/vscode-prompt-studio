@@ -1,32 +1,33 @@
 import * as vscode from 'vscode';
 
+import { VaultManager } from './common/vaultManager';
 import { registerConfigureVault } from './vault/configureVault';
 import { registerCreateFolder, registerCreateNote } from './vault/createEntries';
-import { VaultManager } from './vault/vaultManager';
-import { VaultTreeDataProvider } from './vault/vaultTreeDataProvider';
-
-const VAULT_VIEW_ID = 'promptStudio.vault';
+import {
+  registerCopyContents,
+  registerRenameEntry,
+  registerRevealInOS
+} from './vault/entryActions';
+import { VaultWebviewProvider } from './vault/vaultWebviewProvider';
+import { registerOpenVisual } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
   const vaultManager = new VaultManager(context.globalStorageUri.fsPath);
   context.subscriptions.push(vaultManager);
 
-  const treeDataProvider = new VaultTreeDataProvider(vaultManager);
-  context.subscriptions.push(treeDataProvider);
-
-  const treeView = vscode.window.createTreeView(VAULT_VIEW_ID, {
-    treeDataProvider,
-    dragAndDropController: treeDataProvider,
-    showCollapseAll: true,
-    canSelectMany: false
-  });
-  context.subscriptions.push(treeView);
+  const provider = new VaultWebviewProvider(vaultManager, context.extensionUri);
+  context.subscriptions.push(provider);
 
   context.subscriptions.push(
-    treeView.onDidExpandElement(({ element }) => treeDataProvider.setExpanded(element, true)),
-    treeView.onDidCollapseElement(({ element }) => treeDataProvider.setExpanded(element, false)),
+    vscode.window.registerWebviewViewProvider(VaultWebviewProvider.viewType, provider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    }),
     registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
-    registerCreateNote(vaultManager, treeView),
-    registerCreateFolder(vaultManager, treeView)
+    registerOpenVisual(vaultManager, context.extensionUri),
+    registerCreateNote(vaultManager),
+    registerCreateFolder(vaultManager),
+    registerRenameEntry(),
+    registerCopyContents(),
+    registerRevealInOS()
   );
 }

@@ -1,0 +1,151 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+}
+
+#breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  flex-shrink: 0;
+}
+
+#breadcrumbs .crumb {
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--vscode-descriptionForeground);
+}
+
+#breadcrumbs .crumb:hover {
+  background: var(--vscode-list-hoverBackground);
+  color: var(--vscode-foreground);
+}
+
+#breadcrumbs .crumb.current {
+  color: var(--vscode-foreground);
+  font-weight: 600;
+  cursor: default;
+}
+
+#breadcrumbs .crumb.current:hover {
+  background: transparent;
+}
+
+#breadcrumbs .sep {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.6;
+}
+
+#canvas {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+#board {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 240px;
+  height: 170px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+
+.card:hover {
+  border-color: var(--vscode-focusBorder);
+}
+
+.card .title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  font-weight: 600;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.card .title .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card .title .codicon {
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  flex-shrink: 0;
+}
+
+.card .preview {
+  flex: 1;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.card .preview.empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.card .folder-thumb {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  opacity: 0.5;
+}
+
+.card .folder-thumb .codicon {
+  font-size: 42px;
+}
+
+#empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--vscode-descriptionForeground);
+  pointer-events: none;
+}
+
+#empty.hidden {
+  display: none;
+}

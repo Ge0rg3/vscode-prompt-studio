@@ -28,7 +28,7 @@ notes:
 
 ## Status
 
-Early development. The current build ships a sidebar tree backed by a configurable vault location.
+Early development. The current build ships a sidebar vault view and a read-only visual canvas, both backed by a configurable folder location. The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
 
 ### Configure the vault
 
@@ -44,12 +44,26 @@ The path persists in the `promptStudio.vaultPath` setting (empty string means "p
 
 Once a vault is set:
 
-- **Title-bar buttons.** The view header shows **New Note** and **New Folder**. New entries land in the currently selected folder, in the parent folder of the selected note, or at the vault root when nothing is selected.
-- **Right-click a folder.** The context menu offers **New Note** and **New Folder**, scoped to that folder.
+- **Title-bar buttons.** The view header shows **New Note** and **New Folder**. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
+- **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root.
+- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, and **Reveal in Explorer**.
+- **Right-click a note.** Offers **Open**, **Rename**, **Copy Contents** (copies the markdown body to the clipboard), and **Reveal in Explorer**.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
 
-No wikilinks, prompts, or visual mode yet.
+### Visual canvas
+
+Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview, each subfolder shows as a card you can drill into. Breadcrumbs across the top walk back toward the root. It is styled with the standard VSCode theme colors rather than the bright sticky-note look of similar tools.
+
+Launch it from:
+
+- **Title-bar button.** The **Open Visual Canvas** button in the view header opens the vault root.
+- **Right-click a folder.** The **Open as Canvas** entry opens that folder. Right-clicking the empty area opens the root.
+- **Command palette.** **Prompt Studio: Open Visual Canvas** opens the root.
+
+The canvas is read-only for now: click a note card to open it in an editor, click a folder card to navigate into it. No drag, resize, color, or saved layout yet.
+
+Wikilinks and prompts are not built yet.
 
 ## Develop
 

@@ -34,6 +34,12 @@
         "icon": "$(gear)"
       },
       {
+        "command": "promptStudio.openVisual",
+        "title": "Open Visual Canvas",
+        "category": "Prompt Studio",
+        "icon": "$(layout)"
+      },
+      {
         "command": "promptStudio.newNote",
         "title": "New Note",
         "category": "Prompt Studio",
@@ -44,6 +50,21 @@
         "title": "New Folder",
         "category": "Prompt Studio",
         "icon": "$(new-folder)"
+      },
+      {
+        "command": "promptStudio.rename",
+        "title": "Rename",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.copyContents",
+        "title": "Copy Contents",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.revealInOS",
+        "title": "Reveal in Explorer",
+        "category": "Prompt Studio"
       }
     ],
     "viewsContainers": {
@@ -59,17 +80,11 @@
       "promptStudio": [
         {
           "id": "promptStudio.vault",
-          "name": "Vault"
+          "name": "Vault",
+          "type": "webview"
         }
       ]
     },
-    "viewsWelcome": [
-      {
-        "view": "promptStudio.vault",
-        "contents": "No vault is configured.\n[Configure Vault](command:promptStudio.configureVault)",
-        "when": "!promptStudio.hasVault"
-      }
-    ],
     "menus": {
       "view/title": [
         {
@@ -83,31 +98,40 @@
           "group": "navigation@2"
         },
         {
+          "command": "promptStudio.openVisual",
+          "when": "view == promptStudio.vault && promptStudio.hasVault",
+          "group": "navigation@3"
+        },
+        {
           "command": "promptStudio.configureVault",
           "when": "view == promptStudio.vault",
           "group": "navigation@99"
         }
       ],
-      "view/item/context": [
-        {
-          "command": "promptStudio.newNote",
-          "when": "view == promptStudio.vault && viewItem == folder",
-          "group": "1_create@1"
-        },
-        {
-          "command": "promptStudio.newFolder",
-          "when": "view == promptStudio.vault && viewItem == folder",
-          "group": "1_create@2"
-        }
-      ],
       "commandPalette": [
         {
+          "command": "promptStudio.openVisual",
+          "when": "promptStudio.hasVault"
+        },
+        {
           "command": "promptStudio.newNote",
           "when": "promptStudio.hasVault"
         },
         {
           "command": "promptStudio.newFolder",
           "when": "promptStudio.hasVault"
+        },
+        {
+          "command": "promptStudio.rename",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.copyContents",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.revealInOS",
+          "when": "false"
         }
       ]
     }
@@ -123,6 +147,7 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.5.0"
