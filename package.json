@@ -29,17 +29,20 @@
     "commands": [
       {
         "command": "promptStudio.configureVault",
-        "title": "Prompt Studio: Configure Vault",
+        "title": "Configure Vault",
+        "category": "Prompt Studio",
         "icon": "$(gear)"
       },
       {
         "command": "promptStudio.newNote",
-        "title": "Prompt Studio: New Note",
+        "title": "New Note",
+        "category": "Prompt Studio",
         "icon": "$(new-file)"
       },
       {
         "command": "promptStudio.newFolder",
-        "title": "Prompt Studio: New Folder",
+        "title": "New Folder",
+        "category": "Prompt Studio",
         "icon": "$(new-folder)"
       }
     ],
@@ -55,12 +58,18 @@
     "views": {
       "promptStudio": [
         {
-          "type": "webview",
           "id": "promptStudio.vault",
           "name": "Vault"
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "promptStudio.vault",
+        "contents": "No vault is configured.\n[Configure Vault](command:promptStudio.configureVault)",
+        "when": "!promptStudio.hasVault"
+      }
+    ],
     "menus": {
       "view/title": [
         {
@@ -77,6 +86,18 @@
           "command": "promptStudio.configureVault",
           "when": "view == promptStudio.vault",
           "group": "navigation@99"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "promptStudio.newNote",
+          "when": "view == promptStudio.vault && viewItem == folder",
+          "group": "1_create@1"
+        },
+        {
+          "command": "promptStudio.newFolder",
+          "when": "view == promptStudio.vault && viewItem == folder",
+          "group": "1_create@2"
         }
       ],
       "commandPalette": [
@@ -102,7 +123,6 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
-    "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.2.0",
     "esbuild": "^0.24.0",
     "typescript": "^5.5.0"

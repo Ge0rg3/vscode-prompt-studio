@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { VaultManager } from './vaultManager';
-import { VaultViewProvider } from './vaultView';
+import { VaultNode } from './vaultTreeDataProvider';
 
 const NOTE_EXT = '.md';
 const INVALID_NAME = /[\\/:*?"<>|]/;
@@ -27,13 +27,23 @@ function ensureNoteExt(name: string): string {
   return name.toLowerCase().endsWith(NOTE_EXT) ? name : `${name}${NOTE_EXT}`;
 }
 
-// pick the directory new entries should land in, selection takes priority
-function resolveParentDir(vaultManager: VaultManager, view: VaultViewProvider): string | undefined {
+// pick the directory new entries should land in, context-menu arg wins over current selection
+function resolveParentDir(
+  vaultManager: VaultManager,
+  treeView: vscode.TreeView<VaultNode>,
+  contextNode: VaultNode | undefined
+): string | undefined {
   const root = vaultManager.getVaultRoot();
   if (!root) {
     return undefined;
   }
-  return view.getCreateTargetDir() ?? root;
+
+  const target = contextNode ?? treeView.selection[0];
+  if (!target) {
+    return root;
+  }
+
+  return target.kind === 'folder' ? target.absPath : path.dirname(target.absPath);
 }
 
 // stat the uri, return true only when it resolves
@@ -59,67 +69,71 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
 
 export function registerCreateNote(
   vaultManager: VaultManager,
-  view: VaultViewProvider
+  treeView: vscode.TreeView<VaultNode>
 ): vscode.Disposable {
-  return vscode.commands.registerCommand('promptStudio.newNote', async () => {
-    const parentDir = resolveParentDir(vaultManager, view);
-    if (!ensureVault(parentDir)) {
-      return;
+  return vscode.commands.registerCommand(
+    'promptStudio.newNote',
+    async (contextNode?: VaultNode) => {
+      const parentDir = resolveParentDir(vaultManager, treeView, contextNode);
+      if (!ensureVault(parentDir)) {
+        return;
+      }
+
+      const input = await vscode.window.showInputBox({
+        title: 'New note',
+        prompt: 'Filename',
+        value: 'Untitled.md',
+        valueSelection: [0, 'Untitled'.length],
+        validateInput: validateEntryName
+      });
+      if (!input) {
+        return;
+      }
+
+      const filename = ensureNoteExt(input.trim());
+      const target = vscode.Uri.file(path.join(parentDir, filename));
+
+      if (await pathExists(target)) {
+        void vscode.window.showErrorMessage(`A file named "${filename}" already exists.`);
+        return;
+      }
+
+      await vscode.workspace.fs.writeFile(target, new Uint8Array());
+      await vscode.commands.executeCommand('vscode.open', target);
     }
-
-    const input = await vscode.window.showInputBox({
-      title: 'New note',
-      prompt: 'Filename',
-      value: 'Untitled.md',
-      valueSelection: [0, 'Untitled'.length],
-      validateInput: validateEntryName
-    });
-    if (!input) {
-      return;
-    }
-
-    const filename = ensureNoteExt(input.trim());
-    const target = vscode.Uri.file(path.join(parentDir, filename));
-
-    if (await pathExists(target)) {
-      void vscode.window.showErrorMessage(`A file named "${filename}" already exists.`);
-      return;
-    }
-
-    await vscode.workspace.fs.writeFile(target, new Uint8Array());
-    view.refresh();
-    await vscode.commands.executeCommand('vscode.open', target);
-  });
+  );
 }
 
 export function registerCreateFolder(
   vaultManager: VaultManager,
-  view: VaultViewProvider
+  treeView: vscode.TreeView<VaultNode>
 ): vscode.Disposable {
-  return vscode.commands.registerCommand('promptStudio.newFolder', async () => {
-    const parentDir = resolveParentDir(vaultManager, view);
-    if (!ensureVault(parentDir)) {
-      return;
+  return vscode.commands.registerCommand(
+    'promptStudio.newFolder',
+    async (contextNode?: VaultNode) => {
+      const parentDir = resolveParentDir(vaultManager, treeView, contextNode);
+      if (!ensureVault(parentDir)) {
+        return;
+      }
+
+      const input = await vscode.window.showInputBox({
+        title: 'New folder',
+        prompt: 'Folder name',
+        validateInput: validateEntryName
+      });
+      if (!input) {
+        return;
+      }
+
+      const folderName = input.trim();
+      const target = vscode.Uri.file(path.join(parentDir, folderName));
+
+      if (await pathExists(target)) {
+        void vscode.window.showErrorMessage(`A folder named "${folderName}" already exists.`);
+        return;
+      }
+
+      await vscode.workspace.fs.createDirectory(target);
     }
-
-    const input = await vscode.window.showInputBox({
-      title: 'New folder',
-      prompt: 'Folder name',
-      validateInput: validateEntryName
-    });
-    if (!input) {
-      return;
-    }
-
-    const folderName = input.trim();
-    const target = vscode.Uri.file(path.join(parentDir, folderName));
-
-    if (await pathExists(target)) {
-      void vscode.window.showErrorMessage(`A folder named "${folderName}" already exists.`);
-      return;
-    }
-
-    await vscode.workspace.fs.createDirectory(target);
-    view.refresh();
-  });
+  );
 }

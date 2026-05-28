@@ -40,8 +40,8 @@ export class VaultManager implements vscode.Disposable {
     this.publishContext();
 
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration((e) => {
-        if (e.affectsConfiguration(FULL_CONFIG_KEY)) {
+      vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration(FULL_CONFIG_KEY)) {
           this.recompute();
         }
       }),
@@ -62,8 +62,8 @@ export class VaultManager implements vscode.Disposable {
 
   dispose(): void {
     this.emitter.dispose();
-    for (const d of this.disposables) {
-      d.dispose();
+    for (const disposable of this.disposables) {
+      disposable.dispose();
     }
   }
 

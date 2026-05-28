@@ -28,7 +28,11 @@ notes:
 
 ## Status
 
-Early development. The current build ships a sidebar tree backed by a configurable vault location, plus title-bar buttons to create notes and folders. Open the activity-bar icon, click **Configure Vault** (or run **Prompt Studio: Configure Vault** from the command palette), then pick one of three locations:
+Early development. The current build ships a sidebar tree backed by a configurable vault location.
+
+### Configure the vault
+
+Open the activity-bar icon, click **Configure Vault** in the empty view (or run **Prompt Studio: Configure Vault** from the command palette), then pick one of three locations:
 
 1. **Per-workspace default.** A vault is auto-created under the extension's global storage at `<extension storage>/<basename>-<hash>` (e.g. `myproject-a1b2c3d4`, derived from a short hash of the workspace path). Your project files stay untouched.
 2. **Custom folder.** Any absolute path on disk.
@@ -36,9 +40,16 @@ Early development. The current build ships a sidebar tree backed by a configurab
 
 The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default"). The view reacts to setting changes immediately.
 
-Once a vault is set, the view title shows **New Note** and **New Folder** buttons (also available as **Prompt Studio: New Note** and **Prompt Studio: New Folder** in the command palette). New entries land in the currently selected folder, or in the parent folder of the selected note, or at the vault root if nothing is selected.
+### Create and organize notes
 
-Notes and folders can be **dragged** onto any folder row to move them, or onto the vault root row to lift them to the top level. Moves into a folder's own descendants or onto a name that already exists are rejected. No wikilinks, prompts, or visual mode yet.
+Once a vault is set:
+
+- **Title-bar buttons.** The view header shows **New Note** and **New Folder**. New entries land in the currently selected folder, in the parent folder of the selected note, or at the vault root when nothing is selected.
+- **Right-click a folder.** The context menu offers **New Note** and **New Folder**, scoped to that folder.
+- **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
+- **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
+
+No wikilinks, prompts, or visual mode yet.
 
 ## Develop
 
