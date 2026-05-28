@@ -45,7 +45,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 - Standard VSCode extension layout: `src/extension.ts` for `activate` / `deactivate`, `src/<feature>/` for each feature folder (commands, providers, views, services that belong to that feature), `media/` for icons and static webview assets.
 - One folder per feature surface. The folder, its commands, its providers, and its services live together.
 - Generic, stateless, domain-agnostic helpers go in `src/common/utils/` (parsing, formatting, path builders, filesystem predicates, etc.). Placement here is by nature, not usage count: a helper with no domain meaning belongs in `utils/` even when only one feature uses it today.
-- The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
+- The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader, the `config.yml` metadata store) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
 - Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`.
 - No `utils.ts`, `helpers.ts`, or `misc.ts`. If a helper does not have a specific name, it does not have a clear purpose. `src/common/utils/` is the *folder* for purpose-named helpers (`parse.ts`, `format.ts`, `paths.ts`); each file inside still earns its name.
 - No barrel `index.ts` re-exports to "flatten" import paths. The path reflects the structure; do not hide it.
@@ -145,6 +145,18 @@ One line. Labels the block. Does not restate the loop. A reader scrolling past s
   // good, active imperative or noun-phrase label
   // stop index failures blocking the tree render
   // drop stale entries before the new ones land
+  ```
+
+- **Plain words, not jargon.** A comment has to land on the first read for someone who knows TypeScript but not this codebase. Skip abstract jargon (`round-trip`, `hydrate`, `reify`) and tangled relative clauses (`keys this build does not interpret`) in favour of the concrete action. If you have to read it twice, rewrite it.
+
+  ```ts
+  // bad, jargon plus a clause that needs a second read
+  // round-trip keys this build does not interpret
+  // hydrate the cache from the persisted snapshot
+
+  // good, plain concrete action
+  // keep any keys it does not use
+  // load the cache from disk
   ```
 
 If you are unsure, read the comment aloud. If it sounds like a sentence from a design doc, rewrite it as a fragment a person would jot on a sticky note.

@@ -56,17 +56,16 @@ body {
   position: relative;
   flex: 1;
   overflow: auto;
-  padding: 16px;
 }
 
-#board {
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 14px;
+#surface {
+  position: relative;
+  min-width: 100%;
+  min-height: 100%;
 }
 
 .card {
+  position: absolute;
   display: flex;
   flex-direction: column;
   width: 240px;
@@ -77,13 +76,19 @@ body {
   border-radius: 6px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
-  cursor: pointer;
+  cursor: grab;
   overflow: hidden;
   user-select: none;
 }
 
 .card:hover {
   border-color: var(--vscode-focusBorder);
+}
+
+.card.dragging {
+  cursor: grabbing;
+  z-index: 5;
+  box-shadow: 0 8px 20px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.45));
 }
 
 .card .title {

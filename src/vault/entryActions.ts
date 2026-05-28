@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { pathExists } from '../common/utils/fs';
+import { VaultConfig } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 import { ensureNoteExt, validateEntryName } from './entryName';
 
@@ -43,7 +44,7 @@ export function registerCopyContents(): vscode.Disposable {
   );
 }
 
-export function registerRenameEntry(): vscode.Disposable {
+export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
   return vscode.commands.registerCommand('promptStudio.rename', async (target?: VaultNode) => {
     if (!target) {
       return;
@@ -74,5 +75,6 @@ export function registerRenameEntry(): vscode.Disposable {
     }
 
     await vscode.workspace.fs.rename(vscode.Uri.file(target.absPath), destination);
+    config.relocate(target.absPath, destination.fsPath);
   });
 }

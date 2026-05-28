@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 
+import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { VisualPanel } from './visualPanel';
 
 export function registerOpenVisual(
   vaultManager: VaultManager,
+  config: VaultConfig,
   extensionUri: vscode.Uri
 ): vscode.Disposable {
   return vscode.commands.registerCommand(
@@ -18,7 +20,7 @@ export function registerOpenVisual(
       }
 
       const folder = contextNode?.kind === 'folder' ? contextNode.absPath : root;
-      VisualPanel.show(extensionUri, root, folder);
+      VisualPanel.show(extensionUri, config, root, folder);
     }
   );
 }

@@ -1,0 +1,251 @@
+import * as path from 'node:path';
+
+import * as vscode from 'vscode';
+import { parse, stringify } from 'yaml';
+
+import { VaultManager } from './vaultManager';
+
+export interface NotePosition {
+  x: number;
+  y: number;
+}
+
+type NoteMetadata = Record<string, unknown>;
+
+export const CONFIG_FILENAME = 'config.yml';
+const WRITE_DEBOUNCE_MS = 200;
+const SELF_WRITE_GRACE_MS = 1000;
+const BANNER = '# Prompt Studio per-note metadata. Safe to edit and commit.\n';
+
+// --- helpers ---
+
+// config.yml keys are vault-relative with forward slashes on every platform
+function toConfigKey(relPath: string): string {
+  return relPath.split(path.sep).join('/');
+}
+
+// pull a finite x/y pair out of a metadata bag, else undefined
+function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
+  const visual = meta?.visual;
+  if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
+    return undefined;
+  }
+  const { x, y } = visual as Record<string, unknown>;
+  if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+    return { x, y };
+  }
+  return undefined;
+}
+
+// read the `notes` map out of parsed config.yml, skipping malformed entries
+function notesFrom(parsed: unknown): Map<string, NoteMetadata> {
+  const out = new Map<string, NoteMetadata>();
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return out;
+  }
+  const notes = (parsed as Record<string, unknown>).notes;
+  if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
+    return out;
+  }
+  for (const [relPath, meta] of Object.entries(notes as Record<string, unknown>)) {
+    if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+      out.set(toConfigKey(relPath), meta as NoteMetadata);
+    }
+  }
+  return out;
+}
+
+// --- exports ---
+
+// per-note metadata stored in <vault>/config.yml, keeps any keys it does not use when rewriting
+export class VaultConfig implements vscode.Disposable {
+  private readonly emitter = new vscode.EventEmitter<void>();
+  private readonly watcherSubs: vscode.Disposable[] = [];
+  private readonly vaultSub: vscode.Disposable;
+  private watcher: vscode.FileSystemWatcher | undefined;
+  private entries = new Map<string, NoteMetadata>();
+  private vaultRoot: string | undefined;
+  private writeTimer: ReturnType<typeof setTimeout> | undefined;
+  private lastSelfWrite = 0;
+
+  readonly onDidChange: vscode.Event<void> = this.emitter.event;
+
+  constructor(private readonly vaultManager: VaultManager) {
+    this.vaultSub = vaultManager.onDidChangeVault(() => this.reload());
+    this.reload();
+  }
+
+  getPosition(absPath: string): NotePosition | undefined {
+    const key = this.configKeyOf(absPath);
+    return key === undefined ? undefined : positionOf(this.entries.get(key));
+  }
+
+  setPosition(absPath: string, position: NotePosition): void {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return;
+    }
+
+    const meta = this.entries.get(key) ?? {};
+    const visual = meta.visual && typeof meta.visual === 'object' && !Array.isArray(meta.visual)
+      ? { ...(meta.visual as Record<string, unknown>) }
+      : {};
+    visual.x = Math.round(position.x);
+    visual.y = Math.round(position.y);
+    meta.visual = visual;
+    this.entries.set(key, meta);
+
+    this.scheduleWrite();
+  }
+
+  // follow a renamed or moved entry, remapping its own key and any descendants
+  relocate(oldAbsPath: string, newAbsPath: string): void {
+    const oldKey = this.configKeyOf(oldAbsPath);
+    const newKey = this.configKeyOf(newAbsPath);
+    if (oldKey === undefined || newKey === undefined || oldKey === newKey) {
+      return;
+    }
+
+    let changed = false;
+    for (const key of [...this.entries.keys()]) {
+      let nextKey: string | undefined;
+      if (key === oldKey) {
+        nextKey = newKey;
+      } else if (key.startsWith(`${oldKey}/`)) {
+        nextKey = newKey + key.slice(oldKey.length);
+      }
+      if (nextKey !== undefined) {
+        const meta = this.entries.get(key)!;
+        this.entries.delete(key);
+        this.entries.set(nextKey, meta);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.scheduleWrite();
+      this.emitter.fire();
+    }
+  }
+
+  dispose(): void {
+    this.teardownWatcher();
+    this.vaultSub.dispose();
+    if (this.writeTimer) {
+      clearTimeout(this.writeTimer);
+    }
+    this.emitter.dispose();
+  }
+
+  private configKeyOf(absPath: string): string | undefined {
+    return this.vaultRoot === undefined
+      ? undefined
+      : toConfigKey(path.relative(this.vaultRoot, absPath));
+  }
+
+  // re-point at the current vault root, reloading config.yml and rearming its watcher
+  private reload(): void {
+    this.teardownWatcher();
+    this.entries = new Map();
+    this.vaultRoot = this.vaultManager.getVaultRoot();
+    if (!this.vaultRoot) {
+      this.emitter.fire();
+      return;
+    }
+
+    const pattern = new vscode.RelativePattern(this.vaultRoot, CONFIG_FILENAME);
+    this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    this.watcherSubs.push(
+      this.watcher.onDidCreate(() => this.handleExternalChange()),
+      this.watcher.onDidChange(() => this.handleExternalChange()),
+      this.watcher.onDidDelete(() => this.handleExternalChange())
+    );
+
+    void this.loadFromDisk(this.vaultRoot).then(() => this.emitter.fire());
+  }
+
+  private teardownWatcher(): void {
+    for (const sub of this.watcherSubs) {
+      sub.dispose();
+    }
+    this.watcherSubs.length = 0;
+    this.watcher?.dispose();
+    this.watcher = undefined;
+  }
+
+  private async loadFromDisk(root: string): Promise<void> {
+    const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
+    let raw: string;
+    try {
+      raw = new TextDecoder('utf-8').decode(await vscode.workspace.fs.readFile(configUri));
+    } catch {
+      return;
+    }
+
+    try {
+      this.entries = notesFrom(parse(raw));
+    } catch (err) {
+      void vscode.window.showWarningMessage(
+        `Prompt Studio: could not parse ${CONFIG_FILENAME} - ${(err as Error).message}`
+      );
+    }
+  }
+
+  // an external edit landed, drop the in-memory copy and re-read
+  private handleExternalChange(): void {
+    if (Date.now() - this.lastSelfWrite < SELF_WRITE_GRACE_MS) {
+      return;
+    }
+    const root = this.vaultRoot;
+    if (!root) {
+      return;
+    }
+    void (async () => {
+      this.entries = new Map();
+      await this.loadFromDisk(root);
+      this.emitter.fire();
+    })();
+  }
+
+  private scheduleWrite(): void {
+    if (this.writeTimer) {
+      clearTimeout(this.writeTimer);
+    }
+    this.writeTimer = setTimeout(() => {
+      this.writeTimer = undefined;
+      void this.flush();
+    }, WRITE_DEBOUNCE_MS);
+  }
+
+  private async flush(): Promise<void> {
+    const root = this.vaultRoot;
+    if (!root) {
+      return;
+    }
+
+    const notes: Record<string, NoteMetadata> = {};
+    const keys = [...this.entries.keys()].sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    );
+    for (const key of keys) {
+      const meta = this.entries.get(key)!;
+      if (Object.keys(meta).length > 0) {
+        notes[key] = meta;
+      }
+    }
+    if (Object.keys(notes).length === 0) {
+      return;
+    }
+
+    const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
+    const body = BANNER + stringify({ notes });
+    try {
+      this.lastSelfWrite = Date.now();
+      await vscode.workspace.fs.writeFile(configUri, new TextEncoder().encode(body));
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        `Prompt Studio: could not write ${CONFIG_FILENAME} - ${(err as Error).message}`
+      );
+    }
+  }
+}

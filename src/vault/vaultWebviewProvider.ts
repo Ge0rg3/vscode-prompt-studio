@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { moveVaultEntry } from './moveEntry';
@@ -37,6 +38,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
 
   constructor(
     private readonly vaultManager: VaultManager,
+    private readonly config: VaultConfig,
     private readonly extensionUri: vscode.Uri
   ) {
     this.rebuildWatcher();
@@ -128,7 +130,10 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       case 'move': {
         const root = this.vaultManager.getVaultRoot();
         if (!root) return;
-        await moveVaultEntry(root, msg.source, msg.destDir);
+        const destination = await moveVaultEntry(root, msg.source, msg.destDir);
+        if (destination) {
+          this.config.relocate(msg.source, destination);
+        }
         return;
       }
       case 'command':

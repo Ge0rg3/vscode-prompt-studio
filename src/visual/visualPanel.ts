@@ -5,12 +5,14 @@ import * as vscode from 'vscode';
 
 import { isWithin } from '../common/utils/paths';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
 import { readFolder } from './folderContents';
 
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; path: string }
-  | { type: 'navigate'; folder: string };
+  | { type: 'navigate'; folder: string }
+  | { type: 'moveCard'; path: string; x: number; y: number };
 
 const REFRESH_DEBOUNCE_MS = 100;
 
@@ -29,7 +31,12 @@ export class VisualPanel {
   private static current: VisualPanel | undefined;
 
   // reveal the single canvas panel, creating it on first use, then point it at folder
-  static show(extensionUri: vscode.Uri, vaultRoot: string, folder: string): void {
+  static show(
+    extensionUri: vscode.Uri,
+    config: VaultConfig,
+    vaultRoot: string,
+    folder: string
+  ): void {
     if (VisualPanel.current) {
       VisualPanel.current.panel.reveal(vscode.ViewColumn.Active);
       VisualPanel.current.navigate(folder);
@@ -46,7 +53,7 @@ export class VisualPanel {
         localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
       }
     );
-    VisualPanel.current = new VisualPanel(panel, extensionUri, vaultRoot, folder);
+    VisualPanel.current = new VisualPanel(panel, extensionUri, config, vaultRoot, folder);
   }
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -58,6 +65,7 @@ export class VisualPanel {
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
+    private readonly config: VaultConfig,
     private readonly vaultRoot: string,
     initialFolder: string
   ) {
@@ -65,7 +73,8 @@ export class VisualPanel {
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
-      this.panel.onDidDispose(() => this.dispose())
+      this.panel.onDidDispose(() => this.dispose()),
+      this.config.onDidChange(() => this.scheduleRefresh())
     );
     this.rebuildWatcher();
   }
@@ -104,10 +113,18 @@ export class VisualPanel {
     const pattern = new vscode.RelativePattern(this.folder, '*');
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
     this.watcherSubs.push(
-      this.watcher.onDidCreate(() => this.scheduleRefresh()),
-      this.watcher.onDidDelete(() => this.scheduleRefresh()),
-      this.watcher.onDidChange(() => this.scheduleRefresh())
+      this.watcher.onDidCreate((uri) => this.onFolderEvent(uri)),
+      this.watcher.onDidDelete((uri) => this.onFolderEvent(uri)),
+      this.watcher.onDidChange((uri) => this.onFolderEvent(uri))
     );
+  }
+
+  // refresh on note add/delete/change, the config store owns config.yml events
+  private onFolderEvent(uri: vscode.Uri): void {
+    if (path.basename(uri.fsPath) === CONFIG_FILENAME) {
+      return;
+    }
+    this.scheduleRefresh();
   }
 
   // coalesce bursts of fs events into a single debounced state push
@@ -133,11 +150,14 @@ export class VisualPanel {
       case 'navigate':
         this.navigate(msg.folder);
         return;
+      case 'moveCard':
+        this.config.setPosition(msg.path, { x: msg.x, y: msg.y });
+        return;
     }
   }
 
   private async postState(): Promise<void> {
-    const state = await readFolder(this.vaultRoot, this.folder);
+    const state = await readFolder(this.config, this.vaultRoot, this.folder);
     await this.panel.webview.postMessage({ type: 'state', state });
   }
 

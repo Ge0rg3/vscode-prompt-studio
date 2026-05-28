@@ -6,7 +6,7 @@ A VSCode extension that turns a folder of markdown files into an Obsidian-like v
 
 - **Vault.** Point it at any folder of `.md` files. Storage stays plain markdown on disk: portable, git-friendly, and readable without the extension.
 - **Sidebar tree.** Browse, create, rename, delete, and drag-reorganize notes from a dedicated activity-bar panel.
-- **Visual canvas.** Open any folder as a card canvas. Drag, resize, and color notes; layout persists as note metadata.
+- **Visual canvas.** Open any folder as a card canvas. Drag notes and folders to reposition them, OneNote style. Positions persist as note metadata.
 - **Wikilinks.** `[[Other Note]]` with completion, cmd-click navigation, hover preview, and rename refactoring.
 - **Prompts.** Notes marked as prompts can declare `{{variables}}`. Pick a prompt, fill in the blanks, then copy to clipboard or insert into the active editor.
 
@@ -19,16 +19,23 @@ Per-note metadata (type, tags, visual layout) lives in a single `config.yml` at 
 ```yaml
 notes:
   Welcome.md:
-    tags: [intro]
+    tags:
+      - intro
   prompts/Refactor.md:
     type: prompt
-    tags: [code, refactor]
-    visual: { x: 200, y: 100, color: pink }
+    tags:
+      - code
+      - refactor
+    visual:
+      x: 200
+      y: 100
 ```
+
+The extension only reads and writes the `visual` position today. Any other keys (`type`, `tags`) are left untouched when it rewrites the file.
 
 ## Status
 
-Early development. The current build ships a sidebar vault view and a read-only visual canvas, both backed by a configurable folder location. The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
+Early development. The current build ships a sidebar vault view and a draggable visual canvas, both backed by a configurable folder location. The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
 
 ### Configure the vault
 
@@ -61,9 +68,9 @@ Launch it from:
 - **Right-click a folder.** The **Open as Canvas** entry opens that folder. Right-clicking the empty area opens the root.
 - **Command palette.** **Prompt Studio: Open Visual Canvas** opens the root.
 
-The canvas is read-only for now: click a note card to open it in an editor, click a folder card to navigate into it. No drag, resize, color, or saved layout yet.
+Drag a card to reposition it anywhere on the canvas, OneNote style. The position is saved to the `visual` block of the note's `config.yml` entry, so the layout survives reopening the canvas and follows the note when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot. Click a card without dragging to act on it: a note opens in an editor, a folder card navigates into it.
 
-Wikilinks and prompts are not built yet.
+Cards are a fixed size and there is no color or resize yet. Wikilinks and prompts are not built yet.
 
 ## Develop
 

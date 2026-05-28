@@ -5,28 +5,28 @@ import * as vscode from 'vscode';
 import { pathExists } from '../common/utils/fs';
 import { isWithin } from '../common/utils/paths';
 
-// move sourcePath into targetDir, no-op when already there, surface a UI error on conflict
+// move sourcePath into targetDir, return the new path, or undefined on a no-op or conflict
 export async function moveVaultEntry(
   vaultRoot: string,
   sourcePath: string,
   targetDir: string
-): Promise<boolean> {
+): Promise<string | undefined> {
   const resolvedRoot = path.resolve(vaultRoot);
   const resolvedSource = path.resolve(sourcePath);
   const resolvedTarget = path.resolve(targetDir);
 
   if (!isWithin(resolvedSource, resolvedRoot) || resolvedSource === resolvedRoot) {
-    return false;
+    return undefined;
   }
   if (!isWithin(resolvedTarget, resolvedRoot)) {
-    return false;
+    return undefined;
   }
   if (isWithin(resolvedTarget, resolvedSource)) {
     void vscode.window.showErrorMessage('Cannot move a folder into itself.');
-    return false;
+    return undefined;
   }
   if (path.dirname(resolvedSource) === resolvedTarget) {
-    return false;
+    return undefined;
   }
 
   const destination = path.join(resolvedTarget, path.basename(resolvedSource));
@@ -34,9 +34,9 @@ export async function moveVaultEntry(
     void vscode.window.showErrorMessage(
       `"${path.basename(resolvedSource)}" already exists in the destination folder.`
     );
-    return false;
+    return undefined;
   }
 
   await vscode.workspace.fs.rename(vscode.Uri.file(resolvedSource), vscode.Uri.file(destination));
-  return true;
+  return destination;
 }

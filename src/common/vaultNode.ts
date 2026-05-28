@@ -1,7 +1,5 @@
-export type VaultNodeKind = 'folder' | 'note';
-
 export interface VaultNode {
-  kind: VaultNodeKind;
+  kind: 'folder' | 'note';
   absPath: string;
   name: string;
 }
