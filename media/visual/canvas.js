@@ -30,6 +30,18 @@
     surfaceEl.style.height = maxY + SURFACE_MARGIN + 'px';
   }
 
+  // raise a card above every other so the most recently dragged one stays on top
+  function bringToFront(card, el) {
+    let topZ = 0;
+    for (const other of cards) {
+      if (typeof other.z === 'number') {
+        topZ = Math.max(topZ, other.z);
+      }
+    }
+    card.z = topZ + 1;
+    el.style.zIndex = String(card.z);
+  }
+
   // drag to reposition, or run onClick when the pointer barely moved
   function attachDrag(el, card, onClick) {
     el.addEventListener('pointerdown', (event) => {
@@ -49,6 +61,7 @@
         if (!dragging && Math.abs(dx) + Math.abs(dy) > DRAG_THRESHOLD) {
           dragging = true;
           el.classList.add('dragging');
+          bringToFront(card, el);
         }
         if (dragging) {
           card.x = Math.max(0, Math.round(originX + dx));
@@ -66,7 +79,7 @@
         if (dragging) {
           el.classList.remove('dragging');
           resizeSurface();
-          vscode.postMessage({ type: 'moveCard', path: card.absPath, x: card.x, y: card.y });
+          vscode.postMessage({ type: 'moveCard', path: card.absPath, x: card.x, y: card.y, z: card.z });
         } else {
           onClick();
         }
@@ -86,6 +99,9 @@
     el.className = 'card';
     el.style.left = card.x + 'px';
     el.style.top = card.y + 'px';
+    if (typeof card.z === 'number') {
+      el.style.zIndex = String(card.z);
+    }
 
     const title = document.createElement('div');
     title.className = 'title';

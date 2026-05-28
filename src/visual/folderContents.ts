@@ -15,6 +15,7 @@ export interface VisualCard {
   color?: string;
   x: number;
   y: number;
+  z?: number;
 }
 
 export interface Breadcrumb {
@@ -99,12 +100,13 @@ function autoPosition(index: number): NotePosition {
   };
 }
 
-// give each card its saved position, falling back to a stable grid slot
+// give each card its saved position and stacking order
 function placeCards(config: VaultConfig, cards: VisualCard[]): void {
   for (let i = 0; i < cards.length; i++) {
     const position = config.getPosition(cards[i].absPath) ?? autoPosition(i);
     cards[i].x = position.x;
     cards[i].y = position.y;
+    cards[i].z = config.getZ(cards[i].absPath);
   }
 }
 

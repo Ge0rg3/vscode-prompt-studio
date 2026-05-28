@@ -24,7 +24,7 @@ function toConfigKey(relPath: string): string {
   return relPath.split(path.sep).join('/');
 }
 
-// the visual block of a metadata bag, or undefined when missing or malformed
+// the visual block within a note's metadata, or undefined if absent or malformed
 function visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
   const visual = meta?.visual;
   if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
@@ -39,7 +39,7 @@ function cloneVisual(meta: NoteMetadata): Record<string, unknown> {
   return visual ? { ...visual } : {};
 }
 
-// pull a finite x/y pair out of a metadata bag, else undefined
+// the x/y position saved in a note's metadata
 function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
   const visual = visualOf(meta);
   if (!visual) {
@@ -52,10 +52,16 @@ function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
   return undefined;
 }
 
-// pull a palette color name out of a metadata bag, else undefined
+// the palette color saved in a note's metadata
 function colorOf(meta: NoteMetadata | undefined): string | undefined {
   const color = visualOf(meta)?.color;
   return typeof color === 'string' ? color : undefined;
+}
+
+// the stacking order saved in a note's metadata
+function zOf(meta: NoteMetadata | undefined): number | undefined {
+  const z = visualOf(meta)?.z;
+  return typeof z === 'number' && Number.isFinite(z) ? z : undefined;
 }
 
 // read the `notes` map out of parsed config.yml, skipping malformed entries
@@ -111,6 +117,27 @@ export class VaultConfig implements vscode.Disposable {
     const visual = cloneVisual(meta);
     visual.x = Math.round(position.x);
     visual.y = Math.round(position.y);
+    meta.visual = visual;
+    this.entries.set(key, meta);
+
+    this.scheduleWrite();
+  }
+
+  getZ(absPath: string): number | undefined {
+    const key = this.configKeyOf(absPath);
+    return key === undefined ? undefined : zOf(this.entries.get(key));
+  }
+
+  // raise a card's stacking order so it sits in front of overlapping cards
+  setZ(absPath: string, z: number): void {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return;
+    }
+
+    const meta = this.entries.get(key) ?? {};
+    const visual = cloneVisual(meta);
+    visual.z = Math.round(z);
     meta.visual = visual;
     this.entries.set(key, meta);
 

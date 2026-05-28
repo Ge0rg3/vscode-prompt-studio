@@ -159,11 +159,22 @@ One line. Labels the block. Does not restate the loop. A reader scrolling past s
   // load the cache from disk
   ```
 
+- **Name the thing, not a vague stand-in.** When a comment refers to a parameter or value, call it what it is in the domain, not a cute or generic placeholder noun. The reader should not have to map "a metadata bag" back to the `NoteMetadata` it stands for.
+
+  ```ts
+  // bad, vague placeholder noun plus a redundant return branch
+  // pull a finite stacking order out of a metadata bag, else undefined
+
+  // good, names the actual value, the signature already carries the empty case
+  // the stacking order saved in a note's metadata
+  ```
+
 If you are unsure, read the comment aloud. If it sounds like a sentence from a design doc, rewrite it as a fragment a person would jot on a sticky note.
 
 **Other rules.**
 
 - Comments explain *why* a block exists, or what it accomplishes at a higher level than the code itself. They never restate the code.
+- Do not append the null/undefined return branch a signature already declares. A helper typed `: number | undefined` needs no trailing `// ..., else undefined` or `// ..., or null`. Name what it yields, the type carries the empty case. Mention the empty case only when *when* it happens is the non-obvious point (`// the visual block, or undefined if absent or malformed`).
 - Comments stay glued to the block they describe (no blank line between the comment and its block; one blank line before the comment to separate it from the previous block).
 - No "Label: explanation" format. Write `// validate the path` not `// Validation: validates the path`.
 - No first-person plural ("we fetch", "we iterate"). Imperative or noun phrase only.
