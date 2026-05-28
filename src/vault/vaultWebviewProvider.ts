@@ -63,6 +63,14 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     this.disposables.push(view.webview.onDidReceiveMessage((msg) => this.handle(msg)));
   }
 
+  expandAll(): void {
+    void this.view?.webview.postMessage({ type: 'expandAll' });
+  }
+
+  collapseAll(): void {
+    void this.view?.webview.postMessage({ type: 'collapseAll' });
+  }
+
   dispose(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -175,4 +183,11 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       treeJs: treeJs.toString()
     });
   }
+}
+
+export function registerVaultViewCommands(provider: VaultWebviewProvider): vscode.Disposable {
+  return vscode.Disposable.from(
+    vscode.commands.registerCommand('promptStudio.expandAll', () => provider.expandAll()),
+    vscode.commands.registerCommand('promptStudio.collapseAll', () => provider.collapseAll())
+  );
 }

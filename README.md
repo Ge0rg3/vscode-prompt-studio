@@ -51,7 +51,7 @@ The path persists in the `promptStudio.vaultPath` setting (empty string means "p
 
 Once a vault is set:
 
-- **Title-bar buttons.** The view header shows **New Note** and **New Folder**. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
+- **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
 - **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root.
 - **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, and **Reveal in Explorer**.
 - **Right-click a note.** Offers **Open**, **Rename**, **Copy Contents** (copies the markdown body to the clipboard), and **Reveal in Explorer**.
@@ -65,6 +65,7 @@ Open any folder (or the vault root) as a pinboard of cards in the editor area. E
 Launch it from:
 
 - **Title-bar button.** The **Open Visual Canvas** button in the view header opens the vault root.
+- **Hover a folder.** An **Open Visual Canvas** icon appears on the right of the row in the sidebar tree, opening that folder.
 - **Right-click a folder.** The **Open as Canvas** entry opens that folder. Right-clicking the empty area opens the root.
 - **Command palette.** **Prompt Studio: Open Visual Canvas** opens the root.
 

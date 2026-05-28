@@ -9,7 +9,7 @@ import {
   registerRenameEntry,
   registerRevealInOS
 } from './vault/entryActions';
-import { VaultWebviewProvider } from './vault/vaultWebviewProvider';
+import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWebviewProvider';
 import { registerOpenVisual } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
@@ -27,6 +27,7 @@ export function activate(context: vscode.ExtensionContext): void {
       webviewOptions: { retainContextWhenHidden: true }
     }),
     registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
+    registerVaultViewCommands(provider),
     registerOpenVisual(vaultManager, config, context.extensionUri),
     registerCreateNote(vaultManager),
     registerCreateFolder(vaultManager),

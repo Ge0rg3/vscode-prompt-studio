@@ -24,8 +24,14 @@
 
   window.addEventListener('message', (event) => {
     const msg = event.data;
-    if (msg && msg.type === 'state') {
+    if (!msg) return;
+    if (msg.type === 'state') {
       state = msg.state;
+      render();
+    } else if (msg.type === 'expandAll') {
+      expandAll();
+    } else if (msg.type === 'collapseAll') {
+      expanded.clear();
       render();
     }
   });
@@ -124,6 +130,24 @@
     label.textContent = isFolder ? node.name : stripMdExt(node.name);
     row.appendChild(label);
 
+    if (isFolder) {
+      const actions = document.createElement('span');
+      actions.className = 'actions';
+      const canvasAction = document.createElement('span');
+      canvasAction.className = 'action codicon codicon-layout';
+      canvasAction.title = 'Open Visual Canvas';
+      canvasAction.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: 'command',
+          command: 'promptStudio.openVisual',
+          node: serialize(node)
+        });
+      });
+      actions.appendChild(canvasAction);
+      row.appendChild(actions);
+    }
+
     row.addEventListener('click', (e) => {
       e.stopPropagation();
       select(node.absPath);
@@ -187,6 +211,23 @@
       expanded.add(node.absPath);
     }
     render();
+  }
+
+  function expandAll() {
+    if (!state) return;
+    addFolderPaths(state.children);
+    render();
+  }
+
+  function addFolderPaths(nodes) {
+    for (const node of nodes) {
+      if (node.kind === 'folder') {
+        expanded.add(node.absPath);
+        if (node.children) {
+          addFolderPaths(node.children);
+        }
+      }
+    }
   }
 
   function select(path) {

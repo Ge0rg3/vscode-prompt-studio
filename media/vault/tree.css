@@ -147,6 +147,35 @@ body.focused .row.selected {
   padding-left: 4px;
 }
 
+.row .actions {
+  display: none;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.row:hover .actions {
+  display: inline-flex;
+}
+
+.row .action {
+  width: 22px;
+  height: var(--row-height);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+
+.row .action.codicon {
+  font-size: 16px;
+}
+
+.row .action:hover {
+  background: var(--vscode-toolbar-hoverBackground);
+  border-radius: 4px;
+}
+
 #context-menu {
   position: fixed;
   z-index: 1000;
