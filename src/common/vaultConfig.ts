@@ -24,17 +24,38 @@ function toConfigKey(relPath: string): string {
   return relPath.split(path.sep).join('/');
 }
 
-// pull a finite x/y pair out of a metadata bag, else undefined
-function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
+// the visual block of a metadata bag, or undefined when missing or malformed
+function visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
   const visual = meta?.visual;
   if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
     return undefined;
   }
-  const { x, y } = visual as Record<string, unknown>;
+  return visual as Record<string, unknown>;
+}
+
+// a mutable copy of the visual block
+function cloneVisual(meta: NoteMetadata): Record<string, unknown> {
+  const visual = visualOf(meta);
+  return visual ? { ...visual } : {};
+}
+
+// pull a finite x/y pair out of a metadata bag, else undefined
+function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
+  const visual = visualOf(meta);
+  if (!visual) {
+    return undefined;
+  }
+  const { x, y } = visual;
   if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
     return { x, y };
   }
   return undefined;
+}
+
+// pull a palette color name out of a metadata bag, else undefined
+function colorOf(meta: NoteMetadata | undefined): string | undefined {
+  const color = visualOf(meta)?.color;
+  return typeof color === 'string' ? color : undefined;
 }
 
 // read the `notes` map out of parsed config.yml, skipping malformed entries
@@ -87,11 +108,34 @@ export class VaultConfig implements vscode.Disposable {
     }
 
     const meta = this.entries.get(key) ?? {};
-    const visual = meta.visual && typeof meta.visual === 'object' && !Array.isArray(meta.visual)
-      ? { ...(meta.visual as Record<string, unknown>) }
-      : {};
+    const visual = cloneVisual(meta);
     visual.x = Math.round(position.x);
     visual.y = Math.round(position.y);
+    meta.visual = visual;
+    this.entries.set(key, meta);
+
+    this.scheduleWrite();
+  }
+
+  getColor(absPath: string): string | undefined {
+    const key = this.configKeyOf(absPath);
+    return key === undefined ? undefined : colorOf(this.entries.get(key));
+  }
+
+  // set a palette color, or pass undefined to clear it back to the theme default
+  setColor(absPath: string, color: string | undefined): void {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return;
+    }
+
+    const meta = this.entries.get(key) ?? {};
+    const visual = cloneVisual(meta);
+    if (color === undefined) {
+      delete visual.color;
+    } else {
+      visual.color = color;
+    }
     meta.visual = visual;
     this.entries.set(key, meta);
 

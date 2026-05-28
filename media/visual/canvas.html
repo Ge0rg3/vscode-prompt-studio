@@ -7,12 +7,13 @@
   <link rel="stylesheet" href="{{canvasCss}}" />
   <title>Visual</title>
 </head>
-<body>
+<body data-note-colors='{{noteColors}}'>
   <nav id="breadcrumbs"></nav>
   <div id="canvas">
     <div id="surface"></div>
     <div id="empty" class="hidden">This folder is empty.</div>
   </div>
+  <div id="context-menu" class="hidden"></div>
   <script nonce="{{nonce}}" src="{{canvasJs}}"></script>
 </body>
 </html>

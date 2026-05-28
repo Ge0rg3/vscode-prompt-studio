@@ -4,12 +4,16 @@
   const breadcrumbsEl = document.getElementById('breadcrumbs');
   const surfaceEl = document.getElementById('surface');
   const emptyEl = document.getElementById('empty');
+  const menuEl = document.getElementById('context-menu');
+  const canvasEl = document.getElementById('canvas');
 
   const CARD_W = 240;
   const CARD_H = 170;
   const SURFACE_MARGIN = 80;
   const DRAG_THRESHOLD = 3;
+  const NOTE_COLORS = JSON.parse(document.body.dataset.noteColors || '[]');
 
+  let state = null;
   let cards = [];
 
   // --- helpers ---
@@ -95,11 +99,20 @@
     title.appendChild(label);
     el.appendChild(title);
 
+    el.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      showMenu(event.clientX, event.clientY, menuFor(card), card);
+    });
+
     return el;
   }
 
   function noteCard(card) {
     const el = baseCard(card, 'codicon-note');
+    if (card.color) {
+      el.classList.add('colored', 'color-' + card.color);
+    }
     const text = (card.preview || '').trim();
 
     const preview = document.createElement('pre');
@@ -155,7 +168,8 @@
     }
   }
 
-  function render(state) {
+  function render(next) {
+    state = next;
     cards = state.cards;
     renderBreadcrumbs(state.breadcrumbs);
     surfaceEl.replaceChildren();
@@ -165,6 +179,99 @@
     }
     resizeSurface();
   }
+
+  // --- context menu ---
+
+  // swatch row plus rename for notes, rename only for folders
+  function menuFor(card) {
+    if (card.kind === 'note') {
+      return [
+        { kind: 'swatches', card },
+        'sep',
+        { label: 'Rename', cmd: 'promptStudio.rename' }
+      ];
+    }
+    return [{ label: 'Rename', cmd: 'promptStudio.rename' }];
+  }
+
+  // apply the color locally, then persist it
+  function recolor(card, color) {
+    hideMenu();
+    card.color = color || undefined;
+    render(state);
+    vscode.postMessage({ type: 'setColor', path: card.absPath, color: color || null });
+  }
+
+  // color dots with a leading clear-color swatch
+  function swatchRow(card) {
+    const row = document.createElement('div');
+    row.className = 'swatch-row';
+
+    const none = document.createElement('span');
+    none.className = 'swatch none';
+    if (!card.color) none.classList.add('selected');
+    none.title = 'No color';
+    none.addEventListener('click', () => recolor(card, null));
+    row.appendChild(none);
+
+    for (const color of NOTE_COLORS) {
+      const dot = document.createElement('span');
+      dot.className = 'swatch color-' + color;
+      if (card.color === color) dot.classList.add('selected');
+      dot.title = color;
+      dot.addEventListener('click', () => recolor(card, color));
+      row.appendChild(dot);
+    }
+    return row;
+  }
+
+  function showMenu(x, y, items, card) {
+    menuEl.replaceChildren();
+    for (const entry of items) {
+      if (entry === 'sep') {
+        const sep = document.createElement('div');
+        sep.className = 'menu-sep';
+        menuEl.appendChild(sep);
+        continue;
+      }
+      if (entry.kind === 'swatches') {
+        menuEl.appendChild(swatchRow(entry.card));
+        continue;
+      }
+
+      const item = document.createElement('div');
+      item.className = 'menu-item';
+      item.textContent = entry.label;
+      item.addEventListener('click', () => {
+        hideMenu();
+        vscode.postMessage({ type: 'command', command: entry.cmd, node: serialize(card) });
+      });
+      menuEl.appendChild(item);
+    }
+    menuEl.classList.remove('hidden');
+
+    const maxX = Math.max(0, window.innerWidth - menuEl.offsetWidth - 4);
+    const maxY = Math.max(0, window.innerHeight - menuEl.offsetHeight - 4);
+    menuEl.style.left = `${Math.min(x, maxX)}px`;
+    menuEl.style.top = `${Math.min(y, maxY)}px`;
+  }
+
+  function hideMenu() {
+    menuEl.classList.add('hidden');
+  }
+
+  function serialize(card) {
+    return { kind: card.kind, absPath: card.absPath, name: card.name };
+  }
+
+  document.addEventListener('mousedown', (event) => {
+    if (!menuEl.contains(event.target)) hideMenu();
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') hideMenu();
+  });
+  window.addEventListener('blur', hideMenu);
+  canvasEl.addEventListener('scroll', hideMenu, true);
 
   // --- inbound state ---
 

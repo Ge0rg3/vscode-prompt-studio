@@ -6,15 +6,20 @@ import * as vscode from 'vscode';
 import { isWithin } from '../common/utils/paths';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
 import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
+import { VaultNode } from '../common/vaultNode';
 import { readFolder } from './folderContents';
+import { isNoteColor, NOTE_COLORS } from './noteColors';
 
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; path: string }
   | { type: 'navigate'; folder: string }
-  | { type: 'moveCard'; path: string; x: number; y: number };
+  | { type: 'moveCard'; path: string; x: number; y: number }
+  | { type: 'setColor'; path: string; color: string | null }
+  | { type: 'command'; command: string; node: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
+const ALLOWED_COMMANDS = new Set(['promptStudio.rename']);
 
 // --- helpers ---
 
@@ -153,6 +158,18 @@ export class VisualPanel {
       case 'moveCard':
         this.config.setPosition(msg.path, { x: msg.x, y: msg.y });
         return;
+      case 'setColor':
+        if (msg.color === null) {
+          this.config.setColor(msg.path, undefined);
+        } else if (isNoteColor(msg.color)) {
+          this.config.setColor(msg.path, msg.color);
+        }
+        return;
+      case 'command':
+        if (ALLOWED_COMMANDS.has(msg.command)) {
+          await vscode.commands.executeCommand(msg.command, msg.node);
+        }
+        return;
     }
   }
 
@@ -189,7 +206,8 @@ export class VisualPanel {
       nonce,
       codiconCss: codiconCss.toString(),
       canvasCss: canvasCss.toString(),
-      canvasJs: canvasJs.toString()
+      canvasJs: canvasJs.toString(),
+      noteColors: JSON.stringify(NOTE_COLORS)
     });
   }
 }

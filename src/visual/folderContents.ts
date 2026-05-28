@@ -9,8 +9,10 @@ export type VisualCardKind = 'folder' | 'note';
 export interface VisualCard {
   kind: VisualCardKind;
   absPath: string;
+  name: string;
   title: string;
   preview?: string;
+  color?: string;
   x: number;
   y: number;
 }
@@ -124,15 +126,17 @@ export async function readFolder(
     }
     const abs = path.join(folder, name);
     if (type === vscode.FileType.Directory) {
-      folders.push({ kind: 'folder', absPath: abs, title: name, x: 0, y: 0 });
+      folders.push({ kind: 'folder', absPath: abs, name, title: name, x: 0, y: 0 });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
       const raw = await readText(abs);
       const stem = name.slice(0, -NOTE_EXT.length);
       notes.push({
         kind: 'note',
         absPath: abs,
+        name,
         title: deriveTitle(raw, stem),
         preview: previewOf(raw),
+        color: config.getColor(abs),
         x: 0,
         y: 0
       });

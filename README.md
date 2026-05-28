@@ -29,9 +29,10 @@ notes:
     visual:
       x: 200
       y: 100
+      color: orange
 ```
 
-The extension only reads and writes the `visual` position today. Any other keys (`type`, `tags`) are left untouched when it rewrites the file.
+The extension reads and writes the `visual` block (card position and color) today. Any other keys (`type`, `tags`) are left untouched when it rewrites the file.
 
 ## Status
 
@@ -71,7 +72,9 @@ Launch it from:
 
 Drag a card to reposition it anywhere on the canvas, OneNote style. The position is saved to the `visual` block of the note's `config.yml` entry, so the layout survives reopening the canvas and follows the note when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot. Click a card without dragging to act on it: a note opens in an editor, a folder card navigates into it.
 
-Cards are a fixed size and there is no color or resize yet. Wikilinks and prompts are not built yet.
+Right-click a card for a context menu. Notes and folders both offer **Rename**. A note card also shows a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it. The color saves to the note's `visual` block alongside its position.
+
+Cards are a fixed size and there is no resize yet. Wikilinks and prompts are not built yet.
 
 ## Develop
 
