@@ -142,15 +142,83 @@
     return el;
   }
 
+  // a scaled-down, non-interactive copy of one child card for a folder preview
+  function miniCard(child) {
+    const el = document.createElement('div');
+    el.className = 'mini-card';
+    el.style.left = child.x + 'px';
+    el.style.top = child.y + 'px';
+    if (child.kind === 'note' && child.color) {
+      el.classList.add('colored', 'color-' + child.color);
+    }
+
+    const title = document.createElement('div');
+    title.className = 'mini-title';
+    const icon = document.createElement('span');
+    icon.className = 'codicon ' + (child.kind === 'folder' ? 'codicon-folder' : 'codicon-note');
+    const label = document.createElement('span');
+    label.className = 'mini-label';
+    label.textContent = child.title;
+    title.appendChild(icon);
+    title.appendChild(label);
+    el.appendChild(title);
+
+    if (child.kind === 'note') {
+      const preview = document.createElement('div');
+      preview.className = 'mini-preview';
+      preview.textContent = (child.preview || '').trim();
+      el.appendChild(preview);
+    } else {
+      el.appendChild(folderPreview(child.children || []));
+    }
+    return el;
+  }
+
+  // render the children at their real canvas positions, then shrink that canvas to fit the preview box
+  function folderPreview(children) {
+    const previewBox = document.createElement('div');
+    previewBox.className = 'folder-preview';
+    if (!children.length) {
+      previewBox.classList.add('empty');
+      const glyph = document.createElement('span');
+      glyph.className = 'codicon codicon-folder';
+      previewBox.appendChild(glyph);
+      return previewBox;
+    }
+
+    // the canvas extent measured from its (0, 0) origin, so cards keep their place in the preview
+    let canvasW = 0;
+    let canvasH = 0;
+    for (const child of children) {
+      canvasW = Math.max(canvasW, child.x + CARD_W);
+      canvasH = Math.max(canvasH, child.y + CARD_H);
+    }
+
+    const miniSurface = document.createElement('div');
+    miniSurface.className = 'mini-surface';
+    miniSurface.style.width = canvasW + 'px';
+    miniSurface.style.height = canvasH + 'px';
+    for (const child of children) {
+      miniSurface.appendChild(miniCard(child));
+    }
+    previewBox.appendChild(miniSurface);
+
+    // shrink the canvas to fit the box once it has a measured size, keeping its aspect and origin
+    const observer = new ResizeObserver(() => {
+      if (previewBox.clientWidth === 0 || previewBox.clientHeight === 0) {
+        return;
+      }
+      const scale = Math.min(previewBox.clientWidth / canvasW, previewBox.clientHeight / canvasH);
+      miniSurface.style.transform = `scale(${scale})`;
+      observer.disconnect();
+    });
+    observer.observe(previewBox);
+    return previewBox;
+  }
+
   function folderCard(card) {
     const el = baseCard(card, 'codicon-folder');
-
-    const thumb = document.createElement('div');
-    thumb.className = 'folder-thumb';
-    const glyph = document.createElement('span');
-    glyph.className = 'codicon codicon-folder';
-    thumb.appendChild(glyph);
-    el.appendChild(thumb);
+    el.appendChild(folderPreview(card.children || []));
 
     attachDrag(el, card, () => {
       vscode.postMessage({ type: 'navigate', folder: card.absPath });

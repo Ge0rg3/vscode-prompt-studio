@@ -16,6 +16,7 @@ export interface VisualCard {
   x: number;
   y: number;
   z?: number;
+  children?: VisualCard[];
 }
 
 export interface Breadcrumb {
@@ -31,6 +32,9 @@ export interface VisualState {
 const NOTE_EXT = '.md';
 const PREVIEW_LIMIT = 280;
 const HEADING = /^\s*#{1,6}\s+(.+?)\s*$/;
+
+// how many nested folder layers a folder card previews before falling back to a plain icon
+const PREVIEW_DEPTH = 3;
 
 // auto-placement grid, sized to match the card box in canvas.css
 const CARD_W = 240;
@@ -110,14 +114,8 @@ function placeCards(config: VaultConfig, cards: VisualCard[]): void {
   }
 }
 
-// --- exports ---
-
-// list a folder's direct children as positioned cards, folders first then notes, with a breadcrumb trail
-export async function readFolder(
-  config: VaultConfig,
-  vaultRoot: string,
-  folder: string
-): Promise<VisualState> {
+// a folder's direct children as placed cards, folders first then notes
+async function readEntries(config: VaultConfig, folder: string): Promise<VisualCard[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(folder));
 
   const folders: VisualCard[] = [];
@@ -149,6 +147,37 @@ export async function readFolder(
   notes.sort(byTitle);
   const cards = [...folders, ...notes];
   placeCards(config, cards);
+  return cards;
+}
+
+// fill each folder card's children for the mini preview, recursing `layers` folders deep
+async function attachPreviews(
+  config: VaultConfig,
+  cards: VisualCard[],
+  layers: number
+): Promise<void> {
+  if (layers < 1) {
+    return;
+  }
+
+  for (const card of cards) {
+    if (card.kind === 'folder') {
+      card.children = await readEntries(config, card.absPath);
+      await attachPreviews(config, card.children, layers - 1);
+    }
+  }
+}
+
+// --- exports ---
+
+// a folder's cards plus a breadcrumb trail, each folder card carrying a nested mini preview of its contents
+export async function readFolder(
+  config: VaultConfig,
+  vaultRoot: string,
+  folder: string
+): Promise<VisualState> {
+  const cards = await readEntries(config, folder);
+  await attachPreviews(config, cards, PREVIEW_DEPTH);
 
   return { breadcrumbs: buildBreadcrumbs(vaultRoot, folder), cards };
 }

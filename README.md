@@ -62,7 +62,7 @@ Once a vault is set:
 
 ### Visual canvas
 
-Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview, each subfolder shows as a card you can drill into. Breadcrumbs across the top walk back toward the root. It is styled with the standard VSCode theme colors rather than the bright sticky-note look of similar tools.
+Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview. Each subfolder shows as a card you can drill into, carrying a scaled-down render of its own canvas with the inner cards at their saved spots. The preview recurses through nested folders up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). A folder that is empty, or sits past that depth, falls back to a plain folder glyph. Breadcrumbs across the top walk back toward the root. It is styled with the standard VSCode theme colors rather than the bright sticky-note look of similar tools.
 
 Launch it from:
 
