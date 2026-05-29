@@ -1,0 +1,35 @@
+/* sticky-note palette shared across webviews, fill tints cards and swatches, accent tints sidebar folder icons */
+.color-red {
+  --ps-fill: #f7c9c4;
+  --ps-accent: #cf5b54;
+}
+
+.color-orange {
+  --ps-fill: #f6d8a8;
+  --ps-accent: #c8822f;
+}
+
+.color-yellow {
+  --ps-fill: #f5eaa6;
+  --ps-accent: #b39614;
+}
+
+.color-green {
+  --ps-fill: #cbe6c2;
+  --ps-accent: #5b9d56;
+}
+
+.color-blue {
+  --ps-fill: #bcdcee;
+  --ps-accent: #4a90c2;
+}
+
+.color-purple {
+  --ps-fill: #dac9ec;
+  --ps-accent: #9b72c4;
+}
+
+.color-gray {
+  --ps-fill: #dcdcdc;
+  --ps-accent: #8a8a8a;
+}

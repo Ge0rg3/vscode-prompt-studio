@@ -15,7 +15,7 @@ type NoteMetadata = Record<string, unknown>;
 export const CONFIG_FILENAME = 'config.yml';
 const WRITE_DEBOUNCE_MS = 200;
 const SELF_WRITE_GRACE_MS = 1000;
-const BANNER = '# Prompt Studio per-note metadata. Safe to edit and commit.\n';
+const BANNER = '# Prompt Studio per-entry metadata. Safe to edit and commit.\n';
 
 // --- helpers ---
 
@@ -24,7 +24,7 @@ function toConfigKey(relPath: string): string {
   return relPath.split(path.sep).join('/');
 }
 
-// the visual block within a note's metadata, or undefined if absent or malformed
+// the visual block within an entry's metadata, or undefined if absent or malformed
 function visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
   const visual = meta?.visual;
   if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
@@ -39,7 +39,7 @@ function cloneVisual(meta: NoteMetadata): Record<string, unknown> {
   return visual ? { ...visual } : {};
 }
 
-// the x/y position saved in a note's metadata
+// the x/y position saved in an entry's metadata
 function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
   const visual = visualOf(meta);
   if (!visual) {
@@ -52,13 +52,13 @@ function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
   return undefined;
 }
 
-// the palette color saved in a note's metadata
+// the palette color saved in an entry's metadata
 function colorOf(meta: NoteMetadata | undefined): string | undefined {
   const color = visualOf(meta)?.color;
   return typeof color === 'string' ? color : undefined;
 }
 
-// the stacking order saved in a note's metadata
+// the stacking order saved in an entry's metadata
 function zOf(meta: NoteMetadata | undefined): number | undefined {
   const z = visualOf(meta)?.z;
   return typeof z === 'number' && Number.isFinite(z) ? z : undefined;
@@ -84,7 +84,7 @@ function notesFrom(parsed: unknown): Map<string, NoteMetadata> {
 
 // --- exports ---
 
-// per-note metadata stored in <vault>/config.yml, keeps any keys it does not use when rewriting
+// per-entry metadata stored in <vault>/config.yml, keeps any keys it does not use when rewriting
 export class VaultConfig implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly watcherSubs: vscode.Disposable[] = [];
@@ -167,6 +167,7 @@ export class VaultConfig implements vscode.Disposable {
     this.entries.set(key, meta);
 
     this.scheduleWrite();
+    this.emitter.fire();
   }
 
   // follow a renamed or moved entry, remapping its own key and any descendants

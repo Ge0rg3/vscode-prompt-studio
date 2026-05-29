@@ -140,6 +140,10 @@ body.focused .row.selected {
   font-size: 16px;
 }
 
+.row.colored .icon .codicon {
+  color: var(--ps-accent);
+}
+
 .row .label {
   flex: 1;
   overflow: hidden;

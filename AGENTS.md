@@ -46,7 +46,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 - One folder per feature surface. The folder, its commands, its providers, and its services live together.
 - Generic, stateless, domain-agnostic helpers go in `src/common/utils/` (parsing, formatting, path builders, filesystem predicates, etc.). Placement here is by nature, not usage count: a helper with no domain meaning belongs in `utils/` even when only one feature uses it today.
 - The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader, the `config.yml` metadata store) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
-- Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`.
+- Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`. Styles shared by more than one webview live in `media/common/` (the color palette), mirroring `src/common/`.
 - No `utils.ts`, `helpers.ts`, or `misc.ts`. If a helper does not have a specific name, it does not have a clear purpose. `src/common/utils/` is the *folder* for purpose-named helpers (`parse.ts`, `format.ts`, `paths.ts`); each file inside still earns its name.
 - No barrel `index.ts` re-exports to "flatten" import paths. The path reflects the structure; do not hide it.
 

@@ -58,6 +58,10 @@ body {
   overflow: auto;
 }
 
+#canvas.surface-tinted {
+  background-color: color-mix(in srgb, var(--ps-fill) 20%, var(--vscode-editor-background));
+}
+
 #surface {
   position: relative;
   min-width: 100%;
@@ -213,6 +217,7 @@ body {
 
 .card.colored,
 .mini-card.colored {
+  background-color: var(--ps-fill);
   color: #1f1f1f;
   border-color: rgba(0, 0, 0, 0.2);
 }
@@ -222,34 +227,6 @@ body {
 .mini-card.colored .mini-title .codicon,
 .mini-card.colored .mini-preview {
   color: #3a3a3a;
-}
-
-.color-red {
-  background-color: #f7c9c4;
-}
-
-.color-orange {
-  background-color: #f6d8a8;
-}
-
-.color-yellow {
-  background-color: #f5eaa6;
-}
-
-.color-green {
-  background-color: #cbe6c2;
-}
-
-.color-blue {
-  background-color: #bcdcee;
-}
-
-.color-purple {
-  background-color: #dac9ec;
-}
-
-.color-gray {
-  background-color: #dcdcdc;
 }
 
 #context-menu {
@@ -298,6 +275,7 @@ body {
   border-radius: 50%;
   box-sizing: border-box;
   border: 1px solid rgba(0, 0, 0, 0.25);
+  background-color: var(--ps-fill);
   cursor: pointer;
 }
 

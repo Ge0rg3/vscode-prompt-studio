@@ -7,8 +7,8 @@ import { isWithin } from '../common/utils/paths';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
 import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
+import { CARD_COLORS, isCardColor } from './cardColors';
 import { readFolder } from './folderContents';
-import { isNoteColor, NOTE_COLORS } from './noteColors';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -162,7 +162,7 @@ export class VisualPanel {
       case 'setColor':
         if (msg.color === null) {
           this.config.setColor(msg.path, undefined);
-        } else if (isNoteColor(msg.color)) {
+        } else if (isCardColor(msg.color)) {
           this.config.setColor(msg.path, msg.color);
         }
         return;
@@ -185,6 +185,9 @@ export class VisualPanel {
     const codiconCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
     );
+    const paletteCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/palette.css')
+    );
     const canvasCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/visual/canvas.css')
     );
@@ -206,9 +209,10 @@ export class VisualPanel {
       csp,
       nonce,
       codiconCss: codiconCss.toString(),
+      paletteCss: paletteCss.toString(),
       canvasCss: canvasCss.toString(),
       canvasJs: canvasJs.toString(),
-      noteColors: JSON.stringify(NOTE_COLORS)
+      cardColors: JSON.stringify(CARD_COLORS)
     });
   }
 }

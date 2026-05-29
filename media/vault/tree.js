@@ -91,6 +91,9 @@
     if (node.absPath === selectedPath) {
       row.classList.add('selected');
     }
+    if (node.color) {
+      row.classList.add('colored', 'color-' + node.color);
+    }
 
     for (let level = 0; level < depth; level++) {
       const guide = document.createElement('span');

@@ -6,7 +6,7 @@ A VSCode extension that turns a folder of markdown files into an Obsidian-like v
 
 - **Vault.** Point it at any folder of `.md` files. Storage stays plain markdown on disk: portable, git-friendly, and readable without the extension.
 - **Sidebar tree.** Browse, create, rename, delete, and drag-reorganize notes from a dedicated activity-bar panel.
-- **Visual canvas.** Open any folder as a card canvas. Drag notes and folders to reposition them, OneNote style. Positions persist as note metadata.
+- **Visual canvas.** Open any folder as a card canvas. Drag notes and folders to reposition them, OneNote style. Positions persist as entry metadata.
 - **Wikilinks.** `[[Other Note]]` with completion, cmd-click navigation, hover preview, and rename refactoring.
 - **Prompts.** Notes marked as prompts can declare `{{variables}}`. Pick a prompt, fill in the blanks, then copy to clipboard or insert into the active editor.
 
@@ -14,13 +14,16 @@ A VSCode extension that turns a folder of markdown files into an Obsidian-like v
 
 A vault is a folder of `.md` files. Note bodies are pure markdown, no frontmatter, so a note can be pasted straight into an LLM without leaking metadata.
 
-Per-note metadata (type, tags, visual layout) lives in a single `config.yml` at the vault root:
+Per-entry metadata (type, tags, visual layout) lives in a single `config.yml` at the vault root. Notes and folders both get an entry, keyed by vault-relative path:
 
 ```yaml
 notes:
   Welcome.md:
     tags:
       - intro
+  prompts:
+    visual:
+      color: blue
   prompts/Refactor.md:
     type: prompt
     tags:
@@ -62,7 +65,7 @@ Once a vault is set:
 
 ### Visual canvas
 
-Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview. Each subfolder shows as a card you can drill into, carrying a scaled-down render of its own canvas with the inner cards at their saved spots. The preview recurses through nested folders up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). A folder that is empty, or sits past that depth, falls back to a plain folder glyph. Breadcrumbs across the top walk back toward the root. It is styled with the standard VSCode theme colors rather than the bright sticky-note look of similar tools.
+Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview. Each subfolder shows as a card you can drill into, carrying a scaled-down render of its own canvas with the inner cards at their saved spots. The preview recurses through nested folders up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). A folder that is empty, or sits past that depth, falls back to a plain folder glyph. Breadcrumbs across the top walk back toward the root.
 
 Launch it from:
 
@@ -71,9 +74,9 @@ Launch it from:
 - **Right-click a folder.** The **Open as Canvas** entry opens that folder. Right-clicking the empty area opens the root.
 - **Command palette.** **Prompt Studio: Open Visual Canvas** opens the root.
 
-Drag a card to reposition it anywhere on the canvas, OneNote style. Dragging a card also brings it to the front, so the most recently moved card stays on top of any it overlaps. The position and stacking order are saved to the `visual` block of the note's `config.yml` entry, so the layout survives reopening the canvas and follows the note when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot. Click a card without dragging to act on it: a note opens in an editor, a folder card navigates into it.
+Drag a card to reposition it anywhere on the canvas, OneNote style. Dragging a card also brings it to the front, so the most recently moved card stays on top of any it overlaps. The position and stacking order are saved to the `visual` block of the card's `config.yml` entry, so the layout survives reopening the canvas and follows it when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot. Click a card without dragging to act on it: a note opens in an editor, a folder card navigates into it.
 
-Right-click a card for a context menu. Notes and folders both offer **Rename**. A note card also shows a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it. The color saves to the note's `visual` block alongside its position.
+Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it. The color saves to the entry's `visual` block alongside its position, and also tints the entry's icon in the sidebar tree. A folder's color additionally washes the canvas background while you are inside that folder.
 
 Cards are a fixed size and there is no resize yet. Wikilinks and prompts are not built yet.
 

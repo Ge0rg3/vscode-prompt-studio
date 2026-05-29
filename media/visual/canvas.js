@@ -11,7 +11,7 @@
   const CARD_H = 170;
   const SURFACE_MARGIN = 80;
   const DRAG_THRESHOLD = 3;
-  const NOTE_COLORS = JSON.parse(document.body.dataset.noteColors || '[]');
+  const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
 
   let state = null;
   let cards = [];
@@ -28,6 +28,18 @@
     }
     surfaceEl.style.width = maxX + SURFACE_MARGIN + 'px';
     surfaceEl.style.height = maxY + SURFACE_MARGIN + 'px';
+  }
+
+  // tint the canvas backdrop with the open folder's color, clearing any previous tint
+  function applyFolderTint(color) {
+    for (const cls of [...canvasEl.classList]) {
+      if (cls === 'surface-tinted' || cls.startsWith('color-')) {
+        canvasEl.classList.remove(cls);
+      }
+    }
+    if (color) {
+      canvasEl.classList.add('surface-tinted', 'color-' + color);
+    }
   }
 
   // raise a card above every other so the most recently dragged one stays on top
@@ -148,7 +160,7 @@
     el.className = 'mini-card';
     el.style.left = child.x + 'px';
     el.style.top = child.y + 'px';
-    if (child.kind === 'note' && child.color) {
+    if (child.color) {
       el.classList.add('colored', 'color-' + child.color);
     }
 
@@ -218,6 +230,9 @@
 
   function folderCard(card) {
     const el = baseCard(card, 'codicon-folder');
+    if (card.color) {
+      el.classList.add('colored', 'color-' + card.color);
+    }
     el.appendChild(folderPreview(card.children || []));
 
     attachDrag(el, card, () => {
@@ -256,6 +271,7 @@
     state = next;
     cards = state.cards;
     renderBreadcrumbs(state.breadcrumbs);
+    applyFolderTint(state.folderColor);
     surfaceEl.replaceChildren();
     emptyEl.classList.toggle('hidden', cards.length > 0);
     for (const card of cards) {
@@ -266,16 +282,13 @@
 
   // --- context menu ---
 
-  // swatch row plus rename for notes, rename only for folders
+  // swatch row plus rename for both notes and folders
   function menuFor(card) {
-    if (card.kind === 'note') {
-      return [
-        { kind: 'swatches', card },
-        'sep',
-        { label: 'Rename', cmd: 'promptStudio.rename' }
-      ];
-    }
-    return [{ label: 'Rename', cmd: 'promptStudio.rename' }];
+    return [
+      { kind: 'swatches', card },
+      'sep',
+      { label: 'Rename', cmd: 'promptStudio.rename' }
+    ];
   }
 
   // apply the color locally, then persist it
@@ -298,7 +311,7 @@
     none.addEventListener('click', () => recolor(card, null));
     row.appendChild(none);
 
-    for (const color of NOTE_COLORS) {
+    for (const color of CARD_COLORS) {
       const dot = document.createElement('span');
       dot.className = 'swatch color-' + color;
       if (card.color === color) dot.classList.add('selected');

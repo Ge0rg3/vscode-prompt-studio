@@ -27,6 +27,7 @@ export interface Breadcrumb {
 export interface VisualState {
   breadcrumbs: Breadcrumb[];
   cards: VisualCard[];
+  folderColor?: string;
 }
 
 const NOTE_EXT = '.md';
@@ -126,7 +127,15 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
     }
     const abs = path.join(folder, name);
     if (type === vscode.FileType.Directory) {
-      folders.push({ kind: 'folder', absPath: abs, name, title: name, x: 0, y: 0 });
+      folders.push({
+        kind: 'folder',
+        absPath: abs,
+        name,
+        title: name,
+        color: config.getColor(abs),
+        x: 0,
+        y: 0
+      });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
       const raw = await readText(abs);
       const stem = name.slice(0, -NOTE_EXT.length);
@@ -179,5 +188,9 @@ export async function readFolder(
   const cards = await readEntries(config, folder);
   await attachPreviews(config, cards, PREVIEW_DEPTH);
 
-  return { breadcrumbs: buildBreadcrumbs(vaultRoot, folder), cards };
+  return {
+    breadcrumbs: buildBreadcrumbs(vaultRoot, folder),
+    cards,
+    folderColor: config.getColor(folder)
+  };
 }

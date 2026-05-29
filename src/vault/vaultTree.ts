@@ -2,9 +2,11 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { VaultConfig } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 
 export interface TreeNode extends VaultNode {
+  color?: string;
   children?: TreeNode[];
 }
 
@@ -16,7 +18,7 @@ export interface TreeState {
 const NOTE_EXT = '.md';
 
 // read a directory recursively, drop dotfiles and non-markdown, folders first then alpha
-export async function readTree(dir: string): Promise<TreeNode[]> {
+export async function readTree(config: VaultConfig, dir: string): Promise<TreeNode[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(dir));
 
   const nodes: TreeNode[] = [];
@@ -26,9 +28,15 @@ export async function readTree(dir: string): Promise<TreeNode[]> {
     }
     const abs = path.join(dir, name);
     if (type === vscode.FileType.Directory) {
-      nodes.push({ kind: 'folder', absPath: abs, name, children: await readTree(abs) });
+      nodes.push({
+        kind: 'folder',
+        absPath: abs,
+        name,
+        color: config.getColor(abs),
+        children: await readTree(config, abs)
+      });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
-      nodes.push({ kind: 'note', absPath: abs, name });
+      nodes.push({ kind: 'note', absPath: abs, name, color: config.getColor(abs) });
     }
   }
 

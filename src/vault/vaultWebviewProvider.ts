@@ -46,7 +46,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       vaultManager.onDidChangeVault(() => {
         this.rebuildWatcher();
         void this.postState();
-      })
+      }),
+      config.onDidChange(() => this.scheduleRefresh())
     );
   }
 
@@ -123,7 +124,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       await this.view.webview.postMessage({ type: 'state', state: null });
       return;
     }
-    const state: TreeState = { root, children: await readTree(root) };
+    const state: TreeState = { root, children: await readTree(this.config, root) };
     await this.view.webview.postMessage({ type: 'state', state });
   }
 
@@ -158,6 +159,9 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     const codiconCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
     );
+    const paletteCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/palette.css')
+    );
     const treeCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.css')
     );
@@ -179,6 +183,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       csp,
       nonce,
       codiconCss: codiconCss.toString(),
+      paletteCss: paletteCss.toString(),
       treeCss: treeCss.toString(),
       treeJs: treeJs.toString()
     });
