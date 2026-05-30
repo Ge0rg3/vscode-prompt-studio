@@ -15,6 +15,7 @@ type InboundMessage =
   | { type: 'openNote'; path: string }
   | { type: 'navigate'; folder: string }
   | { type: 'moveCard'; path: string; x: number; y: number; z: number }
+  | { type: 'resizeCard'; path: string; width: number; height: number }
   | { type: 'setColor'; path: string; color: string | null }
   | { type: 'command'; command: string; node: VaultNode };
 
@@ -158,6 +159,9 @@ export class VisualPanel {
       case 'moveCard':
         this.config.setPosition(msg.path, { x: msg.x, y: msg.y });
         this.config.setZ(msg.path, msg.z);
+        return;
+      case 'resizeCard':
+        this.config.setSize(msg.path, { width: msg.width, height: msg.height });
         return;
       case 'setColor':
         if (msg.color === null) {

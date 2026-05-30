@@ -33,14 +33,18 @@ notes:
       x: 200
       y: 100
       z: 3
+      width: 280
+      height: 200
       color: orange
 ```
 
-The extension reads and writes the `visual` block (card position, stacking order, and color) today. Any other keys (`type`, `tags`) are left untouched when it rewrites the file.
+The extension reads and writes the `visual` block (card position, size, stacking order, and color) today. Any other keys (`type`, `tags`) are left untouched when it rewrites the file.
 
 ## Status
 
-Early development. The current build ships a sidebar vault view and a draggable visual canvas, both backed by a configurable folder location. The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
+Early development. The current build ships a sidebar vault view and a draggable visual canvas, both backed by a configurable folder location.
+
+The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
 
 ### Configure the vault
 
@@ -65,7 +69,12 @@ Once a vault is set:
 
 ### Visual canvas
 
-Open any folder (or the vault root) as a pinboard of cards in the editor area. Each note shows its title and a short text preview. Each subfolder shows as a card you can drill into, carrying a scaled-down render of its own canvas with the inner cards at their saved spots. The preview recurses through nested folders up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). A folder that is empty, or sits past that depth, falls back to a plain folder glyph. Breadcrumbs across the top walk back toward the root.
+Open any folder (or the vault root) as a pinboard of cards in the editor area. Breadcrumbs across the top walk back toward the root.
+
+- **Note cards** show the title and a short text preview.
+- **Folder cards** drill in on click, and preview their contents as a scaled-down render of their own canvas, inner cards at their saved spots.
+
+The folder preview recurses up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). An empty folder, or one past that depth, shows a plain folder glyph.
 
 Launch it from:
 
@@ -74,11 +83,19 @@ Launch it from:
 - **Right-click a folder.** The **Open as Canvas** entry opens that folder. Right-clicking the empty area opens the root.
 - **Command palette.** **Prompt Studio: Open Visual Canvas** opens the root.
 
-Drag a card to reposition it anywhere on the canvas, OneNote style. Dragging a card also brings it to the front, so the most recently moved card stays on top of any it overlaps. The position and stacking order are saved to the `visual` block of the card's `config.yml` entry, so the layout survives reopening the canvas and follows it when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot. Click a card without dragging to act on it: a note opens in an editor, a folder card navigates into it.
+Once open, cards respond to pointer gestures:
 
-Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it. The color saves to the entry's `visual` block alongside its position, and also tints the entry's icon in the sidebar tree. A folder's color additionally washes the canvas background while you are inside that folder.
+- **Drag.** Reposition a card anywhere, OneNote style. Dragging also brings it to the front, so the most recently moved card stays on top of any it overlaps.
+- **Resize.** Drag the handle at a card's bottom-right corner. A folder card keeps its preview at a fixed scale anchored to the top-left, so resizing reveals more or less of its contents instead of scaling them.
+- **Click.** Without dragging, act on a card: a note opens in an editor, a folder card navigates into it.
 
-Cards are a fixed size and there is no resize yet. Wikilinks and prompts are not built yet.
+Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot, and one with no saved size uses the default size.
+
+Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it.
+
+The color saves to the entry's `visual` block and tints its icon in the sidebar tree too. A folder's color also washes the canvas background while you are inside it.
+
+Wikilinks and prompts are not built yet.
 
 ## Develop
 

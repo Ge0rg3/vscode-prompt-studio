@@ -7,8 +7,10 @@
   const menuEl = document.getElementById('context-menu');
   const canvasEl = document.getElementById('canvas');
 
-  const CARD_W = 240;
-  const CARD_H = 170;
+  const DEFAULT_CARD_W = 240;
+  const DEFAULT_CARD_H = 170;
+  const MIN_CARD_W = 160;
+  const MIN_CARD_H = 100;
   const SURFACE_MARGIN = 80;
   const DRAG_THRESHOLD = 3;
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
@@ -23,8 +25,8 @@
     let maxX = 0;
     let maxY = 0;
     for (const card of cards) {
-      maxX = Math.max(maxX, card.x + CARD_W);
-      maxY = Math.max(maxY, card.y + CARD_H);
+      maxX = Math.max(maxX, card.x + card.width);
+      maxY = Math.max(maxY, card.y + card.height);
     }
     surfaceEl.style.width = maxX + SURFACE_MARGIN + 'px';
     surfaceEl.style.height = maxY + SURFACE_MARGIN + 'px';
@@ -60,6 +62,7 @@
       if (event.button !== 0) {
         return;
       }
+
       const startX = event.clientX;
       const startY = event.clientY;
       const originX = card.x;
@@ -103,14 +106,56 @@
     });
   }
 
+  // drag the corner handle to resize the card
+  function attachResize(el, card) {
+    const handle = document.createElement('div');
+    handle.className = 'resize-handle';
+    el.appendChild(handle);
+
+    handle.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) {
+        return;
+      }
+
+      event.stopPropagation();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const originW = card.width;
+      const originH = card.height;
+      handle.setPointerCapture(event.pointerId);
+
+      const onMove = (move) => {
+        card.width = Math.max(MIN_CARD_W, Math.round(originW + move.clientX - startX));
+        card.height = Math.max(MIN_CARD_H, Math.round(originH + move.clientY - startY));
+        el.style.width = card.width + 'px';
+        el.style.height = card.height + 'px';
+      };
+
+      const onUp = () => {
+        handle.releasePointerCapture(event.pointerId);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        resizeSurface();
+        vscode.postMessage({ type: 'resizeCard', path: card.absPath, width: card.width, height: card.height });
+      };
+
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+  }
+
   // --- card builders ---
 
-  // shared card shell with an icon + title row, positioned at the card's saved spot
+  // shared card shell with an icon + title row, placed and sized at the card's saved spot
   function baseCard(card, iconName) {
     const el = document.createElement('div');
     el.className = 'card';
     el.style.left = card.x + 'px';
     el.style.top = card.y + 'px';
+    el.style.width = card.width + 'px';
+    el.style.height = card.height + 'px';
     if (typeof card.z === 'number') {
       el.style.zIndex = String(card.z);
     }
@@ -151,6 +196,7 @@
     attachDrag(el, card, () => {
       vscode.postMessage({ type: 'openNote', path: card.absPath });
     });
+    attachResize(el, card);
     return el;
   }
 
@@ -160,6 +206,8 @@
     el.className = 'mini-card';
     el.style.left = child.x + 'px';
     el.style.top = child.y + 'px';
+    el.style.width = child.width + 'px';
+    el.style.height = child.height + 'px';
     if (child.color) {
       el.classList.add('colored', 'color-' + child.color);
     }
@@ -181,13 +229,13 @@
       preview.textContent = (child.preview || '').trim();
       el.appendChild(preview);
     } else {
-      el.appendChild(folderPreview(child.children || []));
+      el.appendChild(folderPreview(child.children || [], child.width, child.height));
     }
     return el;
   }
 
-  // render the children at their real canvas positions, then shrink that canvas to fit the preview box
-  function folderPreview(children) {
+  // render the children at their real canvas positions, scaled down for the preview
+  function folderPreview(children, containerWidth, containerHeight) {
     const previewBox = document.createElement('div');
     previewBox.className = 'folder-preview';
     if (!children.length) {
@@ -202,8 +250,8 @@
     let canvasW = 0;
     let canvasH = 0;
     for (const child of children) {
-      canvasW = Math.max(canvasW, child.x + CARD_W);
-      canvasH = Math.max(canvasH, child.y + CARD_H);
+      canvasW = Math.max(canvasW, child.x + child.width);
+      canvasH = Math.max(canvasH, child.y + child.height);
     }
 
     const miniSurface = document.createElement('div');
@@ -215,12 +263,14 @@
     }
     previewBox.appendChild(miniSurface);
 
-    // shrink the canvas to fit the box once it has a measured size, keeping its aspect and origin
+    // scale against the box at the container's default size
     const observer = new ResizeObserver(() => {
       if (previewBox.clientWidth === 0 || previewBox.clientHeight === 0) {
         return;
       }
-      const scale = Math.min(previewBox.clientWidth / canvasW, previewBox.clientHeight / canvasH);
+      const boxW = previewBox.clientWidth - (containerWidth - DEFAULT_CARD_W);
+      const boxH = previewBox.clientHeight - (containerHeight - DEFAULT_CARD_H);
+      const scale = Math.min(boxW / canvasW, boxH / canvasH);
       miniSurface.style.transform = `scale(${scale})`;
       observer.disconnect();
     });
@@ -233,11 +283,12 @@
     if (card.color) {
       el.classList.add('colored', 'color-' + card.color);
     }
-    el.appendChild(folderPreview(card.children || []));
+    el.appendChild(folderPreview(card.children || [], card.width, card.height));
 
     attachDrag(el, card, () => {
       vscode.postMessage({ type: 'navigate', folder: card.absPath });
     });
+    attachResize(el, card);
     return el;
   }
 

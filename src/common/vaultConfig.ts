@@ -10,6 +10,11 @@ export interface NotePosition {
   y: number;
 }
 
+export interface CardSize {
+  width: number;
+  height: number;
+}
+
 type NoteMetadata = Record<string, unknown>;
 
 export const CONFIG_FILENAME = 'config.yml';
@@ -48,6 +53,24 @@ function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
   const { x, y } = visual;
   if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
     return { x, y };
+  }
+  return undefined;
+}
+
+// the width/height saved in an entry's metadata
+function sizeOf(meta: NoteMetadata | undefined): CardSize | undefined {
+  const visual = visualOf(meta);
+  if (!visual) {
+    return undefined;
+  }
+  const { width, height } = visual;
+  if (
+    typeof width === 'number' &&
+    Number.isFinite(width) &&
+    typeof height === 'number' &&
+    Number.isFinite(height)
+  ) {
+    return { width, height };
   }
   return undefined;
 }
@@ -117,6 +140,27 @@ export class VaultConfig implements vscode.Disposable {
     const visual = cloneVisual(meta);
     visual.x = Math.round(position.x);
     visual.y = Math.round(position.y);
+    meta.visual = visual;
+    this.entries.set(key, meta);
+
+    this.scheduleWrite();
+  }
+
+  getSize(absPath: string): CardSize | undefined {
+    const key = this.configKeyOf(absPath);
+    return key === undefined ? undefined : sizeOf(this.entries.get(key));
+  }
+
+  setSize(absPath: string, size: CardSize): void {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return;
+    }
+
+    const meta = this.entries.get(key) ?? {};
+    const visual = cloneVisual(meta);
+    visual.width = Math.round(size.width);
+    visual.height = Math.round(size.height);
     meta.visual = visual;
     this.entries.set(key, meta);
 

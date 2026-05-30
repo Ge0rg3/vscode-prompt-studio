@@ -10,6 +10,7 @@ Guidance for AI assistants and humans working in this repo.
 - **Edit in place, do not append.** When a section becomes wrong, rewrite it. Do not add a new paragraph below the old one, do not leave the old wording with a note that it has been superseded, do not stack "Update:" prefixes. The reader should see one coherent description, not an archaeology of past states.
 - **No history, no narrative.** No "previously we did X", "this used to live at Y", "as of November we switched to Z". `git log` is the log; the doc states only what is true today.
 - **Restructure when sections grow.** If a section starts straddling two concerns, split it. If two sections cover overlapping ground, merge them. The structure is part of the content; let it move.
+- **Keep prose skimmable.** Prefer short paragraphs of one or two sentences, or a bullet list, over a dense block a tired reader has to wade through. When a paragraph piles several distinct points together (every gesture a card supports, every place a command lives), split them into bullets. A sustained single explanation may run longer, an enumeration may not.
 - **Re-read before finishing.** Before closing out any non-trivial change, re-read this file and `README.md` end-to-end and fix anything that is now wrong, redundant, or misleading.
 
 ## Useful commands

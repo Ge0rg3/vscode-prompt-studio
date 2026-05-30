@@ -16,6 +16,8 @@ export interface VisualCard {
   x: number;
   y: number;
   z?: number;
+  width: number;
+  height: number;
   children?: VisualCard[];
 }
 
@@ -37,7 +39,7 @@ const HEADING = /^\s*#{1,6}\s+(.+?)\s*$/;
 // how many nested folder layers a folder card previews before falling back to a plain icon
 const PREVIEW_DEPTH = 3;
 
-// auto-placement grid, sized to match the card box in canvas.css
+// default card size, also the auto-placement grid step
 const CARD_W = 240;
 const CARD_H = 170;
 const GRID_MARGIN = 24;
@@ -105,13 +107,17 @@ function autoPosition(index: number): NotePosition {
   };
 }
 
-// give each card its saved position and stacking order
+// give each card its saved position, size, and stacking order
 function placeCards(config: VaultConfig, cards: VisualCard[]): void {
   for (let i = 0; i < cards.length; i++) {
     const position = config.getPosition(cards[i].absPath) ?? autoPosition(i);
     cards[i].x = position.x;
     cards[i].y = position.y;
     cards[i].z = config.getZ(cards[i].absPath);
+
+    const size = config.getSize(cards[i].absPath) ?? { width: CARD_W, height: CARD_H };
+    cards[i].width = size.width;
+    cards[i].height = size.height;
   }
 }
 
@@ -134,7 +140,9 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
         title: name,
         color: config.getColor(abs),
         x: 0,
-        y: 0
+        y: 0,
+        width: 0,
+        height: 0
       });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
       const raw = await readText(abs);
@@ -147,7 +155,9 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
         preview: previewOf(raw),
         color: config.getColor(abs),
         x: 0,
-        y: 0
+        y: 0,
+        width: 0,
+        height: 0
       });
     }
   }
