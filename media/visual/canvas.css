@@ -183,7 +183,8 @@ body {
   padding: 12px 14px;
   border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   border-radius: 6px;
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  /* translucent grey keeps uncolored preview cards visible against the folder backdrop */
+  background-color: color-mix(in srgb, var(--vscode-foreground) 15%, transparent);
   overflow: hidden;
 }
 

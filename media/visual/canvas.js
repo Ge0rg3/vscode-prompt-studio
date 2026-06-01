@@ -181,6 +181,7 @@
     return el;
   }
 
+  // a note card showing a text snippet, opens the note when clicked
   function noteCard(card) {
     const el = baseCard(card, 'codicon-note');
     if (card.color) {
@@ -278,6 +279,7 @@
     return previewBox;
   }
 
+  // a folder card showing a mini preview of its contents, drills in when clicked
   function folderCard(card) {
     const el = baseCard(card, 'codicon-folder');
     if (card.color) {
