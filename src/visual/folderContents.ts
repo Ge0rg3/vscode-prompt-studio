@@ -84,6 +84,7 @@ function buildBreadcrumbs(vaultRoot: string, folder: string): Breadcrumb[] {
   const crumbs: Breadcrumb[] = [
     { path: vaultRoot, name: path.basename(vaultRoot) || vaultRoot }
   ];
+
   const rel = path.relative(vaultRoot, folder);
   if (!rel || rel === '.') {
     return crumbs;

@@ -304,6 +304,7 @@
 
   // --- rendering ---
 
+  // the crumb trail, every crumb but the current folder navigates on click
   function renderBreadcrumbs(crumbs) {
     breadcrumbsEl.replaceChildren();
     for (const [index, crumb] of crumbs.entries()) {
@@ -328,6 +329,7 @@
     }
   }
 
+  // redraw everything from the new state
   function render(next) {
     state = next;
     cards = state.cards;
@@ -411,6 +413,12 @@
     return row;
   }
 
+  // the card fields the host needs for a command
+  function serialize(card) {
+    return { kind: card.kind, absPath: card.absPath, name: card.name };
+  }
+
+  // place the menu at the click point, clamped inside the window
   function showMenu(x, y, items, card) {
     menuCardPath = card.absPath;
     menuEl.replaceChildren();
@@ -450,10 +458,6 @@
       menuCardPath = null;
     }
     menuEl.classList.add('hidden');
-  }
-
-  function serialize(card) {
-    return { kind: card.kind, absPath: card.absPath, name: card.name };
   }
 
   document.addEventListener('mousedown', (event) => {

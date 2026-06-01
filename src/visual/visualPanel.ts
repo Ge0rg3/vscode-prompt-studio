@@ -87,10 +87,12 @@ export class VisualPanel {
 
   private dispose(): void {
     VisualPanel.current = undefined;
+
     for (const sub of this.watcherSubs) {
       sub.dispose();
     }
     this.watcher?.dispose();
+
     for (const disposable of this.disposables) {
       disposable.dispose();
     }
