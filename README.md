@@ -91,7 +91,7 @@ Once open, cards respond to pointer gestures:
 
 Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot, and one with no saved size uses the default size.
 
-Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches: pick one to tint the card, or the leftmost clear swatch to remove it.
+Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches. Hover a swatch to preview the card in that color, click to apply it, or pick the leftmost clear swatch to remove the color. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
 
 The color saves to the entry's `visual` block and tints its icon in the sidebar tree too. A folder's color also washes the canvas background while you are inside it.
 

@@ -17,6 +17,8 @@
 
   let state = null;
   let cards = [];
+  let cardEls = new Map();
+  let menuCardPath = null;
 
   // --- helpers ---
 
@@ -41,6 +43,18 @@
     }
     if (color) {
       canvasEl.classList.add('surface-tinted', 'color-' + color);
+    }
+  }
+
+  // set a card element's color classes, clearing any previous tint
+  function applyCardColor(el, color) {
+    for (const cls of [...el.classList]) {
+      if (cls === 'colored' || cls.startsWith('color-')) {
+        el.classList.remove(cls);
+      }
+    }
+    if (color) {
+      el.classList.add('colored', 'color-' + color);
     }
   }
 
@@ -184,9 +198,7 @@
   // a note card showing a text snippet, opens the note when clicked
   function noteCard(card) {
     const el = baseCard(card, 'codicon-note');
-    if (card.color) {
-      el.classList.add('colored', 'color-' + card.color);
-    }
+    applyCardColor(el, card.color);
     const text = (card.preview || '').trim();
 
     const preview = document.createElement('pre');
@@ -209,9 +221,7 @@
     el.style.top = child.y + 'px';
     el.style.width = child.width + 'px';
     el.style.height = child.height + 'px';
-    if (child.color) {
-      el.classList.add('colored', 'color-' + child.color);
-    }
+    applyCardColor(el, child.color);
 
     const title = document.createElement('div');
     title.className = 'mini-title';
@@ -282,9 +292,7 @@
   // a folder card showing a mini preview of its contents, drills in when clicked
   function folderCard(card) {
     const el = baseCard(card, 'codicon-folder');
-    if (card.color) {
-      el.classList.add('colored', 'color-' + card.color);
-    }
+    applyCardColor(el, card.color);
     el.appendChild(folderPreview(card.children || [], card.width, card.height));
 
     attachDrag(el, card, () => {
@@ -323,12 +331,15 @@
   function render(next) {
     state = next;
     cards = state.cards;
+    cardEls = new Map();
     renderBreadcrumbs(state.breadcrumbs);
     applyFolderTint(state.folderColor);
     surfaceEl.replaceChildren();
     emptyEl.classList.toggle('hidden', cards.length > 0);
     for (const card of cards) {
-      surfaceEl.appendChild(card.kind === 'folder' ? folderCard(card) : noteCard(card));
+      const el = card.kind === 'folder' ? folderCard(card) : noteCard(card);
+      cardEls.set(card.absPath, el);
+      surfaceEl.appendChild(el);
     }
     resizeSurface();
   }
@@ -344,38 +355,64 @@
     ];
   }
 
-  // apply the color locally, then persist it
-  function recolor(card, color) {
-    hideMenu();
-    card.color = color || undefined;
-    render(state);
-    vscode.postMessage({ type: 'setColor', path: card.absPath, color: color || null });
+  // the color currently saved for a card path
+  function cardColorOf(absPath) {
+    const card = cards.find((entry) => entry.absPath === absPath);
+    return card ? card.color : undefined;
   }
 
-  // color dots with a leading clear-color swatch
+  // tint the live card element for a path, without persisting
+  function tintCard(absPath, color) {
+    const el = cardEls.get(absPath);
+    if (el) {
+      applyCardColor(el, color);
+    }
+  }
+
+  // apply the color to the live card, then persist it
+  function recolor(absPath, color) {
+    const card = cards.find((entry) => entry.absPath === absPath);
+    if (card) {
+      card.color = color || undefined;
+    }
+    tintCard(absPath, color);
+    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
+  }
+
+  // color dots with a leading clear-color swatch, hover previews the card and click commits
   function swatchRow(card) {
     const row = document.createElement('div');
     row.className = 'swatch-row';
 
-    const none = document.createElement('span');
-    none.className = 'swatch none';
-    if (!card.color) none.classList.add('selected');
-    none.title = 'No color';
-    none.addEventListener('click', () => recolor(card, null));
-    row.appendChild(none);
-
-    for (const color of CARD_COLORS) {
+    for (const color of [null, ...CARD_COLORS]) {
       const dot = document.createElement('span');
-      dot.className = 'swatch color-' + color;
-      if (card.color === color) dot.classList.add('selected');
-      dot.title = color;
-      dot.addEventListener('click', () => recolor(card, color));
+      dot.className = color ? 'swatch color-' + color : 'swatch none';
+      dot.title = color || 'No color';
+      if ((card.color || null) === color) {
+        dot.classList.add('selected');
+      }
+
+      dot.addEventListener('mouseenter', () => tintCard(card.absPath, color));
+      dot.addEventListener('mouseleave', () => tintCard(card.absPath, cardColorOf(card.absPath)));
+      dot.addEventListener('click', () => {
+        if (dot.classList.contains('selected')) {
+          hideMenu();
+          return;
+        }
+
+        for (const other of row.children) {
+          other.classList.remove('selected');
+        }
+        dot.classList.add('selected');
+        recolor(card.absPath, color);
+      });
       row.appendChild(dot);
     }
     return row;
   }
 
   function showMenu(x, y, items, card) {
+    menuCardPath = card.absPath;
     menuEl.replaceChildren();
     for (const entry of items) {
       if (entry === 'sep') {
@@ -406,7 +443,12 @@
     menuEl.style.top = `${Math.min(y, maxY)}px`;
   }
 
+  // close the menu, dropping any uncommitted hover preview back to the saved color
   function hideMenu() {
+    if (menuCardPath !== null) {
+      tintCard(menuCardPath, cardColorOf(menuCardPath));
+      menuCardPath = null;
+    }
     menuEl.classList.add('hidden');
   }
 
