@@ -76,6 +76,8 @@ Open any folder (or the vault root) as a pinboard of cards in the editor area. B
 
 The folder preview recurses up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). An empty folder, or one past that depth, shows a plain folder glyph.
 
+Each nested level is tinted to stand apart from the one around it, so folders sharing a color (or sharing the default gray) stay distinct.
+
 Launch it from:
 
 - **Title-bar button.** The **Open Visual Canvas** button in the view header opens the vault root.
