@@ -135,23 +135,21 @@
     label.textContent = isFolder ? node.name : stripMdExt(node.name);
     row.appendChild(label);
 
-    if (isFolder) {
-      const actions = document.createElement('span');
-      actions.className = 'actions';
-      const canvasAction = document.createElement('span');
-      canvasAction.className = 'action codicon codicon-layout';
-      canvasAction.title = 'Open Visual Canvas';
-      canvasAction.addEventListener('click', (e) => {
-        e.stopPropagation();
-        vscode.postMessage({
-          type: 'command',
-          command: 'promptStudio.openVisual',
-          node: serialize(node)
-        });
+    const actions = document.createElement('span');
+    actions.className = 'actions';
+    const canvasAction = document.createElement('span');
+    canvasAction.className = 'action codicon codicon-layout';
+    canvasAction.title = 'Open Visual Canvas';
+    canvasAction.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vscode.postMessage({
+        type: 'command',
+        command: 'promptStudio.openVisual',
+        node: serialize(node)
       });
-      actions.appendChild(canvasAction);
-      row.appendChild(actions);
-    }
+    });
+    actions.appendChild(canvasAction);
+    row.appendChild(actions);
 
     row.addEventListener('click', (e) => {
       e.stopPropagation();

@@ -1,9 +1,22 @@
+import * as path from 'node:path';
+
 import * as vscode from 'vscode';
 
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { VisualPanel } from './visualPanel';
+
+// the folder to open as a canvas, a note uses its parent folder
+function canvasFolder(contextNode: VaultNode | undefined, vaultRoot: string): string {
+  if (contextNode?.kind === 'folder') {
+    return contextNode.absPath;
+  }
+  if (contextNode?.kind === 'note') {
+    return path.dirname(contextNode.absPath);
+  }
+  return vaultRoot;
+}
 
 export function registerOpenVisual(
   vaultManager: VaultManager,
@@ -19,8 +32,7 @@ export function registerOpenVisual(
         return;
       }
 
-      const folder = contextNode?.kind === 'folder' ? contextNode.absPath : root;
-      VisualPanel.show(extensionUri, config, root, folder);
+      VisualPanel.show(extensionUri, config, root, canvasFolder(contextNode, root));
     }
   );
 }
