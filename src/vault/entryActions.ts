@@ -25,6 +25,7 @@ export function registerRevealInOS(): vscode.Disposable {
     if (!target) {
       return;
     }
+
     await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(target.absPath));
   });
 }
@@ -36,12 +37,24 @@ export function registerCopyContents(): vscode.Disposable {
       if (!target || target.kind !== 'note') {
         return;
       }
+
       const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(target.absPath));
       const text = new TextDecoder('utf-8').decode(bytes);
       await vscode.env.clipboard.writeText(text);
       void vscode.window.setStatusBarMessage(`Copied "${target.name}" to clipboard.`, 2000);
     }
   );
+}
+
+export function registerCopyPath(): vscode.Disposable {
+  return vscode.commands.registerCommand('promptStudio.copyPath', async (target?: VaultNode) => {
+    if (!target) {
+      return;
+    }
+
+    await vscode.env.clipboard.writeText(target.absPath);
+    void vscode.window.setStatusBarMessage(`Copied path of "${target.name}" to clipboard.`, 2000);
+  });
 }
 
 export function registerRenameEntry(config: VaultConfig): vscode.Disposable {

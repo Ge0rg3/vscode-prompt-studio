@@ -74,6 +74,11 @@
         "category": "Prompt Studio"
       },
       {
+        "command": "promptStudio.copyPath",
+        "title": "Copy as Path",
+        "category": "Prompt Studio"
+      },
+      {
         "command": "promptStudio.revealInOS",
         "title": "Reveal in Explorer",
         "category": "Prompt Studio"
@@ -157,6 +162,10 @@
         },
         {
           "command": "promptStudio.copyContents",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.copyPath",
           "when": "false"
         },
         {

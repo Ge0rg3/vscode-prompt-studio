@@ -20,7 +20,14 @@ type InboundMessage =
   | { type: 'command'; command: string; node: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
-const ALLOWED_COMMANDS = new Set(['promptStudio.rename']);
+const ALLOWED_COMMANDS = new Set([
+  'promptStudio.rename',
+  'promptStudio.copyContents',
+  'promptStudio.copyPath',
+  'promptStudio.revealInOS',
+  'promptStudio.newNote',
+  'promptStudio.newFolder'
+]);
 
 // --- helpers ---
 

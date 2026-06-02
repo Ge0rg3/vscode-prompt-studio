@@ -295,32 +295,34 @@
   function menuFor(node) {
     if (node.kind === 'note') {
       return [
-        { label: 'Open', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
+        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
         'sep',
-        { label: 'Rename', cmd: 'promptStudio.rename' },
-        { label: 'Copy Contents', cmd: 'promptStudio.copyContents' },
+        { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+        { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
-        { label: 'Reveal in Explorer', cmd: 'promptStudio.revealInOS' }
+        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
       ];
     }
     return [
-      { label: 'Open as Canvas', cmd: 'promptStudio.openVisual' },
+      { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openVisual' },
       'sep',
-      { label: 'New Note', cmd: 'promptStudio.newNote', expandFolder: true },
-      { label: 'New Folder', cmd: 'promptStudio.newFolder', expandFolder: true },
+      { label: 'New Note', icon: 'new-file', cmd: 'promptStudio.newNote', expandFolder: true },
+      { label: 'New Folder', icon: 'new-folder', cmd: 'promptStudio.newFolder', expandFolder: true },
       'sep',
-      { label: 'Rename', cmd: 'promptStudio.rename' },
+      { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
       'sep',
-      { label: 'Reveal in Explorer', cmd: 'promptStudio.revealInOS' }
+      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
     ];
   }
 
   function emptyMenu() {
     return [
-      { label: 'Open as Canvas', cmd: 'promptStudio.openVisual' },
+      { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openVisual' },
       'sep',
-      { label: 'New Note', cmd: 'promptStudio.newNote' },
-      { label: 'New Folder', cmd: 'promptStudio.newFolder' }
+      { label: 'New Note', icon: 'new-file', cmd: 'promptStudio.newNote' },
+      { label: 'New Folder', icon: 'new-folder', cmd: 'promptStudio.newFolder' }
     ];
   }
 
@@ -335,7 +337,13 @@
       }
       const item = document.createElement('div');
       item.className = 'menu-item';
-      item.textContent = entry.label;
+      const icon = document.createElement('span');
+      icon.className = `codicon codicon-${entry.icon}`;
+      const label = document.createElement('span');
+      label.textContent = entry.label;
+      item.appendChild(icon);
+      item.appendChild(label);
+
       item.addEventListener('click', () => {
         hideMenu();
         if (entry.action) {

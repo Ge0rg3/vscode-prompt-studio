@@ -198,7 +198,10 @@ body.focused .row.selected {
 }
 
 .menu-item {
-  padding: 4px 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
   cursor: pointer;
   white-space: nowrap;
 }

@@ -18,7 +18,7 @@
   let state = null;
   let cards = [];
   let cardEls = new Map();
-  let menuCardPath = null;
+  let menuColorTarget = null;
 
   // --- helpers ---
 
@@ -358,13 +358,10 @@
 
   // --- context menu ---
 
-  // swatch row plus rename for both notes and folders
-  function menuFor(card) {
-    return [
-      { kind: 'swatches', card },
-      'sep',
-      { label: 'Rename', cmd: 'promptStudio.rename' }
-    ];
+  // the open folder as a node, taken from the last breadcrumb
+  function currentFolderNode() {
+    const crumb = state.breadcrumbs[state.breadcrumbs.length - 1];
+    return { kind: 'folder', absPath: crumb.path, name: crumb.name };
   }
 
   // the color currently saved for a card path
@@ -391,8 +388,72 @@
     vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
   }
 
-  // color dots with a leading clear-color swatch, hover previews the card and click commits
-  function swatchRow(card) {
+  // apply the color to the canvas backdrop, then persist it on the open folder
+  function recolorFolder(absPath, color) {
+    state.folderColor = color || undefined;
+    applyFolderTint(state.folderColor);
+    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
+  }
+
+  // swatch target for a card, tints the card element live
+  function cardColorTarget(card) {
+    return {
+      currentColor: () => cardColorOf(card.absPath),
+      preview: (color) => tintCard(card.absPath, color),
+      commit: (color) => recolor(card.absPath, color)
+    };
+  }
+
+  // swatch target for the open folder, tints the canvas backdrop live
+  function folderColorTarget() {
+    const folder = currentFolderNode();
+    return {
+      currentColor: () => state.folderColor,
+      preview: (color) => applyFolderTint(color || undefined),
+      commit: (color) => recolorFolder(folder.absPath, color)
+    };
+  }
+
+  // card right-click menu, color swatches then the actions for its kind
+  function menuFor(card) {
+    if (card.kind === 'note') {
+      return [
+        { kind: 'swatches', target: cardColorTarget(card) },
+        'sep',
+        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: card.absPath }) },
+        'sep',
+        { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+        { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
+        'sep',
+        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
+      ];
+    }
+    return [
+      { kind: 'swatches', target: cardColorTarget(card) },
+      'sep',
+      { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+      'sep',
+      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
+    ];
+  }
+
+  // empty-area right-click menu, acts on the open folder
+  function backgroundMenu() {
+    return [
+      { kind: 'swatches', target: folderColorTarget() },
+      'sep',
+      { label: 'New Note', icon: 'new-file', cmd: 'promptStudio.newNote' },
+      { label: 'New Folder', icon: 'new-folder', cmd: 'promptStudio.newFolder' },
+      'sep',
+      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
+    ];
+  }
+
+  // color dots with a leading clear-color swatch, hover previews and click commits
+  function swatchRow(target) {
     const row = document.createElement('div');
     row.className = 'swatch-row';
 
@@ -400,12 +461,12 @@
       const dot = document.createElement('span');
       dot.className = color ? 'swatch color-' + color : 'swatch none';
       dot.title = color || 'No color';
-      if ((card.color || null) === color) {
+      if ((target.currentColor() || null) === color) {
         dot.classList.add('selected');
       }
 
-      dot.addEventListener('mouseenter', () => tintCard(card.absPath, color));
-      dot.addEventListener('mouseleave', () => tintCard(card.absPath, cardColorOf(card.absPath)));
+      dot.addEventListener('mouseenter', () => target.preview(color));
+      dot.addEventListener('mouseleave', () => target.preview(target.currentColor()));
       dot.addEventListener('click', () => {
         if (dot.classList.contains('selected')) {
           hideMenu();
@@ -416,21 +477,21 @@
           other.classList.remove('selected');
         }
         dot.classList.add('selected');
-        recolor(card.absPath, color);
+        target.commit(color);
       });
       row.appendChild(dot);
     }
     return row;
   }
 
-  // the card fields the host needs for a command
-  function serialize(card) {
-    return { kind: card.kind, absPath: card.absPath, name: card.name };
+  // the node fields the host needs for a command
+  function serialize(node) {
+    return { kind: node.kind, absPath: node.absPath, name: node.name };
   }
 
   // place the menu at the click point, clamped inside the window
-  function showMenu(x, y, items, card) {
-    menuCardPath = card.absPath;
+  function showMenu(x, y, items, node) {
+    menuColorTarget = null;
     menuEl.replaceChildren();
     for (const entry of items) {
       if (entry === 'sep') {
@@ -440,16 +501,27 @@
         continue;
       }
       if (entry.kind === 'swatches') {
-        menuEl.appendChild(swatchRow(entry.card));
+        menuColorTarget = entry.target;
+        menuEl.appendChild(swatchRow(entry.target));
         continue;
       }
 
       const item = document.createElement('div');
       item.className = 'menu-item';
-      item.textContent = entry.label;
+      const icon = document.createElement('span');
+      icon.className = 'codicon codicon-' + entry.icon;
+      const label = document.createElement('span');
+      label.textContent = entry.label;
+      item.appendChild(icon);
+      item.appendChild(label);
+
       item.addEventListener('click', () => {
         hideMenu();
-        vscode.postMessage({ type: 'command', command: entry.cmd, node: serialize(card) });
+        if (entry.action) {
+          entry.action();
+          return;
+        }
+        vscode.postMessage({ type: 'command', command: entry.cmd, node: serialize(node) });
       });
       menuEl.appendChild(item);
     }
@@ -463,9 +535,9 @@
 
   // close the menu, dropping any uncommitted hover preview back to the saved color
   function hideMenu() {
-    if (menuCardPath !== null) {
-      tintCard(menuCardPath, cardColorOf(menuCardPath));
-      menuCardPath = null;
+    if (menuColorTarget) {
+      menuColorTarget.preview(menuColorTarget.currentColor());
+      menuColorTarget = null;
     }
     menuEl.classList.add('hidden');
   }
@@ -478,6 +550,16 @@
   });
   window.addEventListener('blur', hideMenu);
   canvasEl.addEventListener('scroll', hideMenu, true);
+
+  // right-click empty canvas space acts on the open folder
+  canvasEl.addEventListener('contextmenu', (event) => {
+    if (!state) {
+      return;
+    }
+
+    event.preventDefault();
+    showMenu(event.clientX, event.clientY, backgroundMenu(), currentFolderNode());
+  });
 
   // --- inbound state ---
 

@@ -61,9 +61,9 @@ The path persists in the `promptStudio.vaultPath` setting (empty string means "p
 Once a vault is set:
 
 - **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
-- **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root.
-- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, and **Reveal in Explorer**.
-- **Right-click a note.** Offers **Open**, **Rename**, **Copy Contents** (copies the markdown body to the clipboard), and **Reveal in Explorer**.
+- **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root, plus **Open as Canvas** (detailed under Visual canvas).
+- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, and **Copy as Path** (copies the absolute path to the clipboard), plus **Open as Canvas** (detailed under Visual canvas).
+- **Right-click a note.** Offers **Open**, **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, and **Copy as Path**.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
 
@@ -93,7 +93,14 @@ Once open, cards respond to pointer gestures:
 
 Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot, and one with no saved size uses the default size.
 
-Right-click a card for a context menu. Both note and folder cards offer **Rename** and a row of color swatches. Hover a swatch to preview the card in that color, click to apply it, or pick the leftmost clear swatch to remove the color. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
+Right-click a card for its context menu:
+
+- **Both note and folder cards** offer a row of color swatches, **Rename**, **Reveal in Explorer**, and **Copy as Path**.
+- **Note cards** add **Open** and **Copy Contents**.
+
+Right-click the empty canvas for the open folder's menu: a row of color swatches, **New Note**, **New Folder**, **Reveal in Explorer**, and **Copy as Path**. New entries land in the open folder.
+
+Hover a swatch to preview that color, click to apply it, or pick the leftmost clear swatch to remove it. A card swatch tints the card, a background swatch tints the open folder and washes the canvas. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
 
 The color saves to the entry's `visual` block and tints its icon in the sidebar tree too. A folder's color also washes the canvas background while you are inside it.
 
