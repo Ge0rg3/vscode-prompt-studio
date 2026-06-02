@@ -9,13 +9,15 @@ import { ensureNoteExt, validateEntryName } from './entryName';
 
 // --- helpers ---
 
-// notes show without .md in the tree, pre-fill the rename box with the same stem
+// the name shown in the tree, notes drop the .md extension
+function displayName(node: VaultNode): string {
+  return node.kind === 'folder' ? node.name : node.name.replace(/\.md$/i, '');
+}
+
+// pre-fill the rename box with the tree name, selecting all of it
 function renamePrefill(node: VaultNode): { value: string; selectionEnd: number } {
-  if (node.kind === 'folder') {
-    return { value: node.name, selectionEnd: node.name.length };
-  }
-  const stem = node.name.replace(/\.md$/i, '');
-  return { value: stem, selectionEnd: stem.length };
+  const value = displayName(node);
+  return { value, selectionEnd: value.length };
 }
 
 // --- exports ---
@@ -89,5 +91,28 @@ export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
 
     await vscode.workspace.fs.rename(vscode.Uri.file(target.absPath), destination);
     config.relocate(target.absPath, destination.fsPath);
+  });
+}
+
+export function registerDeleteEntry(config: VaultConfig): vscode.Disposable {
+  return vscode.commands.registerCommand('promptStudio.delete', async (target?: VaultNode) => {
+    if (!target) {
+      return;
+    }
+
+    const label = target.kind === 'folder' ? 'folder' : 'note';
+    const detail =
+      target.kind === 'folder' ? 'The folder and everything inside it will be deleted.' : undefined;
+    const choice = await vscode.window.showWarningMessage(
+      `Delete ${label} "${displayName(target)}"?`,
+      { modal: true, detail },
+      'Delete'
+    );
+    if (choice !== 'Delete') {
+      return;
+    }
+
+    await vscode.workspace.fs.delete(vscode.Uri.file(target.absPath), { recursive: true });
+    config.remove(target.absPath);
   });
 }

@@ -23,6 +23,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.newFolder',
   'promptStudio.configureVault',
   'promptStudio.rename',
+  'promptStudio.delete',
   'promptStudio.copyContents',
   'promptStudio.copyPath',
   'promptStudio.revealInOS',

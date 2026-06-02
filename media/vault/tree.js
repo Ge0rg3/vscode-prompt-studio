@@ -301,7 +301,9 @@
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-        { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
+        { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' },
+        'sep',
+        { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
       ];
     }
     return [
@@ -313,7 +315,9 @@
       { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
+      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' },
+      'sep',
+      { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
     ];
   }
 

@@ -83,6 +83,11 @@
         "command": "promptStudio.revealInOS",
         "title": "Reveal in Explorer",
         "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.delete",
+        "title": "Delete",
+        "category": "Prompt Studio"
       }
     ],
     "viewsContainers": {
@@ -171,6 +176,10 @@
         },
         {
           "command": "promptStudio.revealInOS",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.delete",
           "when": "false"
         }
       ]

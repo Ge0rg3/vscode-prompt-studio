@@ -22,6 +22,7 @@ type InboundMessage =
 const REFRESH_DEBOUNCE_MS = 100;
 const ALLOWED_COMMANDS = new Set([
   'promptStudio.rename',
+  'promptStudio.delete',
   'promptStudio.copyContents',
   'promptStudio.copyPath',
   'promptStudio.revealInOS',

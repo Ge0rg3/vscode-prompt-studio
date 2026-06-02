@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { parse, stringify } from 'yaml';
 
+import { pathExists } from './utils/fs';
 import { VaultManager } from './vaultManager';
 
 export interface NotePosition {
@@ -244,6 +245,27 @@ export class VaultConfig implements vscode.Disposable {
     }
   }
 
+  // drop a deleted entry and any descendants from the metadata
+  remove(absPath: string): void {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return;
+    }
+
+    let changed = false;
+    for (const existing of [...this.entries.keys()]) {
+      if (existing === key || existing.startsWith(`${key}/`)) {
+        this.entries.delete(existing);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.scheduleWrite();
+      this.emitter.fire();
+    }
+  }
+
   dispose(): void {
     this.teardownWatcher();
     this.vaultSub.dispose();
@@ -349,11 +371,13 @@ export class VaultConfig implements vscode.Disposable {
         notes[key] = meta;
       }
     }
-    if (Object.keys(notes).length === 0) {
+
+    // a fresh vault with nothing to store gets no config.yml
+    const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
+    if (Object.keys(notes).length === 0 && !(await pathExists(configUri))) {
       return;
     }
 
-    const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
     const body = BANNER + stringify({ notes });
     try {
       this.lastSelfWrite = Date.now();

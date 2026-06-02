@@ -7,6 +7,7 @@ import { registerCreateFolder, registerCreateNote } from './vault/createEntries'
 import {
   registerCopyContents,
   registerCopyPath,
+  registerDeleteEntry,
   registerRenameEntry,
   registerRevealInOS
 } from './vault/entryActions';
@@ -38,6 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerCreateNote(vaultManager),
     registerCreateFolder(vaultManager),
     registerRenameEntry(config),
+    registerDeleteEntry(config),
     registerCopyContents(),
     registerCopyPath(),
     registerRevealInOS()
