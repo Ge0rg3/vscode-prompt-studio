@@ -70,10 +70,20 @@
     el.style.zIndex = String(card.z);
   }
 
+  // pointerdown landed on the target's scrollbar, not its content
+  function isScrollbarPress(event) {
+    const target = event.target;
+    return event.offsetX > target.clientWidth || event.offsetY > target.clientHeight;
+  }
+
   // drag to reposition, or run onClick when the pointer barely moved
   function attachDrag(el, card, onClick) {
     el.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) {
+        return;
+      }
+
+      if (isScrollbarPress(event)) {
         return;
       }
 
