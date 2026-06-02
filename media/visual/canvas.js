@@ -422,6 +422,8 @@
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: card.absPath }) },
         'sep',
+        { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
+        'sep',
         { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',

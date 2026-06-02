@@ -137,6 +137,22 @@
 
     const actions = document.createElement('span');
     actions.className = 'actions';
+
+    if (!isFolder) {
+      const sendAction = document.createElement('span');
+      sendAction.className = 'action codicon codicon-claude';
+      sendAction.title = 'Send to Claude';
+      sendAction.addEventListener('click', (e) => {
+        e.stopPropagation();
+        vscode.postMessage({
+          type: 'command',
+          command: 'promptStudio.sendToClaude',
+          node: serialize(node)
+        });
+      });
+      actions.appendChild(sendAction);
+    }
+
     const canvasAction = document.createElement('span');
     canvasAction.className = 'action codicon codicon-layout';
     canvasAction.title = 'Open Visual Canvas';
@@ -296,6 +312,8 @@
     if (node.kind === 'note') {
       return [
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
+        'sep',
+        { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
         { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
