@@ -33,7 +33,6 @@ export interface VisualState {
 }
 
 const NOTE_EXT = '.md';
-const PREVIEW_LIMIT = 280;
 const HEADING = /^\s*#{1,6}\s+(.+?)\s*$/;
 
 // how many nested folder layers a folder card previews before falling back to a plain icon
@@ -65,13 +64,9 @@ function deriveTitle(raw: string, fallback: string): string {
   return fallback;
 }
 
-// body preview with the leading heading dropped, clamped to a card-sized snippet
+// the note body with the leading heading dropped
 function previewOf(raw: string): string {
-  const body = raw.replace(/^\s*#{1,6}\s+[^\n]*\n?/, '').trim();
-  if (body.length <= PREVIEW_LIMIT) {
-    return body;
-  }
-  return body.slice(0, PREVIEW_LIMIT) + '...';
+  return raw.replace(/^\s*#{1,6}\s+[^\n]*\n?/, '').trim();
 }
 
 // alphabetical by title, case-insensitive

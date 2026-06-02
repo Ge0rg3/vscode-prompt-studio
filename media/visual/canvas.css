@@ -136,9 +136,13 @@ body {
 
 .card .preview {
   flex: 1;
-  margin: 0;
+  /* pull the scrollbar to the card edge, keep text inset */
+  margin: 0 -14px 0 0;
+  padding-right: 14px;
   white-space: pre-wrap;
-  overflow: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
   color: var(--vscode-descriptionForeground);
   font-family: var(--vscode-editor-font-family, monospace);
   font-size: 12px;
@@ -263,6 +267,11 @@ body {
 .mini-card.colored > .mini-title > .codicon,
 .mini-card.colored > .mini-preview {
   color: #3a3a3a;
+}
+
+/* accent-tinted scrollbar thumb */
+.card.colored > .preview {
+  scrollbar-color: var(--ps-accent) transparent;
 }
 
 .card.colored .resize-handle {

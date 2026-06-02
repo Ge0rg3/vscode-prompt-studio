@@ -71,7 +71,7 @@ Once a vault is set:
 
 Open any folder (or the vault root) as a pinboard of cards in the editor area. Breadcrumbs across the top walk back toward the root.
 
-- **Note cards** show the title and a short text preview.
+- **Note cards** show the title and the note body, scrolling when the text overflows the card.
 - **Folder cards** drill in on click, and preview their contents as a scaled-down render of their own canvas, inner cards at their saved spots.
 
 The folder preview recurses up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). An empty folder, or one past that depth, shows a plain folder glyph.
