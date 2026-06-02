@@ -183,7 +183,8 @@ body {
   padding: 12px 14px;
   border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   border-radius: 6px;
-  /* opaque base keeps the card neutral over a colored folder */
+  /* neutral fill and text over a colored folder */
+  color: var(--vscode-foreground);
   background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten, 14%), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
   overflow: hidden;
 }
@@ -251,15 +252,16 @@ body {
   background-color: var(--ps-fill);
 }
 
-/* lighten toward white, keeping the dark card text readable */
+/* lighten toward white */
 .mini-card.colored {
   background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten, 14%), var(--ps-fill));
 }
 
-.card.colored .title .codicon,
-.card.colored .preview,
-.mini-card.colored .mini-title .codicon,
-.mini-card.colored .mini-preview {
+/* dark text on the colored card's own icon and preview */
+.card.colored > .title > .codicon,
+.card.colored > .preview,
+.mini-card.colored > .mini-title > .codicon,
+.mini-card.colored > .mini-preview {
   color: #3a3a3a;
 }
 
