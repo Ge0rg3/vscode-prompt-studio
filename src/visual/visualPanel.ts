@@ -117,7 +117,7 @@ export class VisualPanel {
     void this.postState();
   }
 
-  // tear down any previous watcher, attach a new one to the current folder's direct children
+  // point the watcher at the current folder's direct children
   private rebuildWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -142,7 +142,7 @@ export class VisualPanel {
     this.scheduleRefresh();
   }
 
-  // coalesce bursts of fs events into a single debounced state push
+  // collapse a burst of fs events into one delayed state push
   private scheduleRefresh(): void {
     if (this.refreshScheduled) {
       return;

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { isWithin } from '../common/utils/paths';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
@@ -48,7 +49,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         this.rebuildWatcher();
         void this.postState();
       }),
-      config.onDidChange(() => this.scheduleRefresh())
+      config.onDidChange(() => this.scheduleRefresh()),
+      vscode.window.onDidChangeActiveTextEditor(() => this.postActiveNote())
     );
   }
 
@@ -83,7 +85,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     }
   }
 
-  // tear down any previous watcher, attach a new one to the current vault root
+  // point the watcher at the current vault root
   private rebuildWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -104,7 +106,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     );
   }
 
-  // coalesce bursts of fs events into a single debounced state push
+  // collapse a burst of fs events into one delayed state push
   private scheduleRefresh(): void {
     if (this.refreshScheduled) {
       return;
@@ -129,10 +131,19 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     await this.view.webview.postMessage({ type: 'state', state });
   }
 
+  // highlight the row for the active editor, or clear it for files outside the vault
+  private postActiveNote(): void {
+    const root = this.vaultManager.getVaultRoot();
+    const active = vscode.window.activeTextEditor?.document.uri.fsPath;
+    const notePath = active && root && isWithin(active, root) ? active : null;
+    void this.view?.webview.postMessage({ type: 'activeNote', path: notePath });
+  }
+
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
         await this.postState();
+        this.postActiveNote();
         return;
       case 'openNote':
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));

@@ -33,6 +33,8 @@
     } else if (msg.type === 'collapseAll') {
       expanded.clear();
       render();
+    } else if (msg.type === 'activeNote') {
+      select(msg.path);
     }
   });
 
