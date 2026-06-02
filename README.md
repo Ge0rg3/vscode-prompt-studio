@@ -121,7 +121,7 @@ To launch the extension, open this folder in VSCode and press **F5**. That opens
 Build a `.vsix` and install it into your everyday VSCode:
 
 ```bash
-npm run vsix                                          # writes prompt-studio-<version>.vsix
+yes | npm run vsix                                  # writes prompt-studio-<version>.vsix
 code --install-extension prompt-studio-0.0.1.vsix
 ```
 
