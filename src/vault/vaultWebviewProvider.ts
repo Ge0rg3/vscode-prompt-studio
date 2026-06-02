@@ -37,6 +37,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
   private readonly watcherSubs: vscode.Disposable[] = [];
   private watcher: vscode.FileSystemWatcher | undefined;
   private refreshScheduled = false;
+  private activeVisualFolder: string | undefined;
 
   constructor(
     private readonly vaultManager: VaultManager,
@@ -50,7 +51,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         void this.postState();
       }),
       config.onDidChange(() => this.scheduleRefresh()),
-      vscode.window.onDidChangeActiveTextEditor(() => this.postActiveNote())
+      vscode.window.onDidChangeActiveTextEditor(() => this.syncSelection())
     );
   }
 
@@ -73,6 +74,12 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
 
   collapseAll(): void {
     void this.view?.webview.postMessage({ type: 'collapseAll' });
+  }
+
+  // track the folder shown by the active canvas, or undefined when no canvas is active
+  setActiveVisualFolder(folder: string | undefined): void {
+    this.activeVisualFolder = folder;
+    this.syncSelection();
   }
 
   dispose(): void {
@@ -131,19 +138,24 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     await this.view.webview.postMessage({ type: 'state', state });
   }
 
-  // highlight the row for the active editor, or clear it for files outside the vault
-  private postActiveNote(): void {
+  // highlight the active canvas folder, or the active editor's note when no canvas is active
+  private syncSelection(): void {
+    if (this.activeVisualFolder) {
+      void this.view?.webview.postMessage({ type: 'select', path: this.activeVisualFolder });
+      return;
+    }
+
     const root = this.vaultManager.getVaultRoot();
     const active = vscode.window.activeTextEditor?.document.uri.fsPath;
     const notePath = active && root && isWithin(active, root) ? active : null;
-    void this.view?.webview.postMessage({ type: 'activeNote', path: notePath });
+    void this.view?.webview.postMessage({ type: 'select', path: notePath });
   }
 
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
         await this.postState();
-        this.postActiveNote();
+        this.syncSelection();
         return;
       case 'openNote':
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));

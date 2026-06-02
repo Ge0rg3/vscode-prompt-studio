@@ -36,6 +36,14 @@ function titleFor(folder: string): string {
   return `Visual: ${path.basename(folder) || folder}`;
 }
 
+// scripts on, asset loads limited to the bundled media folder
+function webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+  return {
+    enableScripts: true,
+    localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
+  };
+}
+
 // --- exports ---
 
 export class VisualPanel {
@@ -48,6 +56,7 @@ export class VisualPanel {
     extensionUri: vscode.Uri,
     config: VaultConfig,
     vaultRoot: string,
+    activeFolderEmitter: vscode.EventEmitter<string | undefined>,
     folder: string
   ): void {
     if (VisualPanel.current) {
@@ -60,13 +69,22 @@ export class VisualPanel {
       VisualPanel.viewType,
       titleFor(folder),
       vscode.ViewColumn.Active,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
-      }
+      { ...webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
-    VisualPanel.current = new VisualPanel(panel, extensionUri, config, vaultRoot, folder);
+    VisualPanel.current = new VisualPanel(panel, extensionUri, config, vaultRoot, activeFolderEmitter, folder);
+  }
+
+  // reattach to a canvas panel VSCode restored after a window reload
+  static restore(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    config: VaultConfig,
+    vaultRoot: string,
+    activeFolderEmitter: vscode.EventEmitter<string | undefined>,
+    folder: string
+  ): void {
+    panel.webview.options = webviewOptions(extensionUri);
+    VisualPanel.current = new VisualPanel(panel, extensionUri, config, vaultRoot, activeFolderEmitter, folder);
   }
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -80,20 +98,25 @@ export class VisualPanel {
     private readonly extensionUri: vscode.Uri,
     private readonly config: VaultConfig,
     private readonly vaultRoot: string,
+    private readonly activeFolderEmitter: vscode.EventEmitter<string | undefined>,
     initialFolder: string
   ) {
     this.folder = initialFolder;
+    this.panel.title = titleFor(initialFolder);
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
       this.panel.onDidDispose(() => this.dispose()),
+      this.panel.onDidChangeViewState(() => this.emitActiveFolder()),
       this.config.onDidChange(() => this.scheduleRefresh())
     );
     this.rebuildWatcher();
+    this.emitActiveFolder();
   }
 
   private dispose(): void {
     VisualPanel.current = undefined;
+    this.activeFolderEmitter.fire(undefined);
 
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -115,6 +138,12 @@ export class VisualPanel {
     this.panel.title = titleFor(folder);
     this.rebuildWatcher();
     void this.postState();
+    this.emitActiveFolder();
+  }
+
+  // fire this canvas's folder while it is the active panel, undefined otherwise
+  private emitActiveFolder(): void {
+    this.activeFolderEmitter.fire(this.panel.active ? this.folder : undefined);
   }
 
   // point the watcher at the current folder's direct children

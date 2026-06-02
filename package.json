@@ -13,7 +13,8 @@
     "url": "https://github.com/Ge0rg3/vscode-prompt-studio.git"
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onWebviewPanel:promptStudio.visual"
   ],
   "contributes": {
     "configuration": {

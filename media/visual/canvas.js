@@ -267,7 +267,7 @@
       return previewBox;
     }
 
-    // the canvas extent measured from its (0, 0) origin, so cards keep their place in the preview
+    // the canvas extent measured from its (0, 0) origin
     let canvasW = 0;
     let canvasH = 0;
     for (const child of children) {
@@ -567,6 +567,8 @@
     const msg = event.data;
     if (msg && msg.type === 'state') {
       render(msg.state);
+      // stash the open folder so VSCode can restore the canvas after a reload
+      vscode.setState({ folder: currentFolderNode().absPath });
     }
   });
 

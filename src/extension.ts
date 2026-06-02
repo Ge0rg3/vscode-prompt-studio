@@ -11,7 +11,7 @@ import {
   registerRevealInOS
 } from './vault/entryActions';
 import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWebviewProvider';
-import { registerOpenVisual } from './visual/openVisual';
+import { registerOpenVisual, registerVisualSerializer } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
   const vaultManager = new VaultManager(context.globalStorageUri.fsPath);
@@ -20,6 +20,9 @@ export function activate(context: vscode.ExtensionContext): void {
   const config = new VaultConfig(vaultManager);
   context.subscriptions.push(config);
 
+  const activeFolderEmitter = new vscode.EventEmitter<string | undefined>();
+  context.subscriptions.push(activeFolderEmitter);
+
   const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri);
   context.subscriptions.push(provider);
 
@@ -27,9 +30,11 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(VaultWebviewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true }
     }),
+    activeFolderEmitter.event((folder) => provider.setActiveVisualFolder(folder)),
     registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
     registerVaultViewCommands(provider),
-    registerOpenVisual(vaultManager, config, context.extensionUri),
+    registerOpenVisual(vaultManager, config, context.extensionUri, activeFolderEmitter),
+    registerVisualSerializer(vaultManager, config, context.extensionUri, activeFolderEmitter),
     registerCreateNote(vaultManager),
     registerCreateFolder(vaultManager),
     registerRenameEntry(config),
