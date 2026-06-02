@@ -54,7 +54,7 @@ Open the activity-bar icon, click **Configure Vault** in the empty view (or run 
 2. **Custom folder.** Any absolute path on disk.
 3. **Folder inside this workspace.** A subfolder of the current workspace, e.g. `<workspace>/prompts`, so the vault is versioned alongside your code.
 
-The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default"). The view reacts to setting changes immediately.
+The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default").
 
 ### Create and organize notes
 
@@ -76,8 +76,6 @@ Open any folder (or the vault root) as a pinboard of cards in the editor area. B
 
 The folder preview recurses up to three layers deep (`PREVIEW_DEPTH` in [src/visual/folderContents.ts](src/visual/folderContents.ts)). An empty folder, or one past that depth, shows a plain folder glyph.
 
-Each nested level is tinted to stand apart from the one around it, so folders sharing a color (or sharing the default gray) stay distinct.
-
 Launch it from:
 
 - **Title-bar button.** The **Open Visual Canvas** button in the view header opens the vault root.
@@ -88,11 +86,11 @@ Launch it from:
 
 Once open, cards respond to pointer gestures:
 
-- **Drag.** Reposition a card anywhere, OneNote style. Dragging also brings it to the front, so the most recently moved card stays on top of any it overlaps.
+- **Drag.** Reposition a card anywhere, OneNote style.
 - **Resize.** Drag the handle at a card's bottom-right corner. A folder card keeps its preview at a fixed scale anchored to the top-left, so resizing reveals more or less of its contents instead of scaling them.
 - **Click.** Without dragging, act on a card: a note opens in an editor, a folder card navigates into it.
 
-Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree. A card with no saved position falls into a tidy grid slot, and one with no saved size uses the default size.
+Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree.
 
 Right-click a card for its context menu:
 
@@ -103,7 +101,7 @@ Right-click the empty canvas for the open folder's menu: a row of color swatches
 
 Hover a swatch to preview that color, click to apply it, or pick the leftmost clear swatch to remove it. A card swatch tints the card, a background swatch tints the open folder and washes the canvas. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
 
-The color saves to the entry's `visual` block and tints its icon in the sidebar tree too. A folder's color also washes the canvas background while you are inside it.
+The color saves to the entry's `visual` block and tints its icon in the sidebar tree too.
 
 Wikilinks and prompts are not built yet.
 
