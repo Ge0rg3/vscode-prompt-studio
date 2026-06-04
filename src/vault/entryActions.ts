@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import { pathExists } from '../common/utils/fs';
 import { VaultConfig } from '../common/vaultConfig';
+import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { ensureNoteExt, validateEntryName } from './entryName';
 
@@ -18,6 +19,12 @@ function displayName(node: VaultNode): string {
 function renamePrefill(node: VaultNode): { value: string; selectionEnd: number } {
   const value = displayName(node);
   return { value, selectionEnd: value.length };
+}
+
+// write a path to the clipboard and flash a status bar message naming the entry
+async function copyPathToClipboard(pathText: string, name: string): Promise<void> {
+  await vscode.env.clipboard.writeText(pathText);
+  void vscode.window.setStatusBarMessage(`Copied path of "${name}" to clipboard.`, 2000);
 }
 
 // --- exports ---
@@ -48,15 +55,33 @@ export function registerCopyContents(): vscode.Disposable {
   );
 }
 
-export function registerCopyPath(): vscode.Disposable {
-  return vscode.commands.registerCommand('promptStudio.copyPath', async (target?: VaultNode) => {
-    if (!target) {
-      return;
-    }
+export function registerCopyPathStatic(): vscode.Disposable {
+  return vscode.commands.registerCommand(
+    'promptStudio.copyPathStatic',
+    async (target?: VaultNode) => {
+      if (!target) {
+        return;
+      }
 
-    await vscode.env.clipboard.writeText(target.absPath);
-    void vscode.window.setStatusBarMessage(`Copied path of "${target.name}" to clipboard.`, 2000);
-  });
+      await copyPathToClipboard(target.absPath, target.name);
+    }
+  );
+}
+
+export function registerCopyPathRelative(vaultManager: VaultManager): vscode.Disposable {
+  return vscode.commands.registerCommand(
+    'promptStudio.copyPathRelative',
+    async (target?: VaultNode) => {
+      const vaultRoot = vaultManager.getVaultRoot();
+      if (!target || !vaultRoot) {
+        return;
+      }
+
+      // '.' when the target is the vault root itself
+      const relativePath = path.relative(vaultRoot, target.absPath) || '.';
+      await copyPathToClipboard(relativePath, target.name);
+    }
+  );
 }
 
 export function registerRenameEntry(config: VaultConfig): vscode.Disposable {

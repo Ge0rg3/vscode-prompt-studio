@@ -216,3 +216,40 @@ body.focused .row.selected {
   margin: 4px 0;
   background: var(--vscode-menu-separatorBackground, rgba(255, 255, 255, 0.12));
 }
+
+.submenu-arrow {
+  margin-left: auto;
+  padding-left: 12px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.submenu {
+  position: fixed;
+  z-index: 1001;
+  min-width: 140px;
+  padding: 4px 0;
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #1f1f1f));
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-widget-border, rgba(255, 255, 255, 0.1)));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  border-radius: 4px;
+}
+
+.submenu.hidden {
+  display: none;
+}
+
+.submenu.inline {
+  position: static;
+  min-width: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+}
+
+.submenu.inline .menu-item {
+  padding-left: 32px;
+}

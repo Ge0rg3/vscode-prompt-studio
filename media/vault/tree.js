@@ -308,6 +308,19 @@
 
   // --- context menu ---
 
+  // how long the pointer must rest on a parent before its submenu opens
+  const SUBMENU_OPEN_DELAY_MS = 150;
+
+  // Copy as Path opens a submenu for the absolute or the vault-relative path
+  const COPY_PATH_ITEM = {
+    label: 'Copy as Path',
+    icon: 'file-symlink-file',
+    submenu: [
+      { label: 'Static', icon: 'link', cmd: 'promptStudio.copyPathStatic' },
+      { label: 'Relative', icon: 'file-submodule', cmd: 'promptStudio.copyPathRelative' }
+    ]
+  };
+
   function menuFor(node) {
     if (node.kind === 'note') {
       return [
@@ -319,7 +332,7 @@
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-        { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' },
+        COPY_PATH_ITEM,
         'sep',
         { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
       ];
@@ -333,7 +346,7 @@
       { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-      { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' },
+      COPY_PATH_ITEM,
       'sep',
       { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
     ];
@@ -348,6 +361,104 @@
     ];
   }
 
+  // a clickable menu row that runs its action or sends its command
+  function buildMenuItem(entry, node) {
+    const item = document.createElement('div');
+    item.className = 'menu-item';
+    const icon = document.createElement('span');
+    icon.className = `codicon codicon-${entry.icon}`;
+    const label = document.createElement('span');
+    label.textContent = entry.label;
+    item.appendChild(icon);
+    item.appendChild(label);
+
+    item.addEventListener('click', () => {
+      hideMenu();
+      if (entry.action) {
+        entry.action();
+        return;
+      }
+      if (entry.expandFolder && node && node.kind === 'folder') {
+        expanded.add(node.absPath);
+        render();
+      }
+      vscode.postMessage({
+        type: 'command',
+        command: entry.cmd,
+        node: node ? serialize(node) : undefined
+      });
+    });
+    return item;
+  }
+
+  // place the submenu beside its parent when it fits there, else expand it inline below
+  function openSubmenu(header, submenu, arrow) {
+    submenu.classList.remove('hidden', 'inline');
+    const rect = header.getBoundingClientRect();
+    const width = submenu.offsetWidth;
+    const fitsRight = rect.right + width <= window.innerWidth - 4;
+    const fitsLeft = rect.left - width >= 4;
+
+    if (fitsRight || fitsLeft) {
+      arrow.className = 'submenu-arrow codicon codicon-chevron-right';
+      const left = fitsRight ? rect.right : rect.left - width;
+      const top = Math.min(rect.top, Math.max(0, window.innerHeight - submenu.offsetHeight - 4));
+      submenu.style.left = `${left}px`;
+      submenu.style.top = `${top}px`;
+    } else {
+      arrow.className = 'submenu-arrow codicon codicon-chevron-down';
+      submenu.classList.add('inline');
+      // pull the menu up so the expanded rows stay on-screen
+      if (menuEl.getBoundingClientRect().bottom > window.innerHeight - 4) {
+        menuEl.style.top = `${Math.max(4, window.innerHeight - menuEl.offsetHeight - 4)}px`;
+      }
+    }
+  }
+
+  // reset the submenu to its closed state
+  function closeSubmenu(submenu, arrow) {
+    submenu.classList.add('hidden');
+    submenu.classList.remove('inline');
+    arrow.className = 'submenu-arrow codicon codicon-chevron-right';
+  }
+
+  // a parent whose children fly out beside it, or expand inline when there is no room
+  function buildSubmenuItem(entry, node) {
+    const parent = document.createElement('div');
+    parent.className = 'submenu-parent';
+
+    const header = document.createElement('div');
+    header.className = 'menu-item';
+    const icon = document.createElement('span');
+    icon.className = `codicon codicon-${entry.icon}`;
+    const label = document.createElement('span');
+    label.textContent = entry.label;
+    const arrow = document.createElement('span');
+    arrow.className = 'submenu-arrow codicon codicon-chevron-right';
+    header.appendChild(icon);
+    header.appendChild(label);
+    header.appendChild(arrow);
+
+    const submenu = document.createElement('div');
+    submenu.className = 'submenu hidden';
+    for (const child of entry.submenu) {
+      submenu.appendChild(buildMenuItem(child, node));
+    }
+
+    parent.appendChild(header);
+    parent.appendChild(submenu);
+
+    let openTimer;
+    parent.addEventListener('mouseenter', () => {
+      openTimer = setTimeout(() => openSubmenu(header, submenu, arrow), SUBMENU_OPEN_DELAY_MS);
+    });
+    parent.addEventListener('mouseleave', () => {
+      clearTimeout(openTimer);
+      closeSubmenu(submenu, arrow);
+    });
+    return parent;
+  }
+
   function showMenu(x, y, items, node) {
     menuEl.replaceChildren();
     for (const entry of items) {
@@ -357,32 +468,8 @@
         menuEl.appendChild(sep);
         continue;
       }
-      const item = document.createElement('div');
-      item.className = 'menu-item';
-      const icon = document.createElement('span');
-      icon.className = `codicon codicon-${entry.icon}`;
-      const label = document.createElement('span');
-      label.textContent = entry.label;
-      item.appendChild(icon);
-      item.appendChild(label);
 
-      item.addEventListener('click', () => {
-        hideMenu();
-        if (entry.action) {
-          entry.action();
-          return;
-        }
-        if (entry.expandFolder && node && node.kind === 'folder') {
-          expanded.add(node.absPath);
-          render();
-        }
-        vscode.postMessage({
-          type: 'command',
-          command: entry.cmd,
-          node: node ? serialize(node) : undefined
-        });
-      });
-      menuEl.appendChild(item);
+      menuEl.appendChild(entry.submenu ? buildSubmenuItem(entry, node) : buildMenuItem(entry, node));
     }
     menuEl.classList.remove('hidden');
 

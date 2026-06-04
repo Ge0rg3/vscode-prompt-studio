@@ -6,7 +6,8 @@ import { registerConfigureVault } from './vault/configureVault';
 import { registerCreateFolder, registerCreateNote } from './vault/createEntries';
 import {
   registerCopyContents,
-  registerCopyPath,
+  registerCopyPathRelative,
+  registerCopyPathStatic,
   registerDeleteEntry,
   registerRenameEntry,
   registerRevealInOS
@@ -43,7 +44,8 @@ export function activate(context: vscode.ExtensionContext): void {
     registerDeleteEntry(config),
     registerCopyContents(),
     registerSendToClaude(),
-    registerCopyPath(),
+    registerCopyPathStatic(),
+    registerCopyPathRelative(vaultManager),
     registerRevealInOS()
   );
 }

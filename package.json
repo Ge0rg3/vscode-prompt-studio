@@ -80,8 +80,13 @@
         "category": "Prompt Studio"
       },
       {
-        "command": "promptStudio.copyPath",
-        "title": "Copy as Path",
+        "command": "promptStudio.copyPathStatic",
+        "title": "Copy as Path (Static)",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.copyPathRelative",
+        "title": "Copy as Path (Relative)",
         "category": "Prompt Studio"
       },
       {
@@ -180,7 +185,11 @@
           "when": "false"
         },
         {
-          "command": "promptStudio.copyPath",
+          "command": "promptStudio.copyPathStatic",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.copyPathRelative",
           "when": "false"
         },
         {

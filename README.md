@@ -62,7 +62,7 @@ Once a vault is set:
 
 - **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
 - **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root, plus **Open as Canvas** (detailed under Visual canvas).
-- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (copies the absolute path to the clipboard), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
+- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (a submenu offering **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
 - **Right-click a note.** Offers **Open**, **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows a quick **Send to Claude** button.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
