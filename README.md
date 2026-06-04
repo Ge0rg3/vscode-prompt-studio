@@ -97,7 +97,7 @@ Right-click a card for its context menu:
 - **Both note and folder cards** offer a row of color swatches, **Rename**, **Reveal in Explorer**, **Copy as Path**, and **Delete**.
 - **Note cards** add **Open**, **Send to Claude**, and **Copy Contents**.
 
-Right-click the empty canvas for the open folder's menu: a row of color swatches, **New Note**, **New Folder**, **Reveal in Explorer**, and **Copy as Path**. New entries land in the open folder.
+Right-click the empty canvas for the open folder's menu: a row of color swatches, **New Note**, **New Folder**, **Reveal in Explorer**, and **Copy as Path**. New entries land in the open folder, their card placed where you right-clicked.
 
 Hover a swatch to preview that color, click to apply it, or pick the leftmost clear swatch to remove it. A card swatch tints the card, a background swatch tints the open folder and washes the canvas. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
 

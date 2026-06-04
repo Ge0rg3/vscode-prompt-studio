@@ -45,6 +45,13 @@ const GRID_MARGIN = 24;
 const GRID_GAP = 20;
 const GRID_COLUMNS = 4;
 
+interface CardRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 // --- helpers ---
 
 // read a file as utf-8 text
@@ -93,8 +100,18 @@ function buildBreadcrumbs(vaultRoot: string, folder: string): Breadcrumb[] {
   return crumbs;
 }
 
-// grid slot for a card with no saved position, by its index in the ordered list
-function autoPosition(index: number): NotePosition {
+// two card rectangles overlap on both axes
+function overlaps(first: CardRect, second: CardRect): boolean {
+  return (
+    first.x < second.x + second.width &&
+    first.x + first.width > second.x &&
+    first.y < second.y + second.height &&
+    first.y + first.height > second.y
+  );
+}
+
+// the nth grid slot, filling left to right then top to bottom
+function gridSlot(index: number): NotePosition {
   const column = index % GRID_COLUMNS;
   const row = Math.floor(index / GRID_COLUMNS);
   return {
@@ -103,17 +120,47 @@ function autoPosition(index: number): NotePosition {
   };
 }
 
-// give each card its saved position, size, and stacking order
-function placeCards(config: VaultConfig, cards: VisualCard[]): void {
-  for (let i = 0; i < cards.length; i++) {
-    const position = config.getPosition(cards[i].absPath) ?? autoPosition(i);
-    cards[i].x = position.x;
-    cards[i].y = position.y;
-    cards[i].z = config.getZ(cards[i].absPath);
+// the first grid slot whose card rectangle clears every occupied rectangle
+function firstFreeSlot(occupied: CardRect[], width: number, height: number): NotePosition {
+  for (let index = 0; ; index++) {
+    const slot = gridSlot(index);
+    const rect = { x: slot.x, y: slot.y, width, height };
+    if (!occupied.some((taken) => overlaps(rect, taken))) {
+      return slot;
+    }
+  }
+}
 
-    const size = config.getSize(cards[i].absPath) ?? { width: CARD_W, height: CARD_H };
-    cards[i].width = size.width;
-    cards[i].height = size.height;
+// a card's current rectangle
+function rectOf(card: VisualCard): CardRect {
+  return { x: card.x, y: card.y, width: card.width, height: card.height };
+}
+
+// size and stack every card, keep saved positions, flow the rest into free slots
+function placeCards(config: VaultConfig, cards: VisualCard[]): void {
+  const occupied: CardRect[] = [];
+  const unplaced: VisualCard[] = [];
+  for (const card of cards) {
+    const size = config.getSize(card.absPath) ?? { width: CARD_W, height: CARD_H };
+    card.width = size.width;
+    card.height = size.height;
+    card.z = config.getZ(card.absPath);
+
+    const saved = config.getPosition(card.absPath);
+    if (saved) {
+      card.x = saved.x;
+      card.y = saved.y;
+      occupied.push(rectOf(card));
+    } else {
+      unplaced.push(card);
+    }
+  }
+
+  for (const card of unplaced) {
+    const slot = firstFreeSlot(occupied, card.width, card.height);
+    card.x = slot.x;
+    card.y = slot.y;
+    occupied.push(rectOf(card));
   }
 }
 

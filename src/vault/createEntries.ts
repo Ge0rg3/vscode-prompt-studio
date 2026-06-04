@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { pathExists } from '../common/utils/fs';
+import { NotePosition, VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { ensureNoteExt, validateEntryName } from './entryName';
@@ -35,10 +36,13 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
 
 // --- exports ---
 
-export function registerCreateNote(vaultManager: VaultManager): vscode.Disposable {
+export function registerCreateNote(
+  vaultManager: VaultManager,
+  config: VaultConfig
+): vscode.Disposable {
   return vscode.commands.registerCommand(
     'promptStudio.newNote',
-    async (contextNode?: VaultNode) => {
+    async (contextNode?: VaultNode, position?: NotePosition) => {
       const parentDir = resolveParentDir(vaultManager, contextNode);
       if (!ensureVault(parentDir)) {
         return;
@@ -64,15 +68,21 @@ export function registerCreateNote(vaultManager: VaultManager): vscode.Disposabl
       }
 
       await vscode.workspace.fs.writeFile(target, new Uint8Array());
+      if (position) {
+        config.setPosition(target.fsPath, position);
+      }
       await vscode.commands.executeCommand('vscode.open', target);
     }
   );
 }
 
-export function registerCreateFolder(vaultManager: VaultManager): vscode.Disposable {
+export function registerCreateFolder(
+  vaultManager: VaultManager,
+  config: VaultConfig
+): vscode.Disposable {
   return vscode.commands.registerCommand(
     'promptStudio.newFolder',
-    async (contextNode?: VaultNode) => {
+    async (contextNode?: VaultNode, position?: NotePosition) => {
       const parentDir = resolveParentDir(vaultManager, contextNode);
       if (!ensureVault(parentDir)) {
         return;
@@ -96,6 +106,9 @@ export function registerCreateFolder(vaultManager: VaultManager): vscode.Disposa
       }
 
       await vscode.workspace.fs.createDirectory(target);
+      if (position) {
+        config.setPosition(target.fsPath, position);
+      }
     }
   );
 }

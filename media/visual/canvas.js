@@ -445,13 +445,22 @@
     ];
   }
 
+  // surface coordinates that center a default card on the click point
+  function dropPoint(event) {
+    const rect = surfaceEl.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.round(event.clientX - rect.left - DEFAULT_CARD_W / 2)),
+      y: Math.max(0, Math.round(event.clientY - rect.top - DEFAULT_CARD_H / 2))
+    };
+  }
+
   // empty-area right-click menu, acts on the open folder
-  function backgroundMenu() {
+  function backgroundMenu(dropPos) {
     return [
       { kind: 'swatches', target: folderColorTarget() },
       'sep',
-      { label: 'New Note', icon: 'new-file', cmd: 'promptStudio.newNote' },
-      { label: 'New Folder', icon: 'new-folder', cmd: 'promptStudio.newFolder' },
+      { label: 'New Note', icon: 'new-file', action: () => vscode.postMessage({ type: 'newEntry', kind: 'note', x: dropPos.x, y: dropPos.y }) },
+      { label: 'New Folder', icon: 'new-folder', action: () => vscode.postMessage({ type: 'newEntry', kind: 'folder', x: dropPos.x, y: dropPos.y }) },
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       { label: 'Copy as Path', icon: 'file-symlink-file', cmd: 'promptStudio.copyPath' }
@@ -564,7 +573,7 @@
     }
 
     event.preventDefault();
-    showMenu(event.clientX, event.clientY, backgroundMenu(), currentFolderNode());
+    showMenu(event.clientX, event.clientY, backgroundMenu(dropPoint(event)), currentFolderNode());
   });
 
   // --- inbound state ---

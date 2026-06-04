@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 
 import { isWithin } from '../common/utils/paths';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
-import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
+import { CONFIG_FILENAME, NotePosition, VaultConfig } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 import { CARD_COLORS, isCardColor } from './cardColors';
 import { readFolder } from './folderContents';
@@ -17,6 +17,7 @@ type InboundMessage =
   | { type: 'moveCard'; path: string; x: number; y: number; z: number }
   | { type: 'resizeCard'; path: string; width: number; height: number }
   | { type: 'setColor'; path: string; color: string | null }
+  | { type: 'newEntry'; kind: 'note' | 'folder'; x: number; y: number }
   | { type: 'command'; command: string; node: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
@@ -26,9 +27,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.copyContents',
   'promptStudio.sendToClaude',
   'promptStudio.copyPath',
-  'promptStudio.revealInOS',
-  'promptStudio.newNote',
-  'promptStudio.newFolder'
+  'promptStudio.revealInOS'
 ]);
 
 // --- helpers ---
@@ -210,12 +209,22 @@ export class VisualPanel {
           this.config.setColor(msg.path, msg.color);
         }
         return;
+      case 'newEntry':
+        await this.createEntry(msg.kind, { x: msg.x, y: msg.y });
+        return;
       case 'command':
         if (ALLOWED_COMMANDS.has(msg.command)) {
           await vscode.commands.executeCommand(msg.command, msg.node);
         }
         return;
     }
+  }
+
+  // create a note or folder in the open folder, pinned at the drop point
+  private async createEntry(kind: 'note' | 'folder', position: NotePosition): Promise<void> {
+    const node: VaultNode = { kind: 'folder', absPath: this.folder, name: path.basename(this.folder) };
+    const command = kind === 'note' ? 'promptStudio.newNote' : 'promptStudio.newFolder';
+    await vscode.commands.executeCommand(command, node, position);
   }
 
   private async postState(): Promise<void> {
