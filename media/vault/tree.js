@@ -82,6 +82,18 @@
     treeEl.appendChild(hint);
   }
 
+  // a hover-row icon that runs a command on the node
+  function actionButton(icon, title, command, node) {
+    const action = document.createElement('span');
+    action.className = `action codicon codicon-${icon}`;
+    action.title = title;
+    action.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vscode.postMessage({ type: 'command', command, node: serialize(node) });
+    });
+    return action;
+  }
+
   function renderNode(node, depth) {
     const isFolder = node.kind === 'folder';
     const isOpen = isFolder && expanded.has(node.absPath);
@@ -139,32 +151,10 @@
     actions.className = 'actions';
 
     if (!isFolder) {
-      const sendAction = document.createElement('span');
-      sendAction.className = 'action codicon codicon-claude';
-      sendAction.title = 'Send to Claude';
-      sendAction.addEventListener('click', (e) => {
-        e.stopPropagation();
-        vscode.postMessage({
-          type: 'command',
-          command: 'promptStudio.sendToClaude',
-          node: serialize(node)
-        });
-      });
-      actions.appendChild(sendAction);
+      actions.appendChild(actionButton('files', 'Open as Template', 'promptStudio.openTemplate', node));
+      actions.appendChild(actionButton('claude', 'Send to Claude', 'promptStudio.sendToClaude', node));
     }
-
-    const canvasAction = document.createElement('span');
-    canvasAction.className = 'action codicon codicon-layout';
-    canvasAction.title = 'Open Visual Canvas';
-    canvasAction.addEventListener('click', (e) => {
-      e.stopPropagation();
-      vscode.postMessage({
-        type: 'command',
-        command: 'promptStudio.openVisual',
-        node: serialize(node)
-      });
-    });
-    actions.appendChild(canvasAction);
+    actions.appendChild(actionButton('layout', 'Open Visual Canvas', 'promptStudio.openVisual', node));
     row.appendChild(actions);
 
     row.addEventListener('click', (e) => {
@@ -325,6 +315,7 @@
     if (node.kind === 'note') {
       return [
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
+        { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openTemplate' },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',

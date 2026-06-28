@@ -63,9 +63,19 @@ Once a vault is set:
 - **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
 - **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root, plus **Open as Canvas** (detailed under Visual canvas).
 - **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (a submenu offering **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
-- **Right-click a note.** Offers **Open**, **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows a quick **Send to Claude** button.
+- **Right-click a note.** Offers **Open**, **Open as Template** (opens an editable copy in its own tab, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
+
+### Template view
+
+**Open as Template** on a note opens an editable copy in its own editor tab, titled `<note> (template)`. Edits live only in the tab and never write back to the note, so there is nothing to save.
+
+A bar along the bottom offers:
+
+- **Preview / Edit.** Toggle between the raw markdown and a rendered preview of it.
+- **Copy.** Put the current text on the clipboard.
+- **Send to Claude.** Drop the current text into the Claude Code chat input.
 
 ### Visual canvas
 
@@ -95,7 +105,7 @@ Position, size, and stacking order save to the card's `visual` block in `config.
 Right-click a card for its context menu:
 
 - **Both note and folder cards** offer a row of color swatches, **Rename**, **Reveal in Explorer**, **Copy as Path**, and **Delete**.
-- **Note cards** add **Open**, **Send to Claude**, and **Copy Contents**.
+- **Note cards** add **Open**, **Open as Template**, **Send to Claude**, and **Copy Contents**.
 
 Right-click the empty canvas for the open folder's menu: a row of color swatches, **New Note**, **New Folder**, **Reveal in Explorer**, and **Copy as Path**. New entries land in the open folder, their card placed where you right-clicked.
 

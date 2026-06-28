@@ -25,6 +25,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.rename',
   'promptStudio.delete',
   'promptStudio.copyContents',
+  'promptStudio.openTemplate',
   'promptStudio.sendToClaude',
   'promptStudio.copyPathStatic',
   'promptStudio.copyPathRelative',

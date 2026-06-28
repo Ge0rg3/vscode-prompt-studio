@@ -12,6 +12,7 @@ import {
   registerRenameEntry,
   registerRevealInOS
 } from './vault/entryActions';
+import { registerOpenTemplate, registerTemplateSerializer } from './vault/openTemplate';
 import { registerSendToClaude } from './vault/sendToClaude';
 import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWebviewProvider';
 import { registerOpenVisual, registerVisualSerializer } from './visual/openVisual';
@@ -43,6 +44,8 @@ export function activate(context: vscode.ExtensionContext): void {
     registerRenameEntry(config),
     registerDeleteEntry(config),
     registerCopyContents(),
+    registerOpenTemplate(context.extensionUri),
+    registerTemplateSerializer(context.extensionUri),
     registerSendToClaude(),
     registerCopyPathStatic(),
     registerCopyPathRelative(vaultManager),

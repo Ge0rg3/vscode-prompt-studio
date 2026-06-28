@@ -14,7 +14,8 @@
   },
   "activationEvents": [
     "onStartupFinished",
-    "onWebviewPanel:promptStudio.visual"
+    "onWebviewPanel:promptStudio.visual",
+    "onWebviewPanel:promptStudio.template"
   ],
   "contributes": {
     "configuration": {
@@ -72,6 +73,11 @@
       {
         "command": "promptStudio.copyContents",
         "title": "Copy Contents",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.openTemplate",
+        "title": "Open as Template",
         "category": "Prompt Studio"
       },
       {
@@ -181,6 +187,10 @@
           "when": "false"
         },
         {
+          "command": "promptStudio.openTemplate",
+          "when": "false"
+        },
+        {
           "command": "promptStudio.sendToClaude",
           "when": "false"
         },
@@ -220,6 +230,7 @@
     "typescript": "^5.5.0"
   },
   "dependencies": {
+    "marked": "^12.0.2",
     "yaml": "^2.9.0"
   }
 }

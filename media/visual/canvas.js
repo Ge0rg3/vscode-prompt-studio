@@ -434,6 +434,7 @@
         { kind: 'swatches', target: cardColorTarget(card) },
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: card.absPath }) },
+        { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openTemplate' },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',

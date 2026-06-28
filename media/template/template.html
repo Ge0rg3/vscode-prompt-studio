@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+  <link rel="stylesheet" href="{{codiconCss}}" />
+  <link rel="stylesheet" href="{{templateCss}}" />
+  <title>Template</title>
+</head>
+<body>
+  <div id="content">
+    <div id="editor-wrap" class="hidden">
+      <div id="gutter"><div id="gutter-lines"></div></div>
+      <textarea id="editor" spellcheck="false" wrap="off"></textarea>
+    </div>
+    <div id="preview"></div>
+  </div>
+  <div id="toolbar">
+    <button id="toggle" class="bar-button" type="button">
+      <span id="toggle-icon" class="codicon codicon-edit"></span>
+      <span id="toggle-label">Edit</span>
+    </button>
+    <span class="spacer"></span>
+    <button id="copy" class="bar-button" type="button">
+      <span class="codicon codicon-copy"></span>
+      <span>Copy</span>
+    </button>
+    <button id="send" class="bar-button primary" type="button">
+      <span class="codicon codicon-claude"></span>
+      <span>Send to Claude</span>
+    </button>
+  </div>
+  <script nonce="{{nonce}}" src="{{templateJs}}"></script>
+</body>
+</html>
