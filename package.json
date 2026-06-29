@@ -104,6 +104,56 @@
         "command": "promptStudio.delete",
         "title": "Delete",
         "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.refreshSkills",
+        "title": "Refresh Skills",
+        "category": "Prompt Studio",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "promptStudio.openSkill",
+        "title": "Open SKILL.md",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.openSkillTemplate",
+        "title": "Open as Template",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.openSkillVisual",
+        "title": "Open as Canvas",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.sendSkillToClaude",
+        "title": "Send to Claude",
+        "category": "Prompt Studio"
+      },
+      {
+        "command": "promptStudio.newSkill",
+        "title": "New Skill",
+        "category": "Prompt Studio",
+        "icon": "$(add)"
+      },
+      {
+        "command": "promptStudio.openSkillsCanvas",
+        "title": "Open Visual Canvas",
+        "category": "Prompt Studio",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "promptStudio.expandAllSkills",
+        "title": "Expand All",
+        "category": "Prompt Studio",
+        "icon": "$(expand-all)"
+      },
+      {
+        "command": "promptStudio.collapseAllSkills",
+        "title": "Collapse All",
+        "category": "Prompt Studio",
+        "icon": "$(collapse-all)"
       }
     ],
     "viewsContainers": {
@@ -121,6 +171,12 @@
           "id": "promptStudio.vault",
           "name": "Vault",
           "type": "webview"
+        },
+        {
+          "id": "promptStudio.skills",
+          "name": "Claude Skills",
+          "type": "webview",
+          "when": "promptStudio.hasSkills"
         }
       ]
     },
@@ -155,6 +211,31 @@
           "command": "promptStudio.configureVault",
           "when": "view == promptStudio.vault",
           "group": "navigation@99"
+        },
+        {
+          "command": "promptStudio.newSkill",
+          "when": "view == promptStudio.skills",
+          "group": "navigation@1"
+        },
+        {
+          "command": "promptStudio.openSkillsCanvas",
+          "when": "view == promptStudio.skills",
+          "group": "navigation@2"
+        },
+        {
+          "command": "promptStudio.expandAllSkills",
+          "when": "view == promptStudio.skills",
+          "group": "navigation@3"
+        },
+        {
+          "command": "promptStudio.collapseAllSkills",
+          "when": "view == promptStudio.skills",
+          "group": "navigation@4"
+        },
+        {
+          "command": "promptStudio.refreshSkills",
+          "when": "view == promptStudio.skills",
+          "group": "navigation@5"
         }
       ],
       "commandPalette": [
@@ -208,6 +289,38 @@
         },
         {
           "command": "promptStudio.delete",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.refreshSkills",
+          "when": "promptStudio.hasSkills"
+        },
+        {
+          "command": "promptStudio.openSkill",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.openSkillTemplate",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.openSkillVisual",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.sendSkillToClaude",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.openSkillsCanvas",
+          "when": "promptStudio.hasSkills"
+        },
+        {
+          "command": "promptStudio.expandAllSkills",
+          "when": "false"
+        },
+        {
+          "command": "promptStudio.collapseAllSkills",
           "when": "false"
         }
       ]

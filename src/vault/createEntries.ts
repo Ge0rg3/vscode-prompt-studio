@@ -2,8 +2,9 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { NotePosition } from '../common/cardLayoutStore';
 import { pathExists } from '../common/utils/fs';
-import { NotePosition, VaultConfig } from '../common/vaultConfig';
+import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
 import { ensureNoteExt, validateEntryName } from './entryName';

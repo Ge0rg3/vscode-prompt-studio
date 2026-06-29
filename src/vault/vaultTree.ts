@@ -2,6 +2,7 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { compareCaseInsensitive } from '../common/utils/compare';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 
@@ -44,7 +45,7 @@ export async function readTree(config: VaultConfig, dir: string): Promise<TreeNo
     if (first.kind !== second.kind) {
       return first.kind === 'folder' ? -1 : 1;
     }
-    return first.name.localeCompare(second.name, undefined, { sensitivity: 'base' });
+    return compareCaseInsensitive(first.name, second.name);
   });
 
   return nodes;

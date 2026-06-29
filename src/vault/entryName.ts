@@ -2,11 +2,14 @@ export const NOTE_EXT = '.md';
 
 const INVALID_NAME = /[\\/:*?"<>|]/;
 
-// reject empties, path separators, and OS-reserved characters
+// reject empties, leading dots, path separators, and OS-reserved characters
 export function validateEntryName(input: string): string | undefined {
   const trimmed = input.trim();
   if (!trimmed) {
     return 'A name is required';
+  }
+  if (trimmed.startsWith('.')) {
+    return 'Name must not start with a dot';
   }
   if (INVALID_NAME.test(trimmed)) {
     return 'Name must not contain / \\ : * ? " < > |';

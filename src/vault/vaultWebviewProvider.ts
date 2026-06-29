@@ -190,6 +190,12 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     const paletteCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/common/palette.css')
     );
+    const contextMenuCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.css')
+    );
+    const contextMenuJs = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.js')
+    );
     const treeCss = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.css')
     );
@@ -212,6 +218,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       nonce,
       codiconCss: codiconCss.toString(),
       paletteCss: paletteCss.toString(),
+      contextMenuCss: contextMenuCss.toString(),
+      contextMenuJs: contextMenuJs.toString(),
       treeCss: treeCss.toString(),
       treeJs: treeJs.toString()
     });

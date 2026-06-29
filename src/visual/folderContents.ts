@@ -2,7 +2,8 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
-import { NotePosition, VaultConfig } from '../common/vaultConfig';
+import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
+import { compareCaseInsensitive } from '../common/utils/compare';
 
 export type VisualCardKind = 'folder' | 'note';
 
@@ -78,21 +79,21 @@ function previewOf(raw: string): string {
 
 // alphabetical by title, case-insensitive
 function byTitle(first: VisualCard, second: VisualCard): number {
-  return first.title.localeCompare(second.title, undefined, { sensitivity: 'base' });
+  return compareCaseInsensitive(first.title, second.title);
 }
 
-// a trail from the vault root down to the folder
-function buildBreadcrumbs(vaultRoot: string, folder: string): Breadcrumb[] {
+// a trail from the canvas root down to the folder
+function buildBreadcrumbs(root: string, folder: string): Breadcrumb[] {
   const crumbs: Breadcrumb[] = [
-    { path: vaultRoot, name: path.basename(vaultRoot) || vaultRoot }
+    { path: root, name: path.basename(root) || root }
   ];
 
-  const rel = path.relative(vaultRoot, folder);
+  const rel = path.relative(root, folder);
   if (!rel || rel === '.') {
     return crumbs;
   }
 
-  let accum = vaultRoot;
+  let accum = root;
   for (const part of rel.split(path.sep)) {
     accum = path.join(accum, part);
     crumbs.push({ path: accum, name: part });
@@ -137,16 +138,16 @@ function rectOf(card: VisualCard): CardRect {
 }
 
 // size and stack every card, keep saved positions, flow the rest into free slots
-function placeCards(config: VaultConfig, cards: VisualCard[]): void {
+function placeCards(store: CardLayoutStore, cards: VisualCard[]): void {
   const occupied: CardRect[] = [];
   const unplaced: VisualCard[] = [];
   for (const card of cards) {
-    const size = config.getSize(card.absPath) ?? { width: CARD_W, height: CARD_H };
+    const size = store.getSize(card.absPath) ?? { width: CARD_W, height: CARD_H };
     card.width = size.width;
     card.height = size.height;
-    card.z = config.getZ(card.absPath);
+    card.z = store.getZ(card.absPath);
 
-    const saved = config.getPosition(card.absPath);
+    const saved = store.getPosition(card.absPath);
     if (saved) {
       card.x = saved.x;
       card.y = saved.y;
@@ -165,7 +166,7 @@ function placeCards(config: VaultConfig, cards: VisualCard[]): void {
 }
 
 // a folder's direct children as placed cards, folders first then notes
-async function readEntries(config: VaultConfig, folder: string): Promise<VisualCard[]> {
+async function readEntries(store: CardLayoutStore, folder: string): Promise<VisualCard[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(folder));
 
   const folders: VisualCard[] = [];
@@ -181,7 +182,7 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
         absPath: abs,
         name,
         title: name,
-        color: config.getColor(abs),
+        color: store.getColor(abs),
         x: 0,
         y: 0,
         width: 0,
@@ -196,7 +197,7 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
         name,
         title: deriveTitle(raw, stem),
         preview: previewOf(raw),
-        color: config.getColor(abs),
+        color: store.getColor(abs),
         x: 0,
         y: 0,
         width: 0,
@@ -208,13 +209,13 @@ async function readEntries(config: VaultConfig, folder: string): Promise<VisualC
   folders.sort(byTitle);
   notes.sort(byTitle);
   const cards = [...folders, ...notes];
-  placeCards(config, cards);
+  placeCards(store, cards);
   return cards;
 }
 
 // fill each folder card's children for the mini preview, recursing `layers` folders deep
 async function attachPreviews(
-  config: VaultConfig,
+  store: CardLayoutStore,
   cards: VisualCard[],
   layers: number
 ): Promise<void> {
@@ -224,8 +225,8 @@ async function attachPreviews(
 
   for (const card of cards) {
     if (card.kind === 'folder') {
-      card.children = await readEntries(config, card.absPath);
-      await attachPreviews(config, card.children, layers - 1);
+      card.children = await readEntries(store, card.absPath);
+      await attachPreviews(store, card.children, layers - 1);
     }
   }
 }
@@ -234,16 +235,16 @@ async function attachPreviews(
 
 // a folder's cards plus a breadcrumb trail, each folder card carrying a nested mini preview of its contents
 export async function readFolder(
-  config: VaultConfig,
-  vaultRoot: string,
+  store: CardLayoutStore,
+  root: string,
   folder: string
 ): Promise<VisualState> {
-  const cards = await readEntries(config, folder);
-  await attachPreviews(config, cards, PREVIEW_DEPTH);
+  const cards = await readEntries(store, folder);
+  await attachPreviews(store, cards, PREVIEW_DEPTH);
 
   return {
-    breadcrumbs: buildBreadcrumbs(vaultRoot, folder),
+    breadcrumbs: buildBreadcrumbs(root, folder),
     cards,
-    folderColor: config.getColor(folder)
+    folderColor: store.getColor(folder)
   };
 }

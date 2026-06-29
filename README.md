@@ -7,6 +7,7 @@ A VSCode extension that turns a folder of markdown files into an Obsidian-like v
 - **Vault.** Point it at any folder of `.md` files. Storage stays plain markdown on disk: portable, git-friendly, and readable without the extension.
 - **Sidebar tree.** Browse, create, rename, delete, and drag-reorganize notes from a dedicated activity-bar panel.
 - **Visual canvas.** Open any folder as a card canvas. Drag notes and folders to reposition them, OneNote style. Positions persist as entry metadata.
+- **Claude skills.** When the workspace has Claude skills in `.claude/skills`, a sidebar section lists them. Browse and edit a skill, open it as a canvas or template, or send its slash command to Claude.
 - **Wikilinks.** `[[Other Note]]` with completion, cmd-click navigation, hover preview, and rename refactoring.
 - **Prompts.** Notes marked as prompts can declare `{{variables}}`. Pick a prompt, fill in the blanks, then copy to clipboard or insert into the active editor.
 
@@ -42,7 +43,7 @@ The extension reads and writes the `visual` block (card position, size, stacking
 
 ## Status
 
-Early development. The current build ships a sidebar vault view and a draggable visual canvas, both backed by a configurable folder location.
+Early development. The current build ships a sidebar vault view and a draggable visual canvas, both backed by a configurable folder location, plus a Claude Skills sidebar section that surfaces the workspace's `.claude/skills`.
 
 The sidebar is a webview styled to match the native tree, which lets it intercept right-clicks on empty space.
 
@@ -112,6 +113,22 @@ Right-click the empty canvas for the open folder's menu: a row of color swatches
 Hover a swatch to preview that color, click to apply it, or pick the leftmost clear swatch to remove it. A card swatch tints the card, a background swatch tints the open folder and washes the canvas. The menu stays open after a pick so you can try several, and clicking the selected swatch again confirms it and closes the menu.
 
 The color saves to the entry's `visual` block and tints its icon in the sidebar tree too.
+
+### Claude skills
+
+A second sidebar section, **Claude Skills**, appears whenever the workspace has skills in `<workspace>/.claude/skills`. Each skill is a folder holding a `SKILL.md`.
+
+- A skill row shows the name from its `SKILL.md` frontmatter.
+- Hover a skill for quick **Open SKILL.md**, **Open as Canvas**, and **Send to Claude** buttons, or expand it to browse and open every file in the skill folder.
+- Right-click a skill for **Open SKILL.md**, **Open as Template**, **Open as Canvas**, **Send to Claude**, **Reveal in Explorer**, and **Copy as Path**.
+- The view header carries **New Skill**, **Open Visual Canvas** (the skills root as a card canvas), **Expand All**, and **Collapse All**. Right-clicking the empty area offers **Open as Canvas** and **New Skill**.
+- **New Skill** scaffolds `.claude/skills/<name>/SKILL.md` and opens it for editing.
+
+Opening a `SKILL.md` or a supporting file opens the real file in an editor, so edits save straight to disk. The skill actions reuse the shared views and Claude integration:
+
+- **Open as Template** opens the `SKILL.md` in the template view. Its **Send to Claude** button sends the skill's slash command, not the text.
+- **Open as Canvas** opens the skill folder as a visual canvas. The skill canvas lets you rearrange, resize, recolor, and open cards but not create, rename, or delete. Its card layout saves to a `config.yml` in `.claude/skills`, the same per-entry metadata file the vault canvas uses, so the layout commits alongside your skills.
+- **Send to Claude** drops the skill's slash command (`/<name>`, taken from the `SKILL.md` frontmatter) into the Claude Code chat.
 
 Wikilinks and prompts are not built yet.
 

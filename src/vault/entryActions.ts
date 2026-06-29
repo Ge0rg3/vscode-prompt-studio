@@ -2,7 +2,9 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { copyPathToClipboard } from '../common/utils/clipboard';
 import { pathExists } from '../common/utils/fs';
+import { relativeToRoot } from '../common/utils/paths';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
@@ -21,22 +23,19 @@ function renamePrefill(node: VaultNode): { value: string; selectionEnd: number }
   return { value, selectionEnd: value.length };
 }
 
-// write a path to the clipboard and flash a status bar message naming the entry
-async function copyPathToClipboard(pathText: string, name: string): Promise<void> {
-  await vscode.env.clipboard.writeText(pathText);
-  void vscode.window.setStatusBarMessage(`Copied path of "${name}" to clipboard.`, 2000);
-}
-
 // --- exports ---
 
 export function registerRevealInOS(): vscode.Disposable {
-  return vscode.commands.registerCommand('promptStudio.revealInOS', async (target?: VaultNode) => {
-    if (!target) {
-      return;
-    }
+  return vscode.commands.registerCommand(
+    'promptStudio.revealInOS',
+    async (target?: { absPath: string }) => {
+      if (!target) {
+        return;
+      }
 
-    await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(target.absPath));
-  });
+      await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(target.absPath));
+    }
+  );
 }
 
 export function registerCopyContents(): vscode.Disposable {
@@ -77,9 +76,7 @@ export function registerCopyPathRelative(vaultManager: VaultManager): vscode.Dis
         return;
       }
 
-      // '.' when the target is the vault root itself
-      const relativePath = path.relative(vaultRoot, target.absPath) || '.';
-      await copyPathToClipboard(relativePath, target.name);
+      await copyPathToClipboard(relativeToRoot(vaultRoot, target.absPath), target.name);
     }
   );
 }

@@ -1,0 +1,224 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+import * as vscode from 'vscode';
+
+import { copyPathToClipboard } from '../common/utils/clipboard';
+import { isWithin, relativeToRoot } from '../common/utils/paths';
+import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { CONFIG_FILENAME } from '../common/vaultConfig';
+import { SkillTreeNode } from './skillNode';
+import { skillsRoot } from './skillScanner';
+import { buildSkillsTree } from './skillsTree';
+
+type InboundMessage =
+  | { type: 'ready' }
+  | { type: 'openNote'; path: string }
+  | { type: 'command'; command: string; node?: SkillTreeNode };
+
+const HAS_SKILLS_CONTEXT = 'promptStudio.hasSkills';
+const REFRESH_DEBOUNCE_MS = 100;
+const ALLOWED_COMMANDS = new Set([
+  'promptStudio.openSkill',
+  'promptStudio.openSkillTemplate',
+  'promptStudio.openSkillVisual',
+  'promptStudio.sendSkillToClaude',
+  'promptStudio.newSkill',
+  'promptStudio.openSkillsCanvas',
+  'promptStudio.revealInOS',
+  'promptStudio.copyPathStatic',
+  'promptStudio.copyPathRelative'
+]);
+
+// watch the skills folder itself and edits inside it
+const WATCH_PATTERNS = ['.claude/skills', '.claude/skills/**'];
+
+export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
+  static readonly viewType = 'promptStudio.skills';
+
+  private view: vscode.WebviewView | undefined;
+  private readonly disposables: vscode.Disposable[] = [];
+  private readonly watcherSubs: vscode.Disposable[] = [];
+  private watchers: vscode.FileSystemWatcher[] = [];
+  private children: SkillTreeNode[] = [];
+  private refreshTimer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(private readonly extensionUri: vscode.Uri) {
+    this.rebuildWatchers();
+    this.disposables.push(
+      vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        this.rebuildWatchers();
+        this.scheduleRefresh();
+      })
+    );
+    void this.refresh();
+  }
+
+  resolveWebviewView(view: vscode.WebviewView): void {
+    this.view = view;
+    view.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
+    };
+    view.webview.html = this.renderHtml(view.webview);
+    view.onDidDispose(() => {
+      this.view = undefined;
+    });
+    this.disposables.push(view.webview.onDidReceiveMessage((msg) => this.handle(msg)));
+  }
+
+  expandAll(): void {
+    void this.view?.webview.postMessage({ type: 'expandAll' });
+  }
+
+  collapseAll(): void {
+    void this.view?.webview.postMessage({ type: 'collapseAll' });
+  }
+
+  // re-scan and repaint the tree
+  async refresh(): Promise<void> {
+    this.children = await buildSkillsTree();
+    await vscode.commands.executeCommand(
+      'setContext',
+      HAS_SKILLS_CONTEXT,
+      this.children.length > 0
+    );
+    await this.postState();
+  }
+
+  dispose(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    this.teardownWatchers();
+    for (const disposable of this.disposables) {
+      disposable.dispose();
+    }
+  }
+
+  private async postState(): Promise<void> {
+    await this.view?.webview.postMessage({ type: 'state', children: this.children });
+  }
+
+  private async handle(msg: InboundMessage): Promise<void> {
+    switch (msg.type) {
+      case 'ready':
+        await this.postState();
+        return;
+      case 'openNote':
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
+        return;
+      case 'command':
+        if (!ALLOWED_COMMANDS.has(msg.command)) {
+          return;
+        }
+        if (msg.command === 'promptStudio.copyPathRelative') {
+          await this.copyRelativePath(msg.node);
+          return;
+        }
+        await vscode.commands.executeCommand(msg.command, msg.node);
+        return;
+    }
+  }
+
+  // copy a node's path relative to the skills root
+  private async copyRelativePath(node: SkillTreeNode | undefined): Promise<void> {
+    const root = skillsRoot();
+    if (!node || !root || !isWithin(node.absPath, root)) {
+      return;
+    }
+
+    await copyPathToClipboard(relativeToRoot(root, node.absPath), node.name);
+  }
+
+  // watch the workspace .claude/skills for added, edited, or removed skills
+  private rebuildWatchers(): void {
+    this.teardownWatchers();
+
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    if (!workspace) {
+      return;
+    }
+
+    for (const pattern of WATCH_PATTERNS) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspace, pattern)
+      );
+      this.watchers.push(watcher);
+      this.watcherSubs.push(
+        watcher.onDidCreate((uri) => this.onSkillsEvent(uri)),
+        watcher.onDidChange((uri) => this.onSkillsEvent(uri)),
+        watcher.onDidDelete((uri) => this.onSkillsEvent(uri))
+      );
+    }
+  }
+
+  // re-scan on skill edits, skip config.yml layout writes
+  private onSkillsEvent(uri: vscode.Uri): void {
+    if (path.basename(uri.fsPath) === CONFIG_FILENAME) {
+      return;
+    }
+    this.scheduleRefresh();
+  }
+
+  private teardownWatchers(): void {
+    for (const sub of this.watcherSubs) {
+      sub.dispose();
+    }
+    this.watcherSubs.length = 0;
+    for (const watcher of this.watchers) {
+      watcher.dispose();
+    }
+    this.watchers.length = 0;
+  }
+
+  // collapse a burst of fs events into one re-scan after the last one settles
+  private scheduleRefresh(): void {
+    if (this.refreshTimer) {
+      clearTimeout(this.refreshTimer);
+    }
+    this.refreshTimer = setTimeout(() => {
+      this.refreshTimer = undefined;
+      void this.refresh();
+    }, REFRESH_DEBOUNCE_MS);
+  }
+
+  private renderHtml(webview: vscode.Webview): string {
+    const nonce = randomNonce();
+    const codiconCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
+    );
+    const contextMenuCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.css')
+    );
+    const treeCss = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.css')
+    );
+    const contextMenuJs = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.js')
+    );
+    const treeJs = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, 'media/skills/tree.js')
+    );
+    const csp = [
+      `default-src 'none'`,
+      `style-src ${webview.cspSource}`,
+      `font-src ${webview.cspSource}`,
+      `script-src 'nonce-${nonce}'`
+    ].join('; ');
+
+    const template = fs.readFileSync(
+      path.join(this.extensionUri.fsPath, 'media/skills/tree.html'),
+      'utf8'
+    );
+    return fillTemplate(template, {
+      csp,
+      nonce,
+      codiconCss: codiconCss.toString(),
+      contextMenuCss: contextMenuCss.toString(),
+      treeCss: treeCss.toString(),
+      contextMenuJs: contextMenuJs.toString(),
+      treeJs: treeJs.toString()
+    });
+  }
+}

@@ -36,7 +36,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 
 - Readability beats cleverness. If a junior engineer would need to pause to parse it, rewrite it.
 - DRY, but not prematurely. Two similar code paths are fine; three is the point at which extraction is justified.
-- Modularity by feature, not by layer. Each surface (`vault`, `prompts`, `visual`, etc.) owns its own commands, providers, views, and helpers in its own folder.
+- Modularity by feature, not by layer. Each surface (`vault`, `visual`, `skills`, `prompts`, etc.) owns its own commands, providers, views, and helpers in its own folder.
 - Reconsider file and folder structure on every meaningful change. If a new function does not have an obvious home, the structure is wrong, not the function. Move things; rename folders; split files that have grown past ~200 lines.
 - No half-finished implementations. If a command is wired up, every code path off it must work or be visibly disabled.
 - No speculative abstractions. Build for the features listed in the README, not for hypothetical future ones.
@@ -48,7 +48,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 - One folder per feature surface. The folder, its commands, its providers, and its services live together.
 - Generic, stateless, domain-agnostic helpers go in `src/common/utils/` (parsing, formatting, path builders, filesystem predicates, etc.). Placement here is by nature, not usage count: a helper with no domain meaning belongs in `utils/` even when only one feature uses it today.
 - The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader, the `config.yml` metadata store) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
-- Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`. Styles shared by more than one webview live in `media/common/` (the color palette), mirroring `src/common/`.
+- Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`. Styles and scripts shared by more than one webview live in `media/common/` (the color palette, the context menu), mirroring `src/common/`.
 - No `utils.ts`, `helpers.ts`, or `misc.ts`. If a helper does not have a specific name, it does not have a clear purpose. `src/common/utils/` is the *folder* for purpose-named helpers (`parse.ts`, `format.ts`, `paths.ts`); each file inside still earns its name.
 - No barrel `index.ts` re-exports to "flatten" import paths. The path reflects the structure; do not hide it.
 

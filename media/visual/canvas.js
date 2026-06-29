@@ -14,6 +14,7 @@
   const SURFACE_MARGIN = 80;
   const DRAG_THRESHOLD = 3;
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
+  const ALLOW_CRUD = document.body.dataset.allowCrud === 'true';
 
   let state = null;
   let cards = [];
@@ -427,10 +428,28 @@
     ]
   };
 
-  // card right-click menu, color swatches then the actions for its kind
+  // drop empty entries, then leading, trailing, and doubled separators
+  function compactMenu(items) {
+    const out = [];
+    for (const entry of items) {
+      if (!entry) {
+        continue;
+      }
+      if (entry === 'sep' && (out.length === 0 || out[out.length - 1] === 'sep')) {
+        continue;
+      }
+      out.push(entry);
+    }
+    while (out.length && out[out.length - 1] === 'sep') {
+      out.pop();
+    }
+    return out;
+  }
+
+  // card right-click menu, swatches then the kind's actions, edits dropped on a read-only canvas
   function menuFor(card) {
     if (card.kind === 'note') {
-      return [
+      return compactMenu([
         { kind: 'swatches', target: cardColorTarget(card) },
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: card.absPath }) },
@@ -438,25 +457,25 @@
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
-        { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+        ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
         COPY_PATH_ITEM,
         'sep',
-        { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
-      ];
+        ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
+      ]);
     }
-    return [
+    return compactMenu([
       { kind: 'swatches', target: cardColorTarget(card) },
       'sep',
-      { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+      ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM,
       'sep',
-      { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
-    ];
+      ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
+    ]);
   }
 
   // surface coordinates that center a default card on the click point
@@ -470,15 +489,15 @@
 
   // empty-area right-click menu, acts on the open folder
   function backgroundMenu(dropPos) {
-    return [
+    return compactMenu([
       { kind: 'swatches', target: folderColorTarget() },
       'sep',
-      { label: 'New Note', icon: 'new-file', action: () => vscode.postMessage({ type: 'newEntry', kind: 'note', x: dropPos.x, y: dropPos.y }) },
-      { label: 'New Folder', icon: 'new-folder', action: () => vscode.postMessage({ type: 'newEntry', kind: 'folder', x: dropPos.x, y: dropPos.y }) },
+      ALLOW_CRUD ? { label: 'New Note', icon: 'new-file', action: () => vscode.postMessage({ type: 'newEntry', kind: 'note', x: dropPos.x, y: dropPos.y }) } : null,
+      ALLOW_CRUD ? { label: 'New Folder', icon: 'new-folder', action: () => vscode.postMessage({ type: 'newEntry', kind: 'folder', x: dropPos.x, y: dropPos.y }) } : null,
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM
-    ];
+    ]);
   }
 
   // color dots with a leading clear-color swatch, hover previews and click commits
@@ -542,6 +561,10 @@
 
   // place the submenu beside its parent when it fits there, else expand it inline below
   function openSubmenu(header, submenu, arrow) {
+    // skip a timer that fired after the menu was rebuilt or hidden
+    if (!header.isConnected) {
+      return;
+    }
     submenu.classList.remove('hidden', 'inline');
     const rect = header.getBoundingClientRect();
     const width = submenu.offsetWidth;
@@ -669,8 +692,8 @@
     const msg = event.data;
     if (msg && msg.type === 'state') {
       render(msg.state);
-      // stash the open folder so VSCode can restore the canvas after a reload
-      vscode.setState({ folder: currentFolderNode().absPath });
+      // stash what VSCode needs to restore the canvas after a reload
+      vscode.setState({ folder: currentFolderNode().absPath, root: state.breadcrumbs[0].path, allowCrud: ALLOW_CRUD });
     }
   });
 

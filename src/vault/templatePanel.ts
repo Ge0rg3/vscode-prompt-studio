@@ -4,8 +4,8 @@ import * as path from 'node:path';
 import { marked } from 'marked';
 import * as vscode from 'vscode';
 
+import { sendTextToClaude } from '../common/sendToClaude';
 import { fillTemplate, randomNonce } from '../common/utils/webview';
-import { sendTextToClaude } from './sendToClaude';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -64,9 +64,12 @@ export class TemplatePanel {
   private static readonly openPanels = new Map<string, TemplatePanel>();
 
   // reveal the note's template panel, creating it on first use
-  static show(extensionUri: vscode.Uri, notePath: string): void {
+  static show(extensionUri: vscode.Uri, notePath: string, claudeCommand?: string): void {
     const existing = TemplatePanel.openPanels.get(notePath);
     if (existing) {
+      if (claudeCommand !== undefined) {
+        existing.claudeCommand = claudeCommand;
+      }
       existing.panel.reveal(vscode.ViewColumn.Active);
       return;
     }
@@ -77,13 +80,18 @@ export class TemplatePanel {
       vscode.ViewColumn.Active,
       { ...webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
-    new TemplatePanel(panel, extensionUri, notePath);
+    new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
   }
 
   // reattach to a template panel VSCode restored after a window reload
-  static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, notePath: string): void {
+  static restore(
+    panel: vscode.WebviewPanel,
+    extensionUri: vscode.Uri,
+    notePath: string,
+    claudeCommand?: string
+  ): void {
     panel.webview.options = webviewOptions(extensionUri);
-    new TemplatePanel(panel, extensionUri, notePath);
+    new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
   }
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -91,7 +99,8 @@ export class TemplatePanel {
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
-    private readonly notePath: string
+    private readonly notePath: string,
+    private claudeCommand: string | undefined
   ) {
     TemplatePanel.openPanels.set(notePath, this);
     this.panel.title = titleFor(notePath);
@@ -118,6 +127,7 @@ export class TemplatePanel {
           type: 'content',
           text,
           notePath: this.notePath,
+          claudeCommand: this.claudeCommand,
           style: editorStyle()
         });
         return;
@@ -132,7 +142,7 @@ export class TemplatePanel {
         void vscode.window.setStatusBarMessage('Copied template to clipboard.', 2000);
         return;
       case 'sendToClaude':
-        await sendTextToClaude(msg.text);
+        await sendTextToClaude(this.claudeCommand ?? msg.text);
         return;
     }
   }

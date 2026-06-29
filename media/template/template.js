@@ -82,7 +82,7 @@
     const msg = event.data;
     if (!msg) return;
     if (msg.type === 'content') {
-      vscode.setState({ notePath: msg.notePath });
+      vscode.setState({ notePath: msg.notePath, claudeCommand: msg.claudeCommand });
       applyEditorStyle(msg.style);
       editor.value = msg.text;
       lineCount = 0;

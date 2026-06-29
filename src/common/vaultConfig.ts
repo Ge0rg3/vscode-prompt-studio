@@ -3,18 +3,9 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { parse, stringify } from 'yaml';
 
+import { CardLayoutStore, CardSize, NotePosition } from './cardLayoutStore';
+import { compareCaseInsensitive } from './utils/compare';
 import { pathExists } from './utils/fs';
-import { VaultManager } from './vaultManager';
-
-export interface NotePosition {
-  x: number;
-  y: number;
-}
-
-export interface CardSize {
-  width: number;
-  height: number;
-}
 
 type NoteMetadata = Record<string, unknown>;
 
@@ -108,11 +99,11 @@ function notesFrom(parsed: unknown): Map<string, NoteMetadata> {
 
 // --- exports ---
 
-// per-entry metadata stored in <vault>/config.yml, keeps any keys it does not use when rewriting
-export class VaultConfig implements vscode.Disposable {
+// per-entry metadata stored in <root>/config.yml, keeps any keys it does not use when rewriting
+export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly watcherSubs: vscode.Disposable[] = [];
-  private readonly vaultSub: vscode.Disposable;
+  private readonly rootSub: vscode.Disposable;
   private watcher: vscode.FileSystemWatcher | undefined;
   private entries = new Map<string, NoteMetadata>();
   private vaultRoot: string | undefined;
@@ -121,8 +112,11 @@ export class VaultConfig implements vscode.Disposable {
 
   readonly onDidChange: vscode.Event<void> = this.emitter.event;
 
-  constructor(private readonly vaultManager: VaultManager) {
-    this.vaultSub = vaultManager.onDidChangeVault(() => this.reload());
+  constructor(
+    private readonly resolveRoot: () => string | undefined,
+    onRootChange: vscode.Event<unknown>
+  ) {
+    this.rootSub = onRootChange(() => this.reload());
     this.reload();
   }
 
@@ -268,7 +262,7 @@ export class VaultConfig implements vscode.Disposable {
 
   dispose(): void {
     this.teardownWatcher();
-    this.vaultSub.dispose();
+    this.rootSub.dispose();
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
     }
@@ -281,11 +275,11 @@ export class VaultConfig implements vscode.Disposable {
       : toConfigKey(path.relative(this.vaultRoot, absPath));
   }
 
-  // re-point at the current vault root, reloading config.yml and rearming its watcher
+  // re-point at the current root, reloading config.yml and rearming its watcher
   private reload(): void {
     this.teardownWatcher();
     this.entries = new Map();
-    this.vaultRoot = this.vaultManager.getVaultRoot();
+    this.vaultRoot = this.resolveRoot();
     if (!this.vaultRoot) {
       this.emitter.fire();
       return;
@@ -362,9 +356,7 @@ export class VaultConfig implements vscode.Disposable {
     }
 
     const notes: Record<string, NoteMetadata> = {};
-    const keys = [...this.entries.keys()].sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: 'base' })
-    );
+    const keys = [...this.entries.keys()].sort(compareCaseInsensitive);
     for (const key of keys) {
       const meta = this.entries.get(key)!;
       if (Object.keys(meta).length > 0) {

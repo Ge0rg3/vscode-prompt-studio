@@ -8,3 +8,8 @@ export function isWithin(target: string, dir: string): boolean {
   const rel = path.relative(dir, target);
   return rel.length > 0 && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
+
+// target made relative to root, '.' for root itself
+export function relativeToRoot(root: string, target: string): string {
+  return path.relative(root, target) || '.';
+}
