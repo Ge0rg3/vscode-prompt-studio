@@ -12,8 +12,8 @@
   // --- focus tracking ---
 
   // toggle the body class so .selected rows render as active vs inactive
-  function setFocused(value) {
-    document.body.classList.toggle('focused', value);
+  function setFocused(isFocused) {
+    document.body.classList.toggle('focused', isFocused);
   }
   document.addEventListener('focusin', () => setFocused(true));
   document.addEventListener('focusout', () => setFocused(false));
@@ -23,18 +23,18 @@
   // --- inbound state ---
 
   window.addEventListener('message', (event) => {
-    const msg = event.data;
-    if (!msg) return;
-    if (msg.type === 'state') {
-      state = msg.state;
+    const message = event.data;
+    if (!message) return;
+    if (message.type === 'state') {
+      state = message.state;
       render();
-    } else if (msg.type === 'expandAll') {
+    } else if (message.type === 'expandAll') {
       expandAll();
-    } else if (msg.type === 'collapseAll') {
+    } else if (message.type === 'collapseAll') {
       expanded.clear();
       render();
-    } else if (msg.type === 'select') {
-      select(msg.path);
+    } else if (message.type === 'select') {
+      select(message.path);
     }
   });
 
@@ -61,16 +61,16 @@
     const wrap = document.createElement('div');
     wrap.id = 'welcome';
 
-    const para = document.createElement('p');
-    para.textContent = 'No vault is configured.';
-    wrap.appendChild(para);
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'No vault is configured.';
+    wrap.appendChild(paragraph);
 
-    const btn = document.createElement('button');
-    btn.textContent = 'Configure Vault';
-    btn.addEventListener('click', () => {
+    const button = document.createElement('button');
+    button.textContent = 'Configure Vault';
+    button.addEventListener('click', () => {
       vscode.postMessage({ type: 'command', command: 'promptStudio.configureVault' });
     });
-    wrap.appendChild(btn);
+    wrap.appendChild(button);
 
     treeEl.appendChild(wrap);
   }
@@ -87,8 +87,8 @@
     const action = document.createElement('span');
     action.className = `action codicon codicon-${icon}`;
     action.title = title;
-    action.addEventListener('click', (e) => {
-      e.stopPropagation();
+    action.addEventListener('click', (event) => {
+      event.stopPropagation();
       vscode.postMessage({ type: 'command', command, node: serialize(node) });
     });
     return action;
@@ -122,11 +122,11 @@
     const twisty = document.createElement('span');
     twisty.className = 'twisty';
     if (isFolder) {
-      const chev = document.createElement('span');
-      chev.className = `codicon codicon-chevron-${isOpen ? 'down' : 'right'}`;
-      twisty.appendChild(chev);
-      twisty.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const chevron = document.createElement('span');
+      chevron.className = `codicon codicon-chevron-${isOpen ? 'down' : 'right'}`;
+      twisty.appendChild(chevron);
+      twisty.addEventListener('click', (event) => {
+        event.stopPropagation();
         toggleExpand(node);
       });
     } else {
@@ -157,8 +157,8 @@
     actions.appendChild(actionButton('layout', 'Open Visual Canvas', 'promptStudio.openVisual', node));
     row.appendChild(actions);
 
-    row.addEventListener('click', (e) => {
-      e.stopPropagation();
+    row.addEventListener('click', (event) => {
+      event.stopPropagation();
       select(node.absPath);
       if (isFolder) {
         toggleExpand(node);
@@ -167,33 +167,33 @@
       }
     });
 
-    row.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    row.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       select(node.absPath);
-      menu.show(e.clientX, e.clientY, menuFor(node), node);
+      menu.show(event.clientX, event.clientY, menuFor(node), node);
     });
 
     row.draggable = true;
-    row.addEventListener('dragstart', (e) => {
+    row.addEventListener('dragstart', (event) => {
       dragSource = node.absPath;
-      e.dataTransfer.setData('text/plain', node.absPath);
-      e.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', node.absPath);
+      event.dataTransfer.effectAllowed = 'move';
     });
 
     if (isFolder) {
-      row.addEventListener('dragover', (e) => {
+      row.addEventListener('dragover', (event) => {
         if (!canDrop(dragSource, node.absPath)) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
         row.classList.add('drop-target');
       });
       row.addEventListener('dragleave', () => row.classList.remove('drop-target'));
-      row.addEventListener('drop', (e) => {
+      row.addEventListener('drop', (event) => {
         row.classList.remove('drop-target');
-        e.preventDefault();
-        e.stopPropagation();
-        const src = dragSource || e.dataTransfer.getData('text/plain');
+        event.preventDefault();
+        event.stopPropagation();
+        const src = dragSource || event.dataTransfer.getData('text/plain');
         dragSource = null;
         if (!canDrop(src, node.absPath)) return;
         vscode.postMessage({ type: 'move', source: src, destDir: node.absPath });
@@ -265,32 +265,32 @@
 
   // --- empty-area handlers ---
 
-  treeEl.addEventListener('click', (e) => {
-    if (e.target.closest('.row')) return;
+  treeEl.addEventListener('click', (event) => {
+    if (event.target.closest('.row')) return;
     select(null);
   });
 
-  treeEl.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('.row')) return;
+  treeEl.addEventListener('contextmenu', (event) => {
+    if (event.target.closest('.row')) return;
     if (!state) return;
-    e.preventDefault();
+    event.preventDefault();
     select(null);
-    menu.show(e.clientX, e.clientY, emptyMenu(), null);
+    menu.show(event.clientX, event.clientY, emptyMenu(), null);
   });
 
-  treeEl.addEventListener('dragover', (e) => {
+  treeEl.addEventListener('dragover', (event) => {
     if (!state) return;
-    if (e.target.closest('.row')) return;
+    if (event.target.closest('.row')) return;
     if (!canDrop(dragSource, state.root)) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
   });
 
-  treeEl.addEventListener('drop', (e) => {
+  treeEl.addEventListener('drop', (event) => {
     if (!state) return;
-    if (e.target.closest('.row')) return;
-    e.preventDefault();
-    const src = dragSource || e.dataTransfer.getData('text/plain');
+    if (event.target.closest('.row')) return;
+    event.preventDefault();
+    const src = dragSource || event.dataTransfer.getData('text/plain');
     dragSource = null;
     if (!canDrop(src, state.root)) return;
     vscode.postMessage({ type: 'move', source: src, destDir: state.root });

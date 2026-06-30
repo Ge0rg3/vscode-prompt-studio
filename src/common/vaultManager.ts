@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 
-import { ensureDir, projectStorageDir } from './vaultPath';
+import { ensureDir } from './utils/fs';
+import { projectStorageDir } from './utils/paths';
 
 const CONFIG_SECTION = 'promptStudio';
 const CONFIG_KEY = 'vaultPath';
@@ -57,7 +58,7 @@ export class VaultManager implements vscode.Disposable {
     this.emitter.fire(next);
   }
 
-  // drive the when-clause context that shows or hides the view
+  // set promptStudio.hasVault so the vault view appears only when a vault exists
   private publishContext(): void {
     void vscode.commands.executeCommand('setContext', HAS_VAULT_CONTEXT, this.current !== undefined);
   }

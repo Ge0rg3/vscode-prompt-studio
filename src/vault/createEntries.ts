@@ -35,6 +35,27 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
   return false;
 }
 
+// create a note or folder, bail on a name conflict
+async function createVaultEntry(
+  parentDir: string,
+  name: string,
+  kind: 'note' | 'folder'
+): Promise<string | undefined> {
+  const target = vscode.Uri.file(path.join(parentDir, name));
+  if (await pathExists(target)) {
+    const label = kind === 'folder' ? 'folder' : 'file';
+    void vscode.window.showErrorMessage(`A ${label} named "${name}" already exists.`);
+    return undefined;
+  }
+
+  if (kind === 'folder') {
+    await vscode.workspace.fs.createDirectory(target);
+  } else {
+    await vscode.workspace.fs.writeFile(target, new Uint8Array());
+  }
+  return target.fsPath;
+}
+
 // --- exports ---
 
 export function registerCreateNote(
@@ -61,18 +82,15 @@ export function registerCreateNote(
       }
 
       const filename = ensureNoteExt(input.trim());
-      const target = vscode.Uri.file(path.join(parentDir, filename));
-
-      if (await pathExists(target)) {
-        void vscode.window.showErrorMessage(`A file named "${filename}" already exists.`);
+      const created = await createVaultEntry(parentDir, filename, 'note');
+      if (!created) {
         return;
       }
 
-      await vscode.workspace.fs.writeFile(target, new Uint8Array());
       if (position) {
-        config.setPosition(target.fsPath, position);
+        config.setPosition(created, position);
       }
-      await vscode.commands.executeCommand('vscode.open', target);
+      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(created));
     }
   );
 }
@@ -99,16 +117,13 @@ export function registerCreateFolder(
       }
 
       const folderName = input.trim();
-      const target = vscode.Uri.file(path.join(parentDir, folderName));
-
-      if (await pathExists(target)) {
-        void vscode.window.showErrorMessage(`A folder named "${folderName}" already exists.`);
+      const created = await createVaultEntry(parentDir, folderName, 'folder');
+      if (!created) {
         return;
       }
 
-      await vscode.workspace.fs.createDirectory(target);
       if (position) {
-        config.setPosition(target.fsPath, position);
+        config.setPosition(created, position);
       }
     }
   );

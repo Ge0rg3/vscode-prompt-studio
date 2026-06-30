@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
+import { projectStorageDir } from '../common/utils/paths';
 import { VaultManager } from '../common/vaultManager';
-import { projectStorageDir } from '../common/vaultPath';
 
 type ModeId = 'default' | 'custom' | 'in-workspace';
 

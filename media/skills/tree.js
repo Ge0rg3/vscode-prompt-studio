@@ -9,7 +9,9 @@
   let children = [];
   const expanded = new Set();
 
-  // the fields the host needs to act on a node
+  // --- helpers ---
+
+  // the node fields the host needs for a command
   function serialize(node) {
     return { kind: node.kind, name: node.name, absPath: node.absPath, skill: node.skill };
   }
@@ -18,31 +20,6 @@
   function postCommand(command, node) {
     vscode.postMessage({ type: 'command', command, node: node ? serialize(node) : undefined });
   }
-
-  const menu = create(menuEl, postCommand);
-
-  // --- inbound state ---
-
-  window.addEventListener('message', (event) => {
-    const msg = event.data;
-    if (!msg) {
-      return;
-    }
-    if (msg.type === 'state') {
-      children = msg.children || [];
-      render();
-    } else if (msg.type === 'expandAll') {
-      addExpandableKeys(children);
-      render();
-    } else if (msg.type === 'collapseAll') {
-      expanded.clear();
-      render();
-    }
-  });
-
-  vscode.postMessage({ type: 'ready' });
-
-  // --- rendering ---
 
   function render() {
     treeEl.replaceChildren();
@@ -72,8 +49,8 @@
     const action = document.createElement('span');
     action.className = `action codicon codicon-${icon}`;
     action.title = title;
-    action.addEventListener('click', (e) => {
-      e.stopPropagation();
+    action.addEventListener('click', (event) => {
+      event.stopPropagation();
       postCommand(command, node);
     });
     return action;
@@ -101,11 +78,11 @@
     const twisty = document.createElement('span');
     twisty.className = 'twisty';
     if (hasChildren) {
-      const chev = document.createElement('span');
-      chev.className = `codicon codicon-chevron-${isOpen ? 'down' : 'right'}`;
-      twisty.appendChild(chev);
-      twisty.addEventListener('click', (e) => {
-        e.stopPropagation();
+      const chevron = document.createElement('span');
+      chevron.className = `codicon codicon-chevron-${isOpen ? 'down' : 'right'}`;
+      twisty.appendChild(chevron);
+      twisty.addEventListener('click', (event) => {
+        event.stopPropagation();
         toggleExpand(key);
       });
     } else {
@@ -147,10 +124,10 @@
 
     const items = menuFor(node);
     if (items) {
-      row.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        menu.show(e.clientX, e.clientY, items, node);
+      row.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        menu.show(event.clientX, event.clientY, items, node);
       });
     }
 
@@ -182,17 +159,7 @@
     }
   }
 
-  // --- empty-area menu ---
-
-  // right-click empty space acts on the skills root
-  treeEl.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('.row')) {
-      return;
-    }
-    e.preventDefault();
-    menu.show(e.clientX, e.clientY, backgroundMenu(), null);
-  });
-
+  // the skills-root actions shown when right-clicking empty space
   function backgroundMenu() {
     return [
       { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openSkillsCanvas' },
@@ -200,8 +167,6 @@
       { label: 'New Skill', icon: 'add', cmd: 'promptStudio.newSkill' }
     ];
   }
-
-  // --- context menu items ---
 
   // the right-click menu for a node
   function menuFor(node) {
@@ -233,4 +198,36 @@
     }
     return null;
   }
+
+  // --- wiring ---
+
+  const menu = create(menuEl, postCommand);
+
+  window.addEventListener('message', (event) => {
+    const message = event.data;
+    if (!message) {
+      return;
+    }
+    if (message.type === 'state') {
+      children = message.children || [];
+      render();
+    } else if (message.type === 'expandAll') {
+      addExpandableKeys(children);
+      render();
+    } else if (message.type === 'collapseAll') {
+      expanded.clear();
+      render();
+    }
+  });
+
+  // right-click empty space acts on the skills root
+  treeEl.addEventListener('contextmenu', (event) => {
+    if (event.target.closest('.row')) {
+      return;
+    }
+    event.preventDefault();
+    menu.show(event.clientX, event.clientY, backgroundMenu(), null);
+  });
+
+  vscode.postMessage({ type: 'ready' });
 })();

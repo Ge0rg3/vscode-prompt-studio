@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { pathExists } from '../common/utils/fs';
 import { isWithin } from '../common/utils/paths';
 
-// move sourcePath into targetDir, return the new path, or undefined on a no-op or conflict
+// move sourcePath into targetDir, or bail on a no-op or a name conflict
 export async function moveVaultEntry(
   vaultRoot: string,
   sourcePath: string,

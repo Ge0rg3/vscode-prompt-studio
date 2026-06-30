@@ -3,6 +3,6 @@ export const CARD_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'
 
 export type CardColor = (typeof CARD_COLORS)[number];
 
-export function isCardColor(value: string): value is CardColor {
-  return (CARD_COLORS as readonly string[]).includes(value);
+export function isCardColor(candidate: string): candidate is CardColor {
+  return (CARD_COLORS as readonly string[]).includes(candidate);
 }

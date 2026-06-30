@@ -37,7 +37,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 - Readability beats cleverness. If a junior engineer would need to pause to parse it, rewrite it.
 - DRY, but not prematurely. Two similar code paths are fine; three is the point at which extraction is justified.
 - Modularity by feature, not by layer. Each surface (`vault`, `visual`, `skills`, `prompts`, etc.) owns its own commands, providers, views, and helpers in its own folder.
-- Reconsider file and folder structure on every meaningful change. If a new function does not have an obvious home, the structure is wrong, not the function. Move things; rename folders; split files that have grown past ~200 lines.
+- Reconsider file and folder structure on every meaningful change. If a new function does not have an obvious home, the structure is wrong, not the function. Move things, rename folders, split a file once it has grown to cover more than one concern. Treat ~200 lines as a prompt to check whether that has happened, not a hard cap. A single cohesive file may run well past it when splitting would only scatter one concern across two, so split by concern, not by line count.
 - No half-finished implementations. If a command is wired up, every code path off it must work or be visibly disabled.
 - No speculative abstractions. Build for the features listed in the README, not for hypothetical future ones.
 - Never add error handling, fallbacks, or validation for cases that cannot occur. Trust internal callers; validate only at the system boundary (filesystem I/O, VSCode API responses, webview messages from the renderer).

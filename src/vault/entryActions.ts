@@ -23,6 +23,24 @@ function renamePrefill(node: VaultNode): { value: string; selectionEnd: number }
   return { value, selectionEnd: value.length };
 }
 
+// rename an entry in place, or bail on a no-op or a name conflict
+async function renameVaultEntry(node: VaultNode, newName: string): Promise<string | undefined> {
+  const nextName = node.kind === 'note' ? ensureNoteExt(newName) : newName;
+  if (nextName === node.name) {
+    return undefined;
+  }
+
+  const destination = vscode.Uri.file(path.join(path.dirname(node.absPath), nextName));
+  if (await pathExists(destination)) {
+    const label = node.kind === 'folder' ? 'folder' : 'file';
+    void vscode.window.showErrorMessage(`A ${label} named "${nextName}" already exists.`);
+    return undefined;
+  }
+
+  await vscode.workspace.fs.rename(vscode.Uri.file(node.absPath), destination);
+  return destination.fsPath;
+}
+
 // --- exports ---
 
 export function registerRevealInOS(): vscode.Disposable {
@@ -98,21 +116,10 @@ export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
       return;
     }
 
-    const trimmed = input.trim();
-    const nextName = target.kind === 'note' ? ensureNoteExt(trimmed) : trimmed;
-    if (nextName === target.name) {
-      return;
+    const destination = await renameVaultEntry(target, input.trim());
+    if (destination) {
+      config.relocate(target.absPath, destination);
     }
-
-    const destination = vscode.Uri.file(path.join(path.dirname(target.absPath), nextName));
-    if (await pathExists(destination)) {
-      const label = target.kind === 'folder' ? 'folder' : 'file';
-      void vscode.window.showErrorMessage(`A ${label} named "${nextName}" already exists.`);
-      return;
-    }
-
-    await vscode.workspace.fs.rename(vscode.Uri.file(target.absPath), destination);
-    config.relocate(target.absPath, destination.fsPath);
   });
 }
 

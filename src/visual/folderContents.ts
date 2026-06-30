@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
 import { compareCaseInsensitive } from '../common/utils/compare';
+import { readTextFile } from '../common/utils/fs';
 
 export type VisualCardKind = 'folder' | 'note';
 
@@ -55,12 +56,6 @@ interface CardRect {
 
 // --- helpers ---
 
-// read a file as utf-8 text
-async function readText(absPath: string): Promise<string> {
-  const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(absPath));
-  return new TextDecoder('utf-8').decode(bytes);
-}
-
 // first markdown heading in the body, else the filename stem
 function deriveTitle(raw: string, fallback: string): string {
   for (const line of raw.split('\n')) {
@@ -93,10 +88,10 @@ function buildBreadcrumbs(root: string, folder: string): Breadcrumb[] {
     return crumbs;
   }
 
-  let accum = root;
+  let currentPath = root;
   for (const part of rel.split(path.sep)) {
-    accum = path.join(accum, part);
-    crumbs.push({ path: accum, name: part });
+    currentPath = path.join(currentPath, part);
+    crumbs.push({ path: currentPath, name: part });
   }
   return crumbs;
 }
@@ -175,29 +170,29 @@ async function readEntries(store: CardLayoutStore, folder: string): Promise<Visu
     if (name.startsWith('.')) {
       continue;
     }
-    const abs = path.join(folder, name);
+    const absPath = path.join(folder, name);
     if (type === vscode.FileType.Directory) {
       folders.push({
         kind: 'folder',
-        absPath: abs,
+        absPath,
         name,
         title: name,
-        color: store.getColor(abs),
+        color: store.getColor(absPath),
         x: 0,
         y: 0,
         width: 0,
         height: 0
       });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
-      const raw = await readText(abs);
+      const raw = await readTextFile(absPath);
       const stem = name.slice(0, -NOTE_EXT.length);
       notes.push({
         kind: 'note',
-        absPath: abs,
+        absPath,
         name,
         title: deriveTitle(raw, stem),
         preview: previewOf(raw),
-        color: store.getColor(abs),
+        color: store.getColor(absPath),
         x: 0,
         y: 0,
         width: 0,

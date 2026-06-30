@@ -7,10 +7,10 @@
   const menuEl = document.getElementById('context-menu');
   const canvasEl = document.getElementById('canvas');
 
-  const DEFAULT_CARD_W = 240;
-  const DEFAULT_CARD_H = 170;
-  const MIN_CARD_W = 160;
-  const MIN_CARD_H = 100;
+  const DEFAULT_CARD_WIDTH = 240;
+  const DEFAULT_CARD_HEIGHT = 170;
+  const MIN_CARD_WIDTH = 160;
+  const MIN_CARD_HEIGHT = 100;
   const SURFACE_MARGIN = 80;
   const DRAG_THRESHOLD = 3;
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
@@ -149,13 +149,13 @@
       event.stopPropagation();
       const startX = event.clientX;
       const startY = event.clientY;
-      const originW = card.width;
-      const originH = card.height;
+      const originWidth = card.width;
+      const originHeight = card.height;
       handle.setPointerCapture(event.pointerId);
 
       const onMove = (move) => {
-        card.width = Math.max(MIN_CARD_W, Math.round(originW + move.clientX - startX));
-        card.height = Math.max(MIN_CARD_H, Math.round(originH + move.clientY - startY));
+        card.width = Math.max(MIN_CARD_WIDTH, Math.round(originWidth + move.clientX - startX));
+        card.height = Math.max(MIN_CARD_HEIGHT, Math.round(originHeight + move.clientY - startY));
         el.style.width = card.width + 'px';
         el.style.height = card.height + 'px';
       };
@@ -273,17 +273,17 @@
     }
 
     // the canvas extent measured from its (0, 0) origin
-    let canvasW = 0;
-    let canvasH = 0;
+    let canvasWidth = 0;
+    let canvasHeight = 0;
     for (const child of children) {
-      canvasW = Math.max(canvasW, child.x + child.width);
-      canvasH = Math.max(canvasH, child.y + child.height);
+      canvasWidth = Math.max(canvasWidth, child.x + child.width);
+      canvasHeight = Math.max(canvasHeight, child.y + child.height);
     }
 
     const miniSurface = document.createElement('div');
     miniSurface.className = 'mini-surface';
-    miniSurface.style.width = canvasW + 'px';
-    miniSurface.style.height = canvasH + 'px';
+    miniSurface.style.width = canvasWidth + 'px';
+    miniSurface.style.height = canvasHeight + 'px';
     for (const child of children) {
       miniSurface.appendChild(miniCard(child));
     }
@@ -294,9 +294,9 @@
       if (previewBox.clientWidth === 0 || previewBox.clientHeight === 0) {
         return;
       }
-      const boxW = previewBox.clientWidth - (containerWidth - DEFAULT_CARD_W);
-      const boxH = previewBox.clientHeight - (containerHeight - DEFAULT_CARD_H);
-      const scale = Math.min(boxW / canvasW, boxH / canvasH);
+      const boxWidth = previewBox.clientWidth - (containerWidth - DEFAULT_CARD_WIDTH);
+      const boxHeight = previewBox.clientHeight - (containerHeight - DEFAULT_CARD_HEIGHT);
+      const scale = Math.min(boxWidth / canvasWidth, boxHeight / canvasHeight);
       miniSurface.style.transform = `scale(${scale})`;
       observer.disconnect();
     });
@@ -473,8 +473,8 @@
   function dropPoint(event) {
     const rect = surfaceEl.getBoundingClientRect();
     return {
-      x: Math.max(0, Math.round(event.clientX - rect.left - DEFAULT_CARD_W / 2)),
-      y: Math.max(0, Math.round(event.clientY - rect.top - DEFAULT_CARD_H / 2))
+      x: Math.max(0, Math.round(event.clientX - rect.left - DEFAULT_CARD_WIDTH / 2)),
+      y: Math.max(0, Math.round(event.clientY - rect.top - DEFAULT_CARD_HEIGHT / 2))
     };
   }
 
@@ -509,9 +509,9 @@
   // --- inbound state ---
 
   window.addEventListener('message', (event) => {
-    const msg = event.data;
-    if (msg && msg.type === 'state') {
-      render(msg.state);
+    const message = event.data;
+    if (message && message.type === 'state') {
+      render(message.state);
       // stash what VSCode needs to restore the canvas after a reload
       vscode.setState({ folder: currentFolderNode().absPath, root: state.breadcrumbs[0].path, allowCrud: ALLOW_CRUD });
     }
