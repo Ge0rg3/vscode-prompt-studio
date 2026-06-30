@@ -71,3 +71,29 @@
 .submenu.inline .menu-item {
   padding-left: 32px;
 }
+
+.swatch-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  background-color: var(--ps-fill);
+  cursor: pointer;
+}
+
+.swatch.none {
+  background: transparent;
+  border: 1px solid var(--vscode-descriptionForeground);
+}
+
+.swatch.selected {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
+}

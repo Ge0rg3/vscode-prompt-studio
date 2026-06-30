@@ -43,19 +43,10 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   }
 
   setPosition(absPath: string, position: NotePosition): void {
-    const key = this.configKeyOf(absPath);
-    if (key === undefined) {
-      return;
-    }
-
-    const meta = this.entries.get(key) ?? {};
-    const visual = this.cloneVisual(meta);
-    visual.x = Math.round(position.x);
-    visual.y = Math.round(position.y);
-    meta.visual = visual;
-    this.entries.set(key, meta);
-
-    this.scheduleWrite();
+    this.mutateVisual(absPath, (visual) => {
+      visual.x = Math.round(position.x);
+      visual.y = Math.round(position.y);
+    });
   }
 
   getSize(absPath: string): CardSize | undefined {
@@ -64,19 +55,10 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   }
 
   setSize(absPath: string, size: CardSize): void {
-    const key = this.configKeyOf(absPath);
-    if (key === undefined) {
-      return;
-    }
-
-    const meta = this.entries.get(key) ?? {};
-    const visual = this.cloneVisual(meta);
-    visual.width = Math.round(size.width);
-    visual.height = Math.round(size.height);
-    meta.visual = visual;
-    this.entries.set(key, meta);
-
-    this.scheduleWrite();
+    this.mutateVisual(absPath, (visual) => {
+      visual.width = Math.round(size.width);
+      visual.height = Math.round(size.height);
+    });
   }
 
   getZ(absPath: string): number | undefined {
@@ -86,18 +68,9 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   // raise a card's stacking order so it sits in front of overlapping cards
   setZ(absPath: string, z: number): void {
-    const key = this.configKeyOf(absPath);
-    if (key === undefined) {
-      return;
-    }
-
-    const meta = this.entries.get(key) ?? {};
-    const visual = this.cloneVisual(meta);
-    visual.z = Math.round(z);
-    meta.visual = visual;
-    this.entries.set(key, meta);
-
-    this.scheduleWrite();
+    this.mutateVisual(absPath, (visual) => {
+      visual.z = Math.round(z);
+    });
   }
 
   getColor(absPath: string): string | undefined {
@@ -107,23 +80,17 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   // set a palette color, or pass undefined to clear it back to the theme default
   setColor(absPath: string, color: string | undefined): void {
-    const key = this.configKeyOf(absPath);
-    if (key === undefined) {
-      return;
-    }
+    const applied = this.mutateVisual(absPath, (visual) => {
+      if (color === undefined) {
+        delete visual.color;
+      } else {
+        visual.color = color;
+      }
+    });
 
-    const meta = this.entries.get(key) ?? {};
-    const visual = this.cloneVisual(meta);
-    if (color === undefined) {
-      delete visual.color;
-    } else {
-      visual.color = color;
+    if (applied) {
+      this.emitter.fire();
     }
-    meta.visual = visual;
-    this.entries.set(key, meta);
-
-    this.scheduleWrite();
-    this.emitter.fire();
   }
 
   // follow a renamed or moved entry, remapping its own key and any descendants
@@ -307,6 +274,23 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   // config.yml keys are vault-relative with forward slashes on every platform
   private toConfigKey(relPath: string): string {
     return relPath.split(path.sep).join('/');
+  }
+
+  // apply a change to a card's visual block and persist, false when no vault is set
+  private mutateVisual(absPath: string, mutate: (visual: Record<string, unknown>) => void): boolean {
+    const key = this.configKeyOf(absPath);
+    if (key === undefined) {
+      return false;
+    }
+
+    const meta = this.entries.get(key) ?? {};
+    const visual = this.cloneVisual(meta);
+    mutate(visual);
+    meta.visual = visual;
+    this.entries.set(key, meta);
+
+    this.scheduleWrite();
+    return true;
   }
 
   // the visual block within an entry's metadata, or undefined if absent or malformed

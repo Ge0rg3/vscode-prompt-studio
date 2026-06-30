@@ -1,4 +1,4 @@
-// shared right-click menu for the sidebar webviews, rendered into a #context-menu element
+// shared right-click menu, rendered into a #context-menu element
 (function () {
   const SUBMENU_OPEN_DELAY_MS = 150;
 
@@ -13,8 +13,15 @@
   };
 
   // a controller bound to one menu container, dispatching picks through onCommand(cmd, node)
-  function create(menuEl, onCommand) {
+  function create(menuEl, onCommand, colors = []) {
+    let colorTarget = null;
+
     function hide() {
+      // drop any uncommitted hover preview back to the saved color
+      if (colorTarget) {
+        colorTarget.preview(colorTarget.currentColor());
+        colorTarget = null;
+      }
       menuEl.classList.add('hidden');
     }
 
@@ -112,14 +119,52 @@
       return parent;
     }
 
+    // color dots with a leading clear-color swatch
+    function buildSwatchRow(target) {
+      const row = document.createElement('div');
+      row.className = 'swatch-row';
+
+      for (const color of [null, ...colors]) {
+        const dot = document.createElement('span');
+        dot.className = color ? 'swatch color-' + color : 'swatch none';
+        dot.title = color || 'No color';
+        if ((target.currentColor() || null) === color) {
+          dot.classList.add('selected');
+        }
+
+        dot.addEventListener('mouseenter', () => target.preview(color));
+        dot.addEventListener('mouseleave', () => target.preview(target.currentColor()));
+        dot.addEventListener('click', () => {
+          if (dot.classList.contains('selected')) {
+            hide();
+            return;
+          }
+
+          for (const other of row.children) {
+            other.classList.remove('selected');
+          }
+          dot.classList.add('selected');
+          target.commit(color);
+        });
+        row.appendChild(dot);
+      }
+      return row;
+    }
+
     // place the menu at the click point, clamped inside the window
     function show(x, y, items, node) {
+      colorTarget = null;
       menuEl.replaceChildren();
       for (const entry of items) {
         if (entry === 'sep') {
           const sep = document.createElement('div');
           sep.className = 'menu-sep';
           menuEl.appendChild(sep);
+          continue;
+        }
+        if (entry.kind === 'swatches') {
+          colorTarget = entry.target;
+          menuEl.appendChild(buildSwatchRow(entry.target));
           continue;
         }
 

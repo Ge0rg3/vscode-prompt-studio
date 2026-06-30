@@ -1,10 +1,7 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
 import * as vscode from 'vscode';
 
 import { isWithin } from '../common/utils/paths';
-import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
@@ -183,45 +180,13 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
   }
 
   private renderHtml(webview: vscode.Webview): string {
-    const nonce = randomNonce();
-    const codiconCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
-    );
-    const paletteCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/palette.css')
-    );
-    const contextMenuCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.css')
-    );
-    const contextMenuJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.js')
-    );
-    const treeCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.css')
-    );
-    const treeJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.js')
-    );
-    const csp = [
-      `default-src 'none'`,
-      `style-src ${webview.cspSource}`,
-      `font-src ${webview.cspSource}`,
-      `script-src 'nonce-${nonce}'`
-    ].join('; ');
-
-    const template = fs.readFileSync(
-      path.join(this.extensionUri.fsPath, 'media/vault/tree.html'),
-      'utf8'
-    );
-    return fillTemplate(template, {
-      csp,
-      nonce,
-      codiconCss: codiconCss.toString(),
-      paletteCss: paletteCss.toString(),
-      contextMenuCss: contextMenuCss.toString(),
-      contextMenuJs: contextMenuJs.toString(),
-      treeCss: treeCss.toString(),
-      treeJs: treeJs.toString()
+    return renderWebviewHtml(webview, this.extensionUri, 'media/vault/tree.html', {
+      codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+      paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
+      contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
+      contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
+      treeJs: assetUri(webview, this.extensionUri, 'media/vault/tree.js')
     });
   }
 }

@@ -1,11 +1,10 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { marked } from 'marked';
 import * as vscode from 'vscode';
 
 import { sendTextToClaude } from '../common/sendToClaude';
-import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -112,33 +111,10 @@ export class TemplatePanel {
 
   private renderHtml(): string {
     const webview = this.panel.webview;
-    const nonce = randomNonce();
-    const codiconCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
-    );
-    const templateCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/template/template.css')
-    );
-    const templateJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/template/template.js')
-    );
-    const csp = [
-      `default-src 'none'`,
-      `style-src ${webview.cspSource}`,
-      `font-src ${webview.cspSource}`,
-      `script-src 'nonce-${nonce}'`
-    ].join('; ');
-
-    const template = fs.readFileSync(
-      path.join(this.extensionUri.fsPath, 'media/template/template.html'),
-      'utf8'
-    );
-    return fillTemplate(template, {
-      csp,
-      nonce,
-      codiconCss: codiconCss.toString(),
-      templateCss: templateCss.toString(),
-      templateJs: templateJs.toString()
+    return renderWebviewHtml(webview, this.extensionUri, 'media/template/template.html', {
+      codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+      templateCss: assetUri(webview, this.extensionUri, 'media/template/template.css'),
+      templateJs: assetUri(webview, this.extensionUri, 'media/template/template.js')
     });
   }
 

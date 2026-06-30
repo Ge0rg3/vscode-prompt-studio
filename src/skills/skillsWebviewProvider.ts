@@ -1,11 +1,10 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
-import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { SkillTreeNode } from './skillNode';
 import { skillsRoot } from './skillScanner';
@@ -184,41 +183,12 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
   }
 
   private renderHtml(webview: vscode.Webview): string {
-    const nonce = randomNonce();
-    const codiconCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
-    );
-    const contextMenuCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.css')
-    );
-    const treeCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/vault/tree.css')
-    );
-    const contextMenuJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/contextMenu.js')
-    );
-    const treeJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/skills/tree.js')
-    );
-    const csp = [
-      `default-src 'none'`,
-      `style-src ${webview.cspSource}`,
-      `font-src ${webview.cspSource}`,
-      `script-src 'nonce-${nonce}'`
-    ].join('; ');
-
-    const template = fs.readFileSync(
-      path.join(this.extensionUri.fsPath, 'media/skills/tree.html'),
-      'utf8'
-    );
-    return fillTemplate(template, {
-      csp,
-      nonce,
-      codiconCss: codiconCss.toString(),
-      contextMenuCss: contextMenuCss.toString(),
-      treeCss: treeCss.toString(),
-      contextMenuJs: contextMenuJs.toString(),
-      treeJs: treeJs.toString()
+    return renderWebviewHtml(webview, this.extensionUri, 'media/skills/tree.html', {
+      codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+      contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
+      treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
+      contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      treeJs: assetUri(webview, this.extensionUri, 'media/skills/tree.js')
     });
   }
 }

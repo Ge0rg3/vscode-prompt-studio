@@ -19,7 +19,11 @@
   let state = null;
   let cards = [];
   let cardEls = new Map();
-  let menuColorTarget = null;
+
+  const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
+
+  // one context-menu controller, commands post back to the host
+  const menu = create(menuEl, (command, node) => vscode.postMessage({ type: 'command', command, node: serialize(node) }), CARD_COLORS);
 
   // --- helpers ---
 
@@ -200,7 +204,7 @@
     el.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      showMenu(event.clientX, event.clientY, menuFor(card), card);
+      menu.show(event.clientX, event.clientY, menuFor(card), card);
     });
 
     return el;
@@ -415,19 +419,6 @@
     };
   }
 
-  // how long the pointer must rest on a parent before its submenu opens
-  const SUBMENU_OPEN_DELAY_MS = 150;
-
-  // Copy as Path opens a submenu for the absolute or the vault-relative path
-  const COPY_PATH_ITEM = {
-    label: 'Copy as Path',
-    icon: 'file-symlink-file',
-    submenu: [
-      { label: 'Static', icon: 'link', cmd: 'promptStudio.copyPathStatic' },
-      { label: 'Relative', icon: 'file-submodule', cmd: 'promptStudio.copyPathRelative' }
-    ]
-  };
-
   // drop empty entries, then leading, trailing, and doubled separators
   function compactMenu(items) {
     const out = [];
@@ -500,181 +491,10 @@
     ]);
   }
 
-  // color dots with a leading clear-color swatch, hover previews and click commits
-  function swatchRow(target) {
-    const row = document.createElement('div');
-    row.className = 'swatch-row';
-
-    for (const color of [null, ...CARD_COLORS]) {
-      const dot = document.createElement('span');
-      dot.className = color ? 'swatch color-' + color : 'swatch none';
-      dot.title = color || 'No color';
-      if ((target.currentColor() || null) === color) {
-        dot.classList.add('selected');
-      }
-
-      dot.addEventListener('mouseenter', () => target.preview(color));
-      dot.addEventListener('mouseleave', () => target.preview(target.currentColor()));
-      dot.addEventListener('click', () => {
-        if (dot.classList.contains('selected')) {
-          hideMenu();
-          return;
-        }
-
-        for (const other of row.children) {
-          other.classList.remove('selected');
-        }
-        dot.classList.add('selected');
-        target.commit(color);
-      });
-      row.appendChild(dot);
-    }
-    return row;
-  }
-
   // the node fields the host needs for a command
   function serialize(node) {
     return { kind: node.kind, absPath: node.absPath, name: node.name };
   }
-
-  // a clickable menu row that runs its action or sends its command
-  function buildMenuItem(entry, node) {
-    const item = document.createElement('div');
-    item.className = 'menu-item';
-    const icon = document.createElement('span');
-    icon.className = 'codicon codicon-' + entry.icon;
-    const label = document.createElement('span');
-    label.textContent = entry.label;
-    item.appendChild(icon);
-    item.appendChild(label);
-
-    item.addEventListener('click', () => {
-      hideMenu();
-      if (entry.action) {
-        entry.action();
-        return;
-      }
-      vscode.postMessage({ type: 'command', command: entry.cmd, node: serialize(node) });
-    });
-    return item;
-  }
-
-  // place the submenu beside its parent when it fits there, else expand it inline below
-  function openSubmenu(header, submenu, arrow) {
-    // skip a timer that fired after the menu was rebuilt or hidden
-    if (!header.isConnected) {
-      return;
-    }
-    submenu.classList.remove('hidden', 'inline');
-    const rect = header.getBoundingClientRect();
-    const width = submenu.offsetWidth;
-    const fitsRight = rect.right + width <= window.innerWidth - 4;
-    const fitsLeft = rect.left - width >= 4;
-
-    if (fitsRight || fitsLeft) {
-      arrow.className = 'submenu-arrow codicon codicon-chevron-right';
-      const left = fitsRight ? rect.right : rect.left - width;
-      const top = Math.min(rect.top, Math.max(0, window.innerHeight - submenu.offsetHeight - 4));
-      submenu.style.left = `${left}px`;
-      submenu.style.top = `${top}px`;
-    } else {
-      arrow.className = 'submenu-arrow codicon codicon-chevron-down';
-      submenu.classList.add('inline');
-      // pull the menu up so the expanded rows stay on-screen
-      if (menuEl.getBoundingClientRect().bottom > window.innerHeight - 4) {
-        menuEl.style.top = `${Math.max(4, window.innerHeight - menuEl.offsetHeight - 4)}px`;
-      }
-    }
-  }
-
-  // reset the submenu to its closed state
-  function closeSubmenu(submenu, arrow) {
-    submenu.classList.add('hidden');
-    submenu.classList.remove('inline');
-    arrow.className = 'submenu-arrow codicon codicon-chevron-right';
-  }
-
-  // a parent whose children fly out beside it, or expand inline when there is no room
-  function buildSubmenuItem(entry, node) {
-    const parent = document.createElement('div');
-    parent.className = 'submenu-parent';
-
-    const header = document.createElement('div');
-    header.className = 'menu-item';
-    const icon = document.createElement('span');
-    icon.className = 'codicon codicon-' + entry.icon;
-    const label = document.createElement('span');
-    label.textContent = entry.label;
-    const arrow = document.createElement('span');
-    arrow.className = 'submenu-arrow codicon codicon-chevron-right';
-    header.appendChild(icon);
-    header.appendChild(label);
-    header.appendChild(arrow);
-
-    const submenu = document.createElement('div');
-    submenu.className = 'submenu hidden';
-    for (const child of entry.submenu) {
-      submenu.appendChild(buildMenuItem(child, node));
-    }
-
-    parent.appendChild(header);
-    parent.appendChild(submenu);
-
-    let openTimer;
-    parent.addEventListener('mouseenter', () => {
-      openTimer = setTimeout(() => openSubmenu(header, submenu, arrow), SUBMENU_OPEN_DELAY_MS);
-    });
-    parent.addEventListener('mouseleave', () => {
-      clearTimeout(openTimer);
-      closeSubmenu(submenu, arrow);
-    });
-    return parent;
-  }
-
-  // place the menu at the click point, clamped inside the window
-  function showMenu(x, y, items, node) {
-    menuColorTarget = null;
-    menuEl.replaceChildren();
-    for (const entry of items) {
-      if (entry === 'sep') {
-        const sep = document.createElement('div');
-        sep.className = 'menu-sep';
-        menuEl.appendChild(sep);
-        continue;
-      }
-      if (entry.kind === 'swatches') {
-        menuColorTarget = entry.target;
-        menuEl.appendChild(swatchRow(entry.target));
-        continue;
-      }
-
-      menuEl.appendChild(entry.submenu ? buildSubmenuItem(entry, node) : buildMenuItem(entry, node));
-    }
-    menuEl.classList.remove('hidden');
-
-    const maxX = Math.max(0, window.innerWidth - menuEl.offsetWidth - 4);
-    const maxY = Math.max(0, window.innerHeight - menuEl.offsetHeight - 4);
-    menuEl.style.left = `${Math.min(x, maxX)}px`;
-    menuEl.style.top = `${Math.min(y, maxY)}px`;
-  }
-
-  // close the menu, dropping any uncommitted hover preview back to the saved color
-  function hideMenu() {
-    if (menuColorTarget) {
-      menuColorTarget.preview(menuColorTarget.currentColor());
-      menuColorTarget = null;
-    }
-    menuEl.classList.add('hidden');
-  }
-
-  document.addEventListener('mousedown', (event) => {
-    if (!menuEl.contains(event.target)) hideMenu();
-  });
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') hideMenu();
-  });
-  window.addEventListener('blur', hideMenu);
-  canvasEl.addEventListener('scroll', hideMenu, true);
 
   // right-click empty canvas space acts on the open folder
   canvasEl.addEventListener('contextmenu', (event) => {
@@ -683,7 +503,7 @@
     }
 
     event.preventDefault();
-    showMenu(event.clientX, event.clientY, backgroundMenu(dropPoint(event)), currentFolderNode());
+    menu.show(event.clientX, event.clientY, backgroundMenu(dropPoint(event)), currentFolderNode());
   });
 
   // --- inbound state ---

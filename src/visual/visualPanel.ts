@@ -1,4 +1,3 @@
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -6,7 +5,7 @@ import * as vscode from 'vscode';
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
-import { fillTemplate, randomNonce } from '../common/utils/webview';
+import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 import { CARD_COLORS, isCardColor } from './cardColors';
@@ -240,37 +239,13 @@ export class VisualPanel {
 
   private renderHtml(): string {
     const webview = this.panel.webview;
-    const nonce = randomNonce();
-    const codiconCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/codicons/codicon.css')
-    );
-    const paletteCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/common/palette.css')
-    );
-    const canvasCss = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/visual/canvas.css')
-    );
-    const canvasJs = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'media/visual/canvas.js')
-    );
-    const csp = [
-      `default-src 'none'`,
-      `style-src ${webview.cspSource}`,
-      `font-src ${webview.cspSource}`,
-      `script-src 'nonce-${nonce}'`
-    ].join('; ');
-
-    const template = fs.readFileSync(
-      path.join(this.extensionUri.fsPath, 'media/visual/canvas.html'),
-      'utf8'
-    );
-    return fillTemplate(template, {
-      csp,
-      nonce,
-      codiconCss: codiconCss.toString(),
-      paletteCss: paletteCss.toString(),
-      canvasCss: canvasCss.toString(),
-      canvasJs: canvasJs.toString(),
+    return renderWebviewHtml(webview, this.extensionUri, 'media/visual/canvas.html', {
+      codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+      paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
+      contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
+      contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      canvasCss: assetUri(webview, this.extensionUri, 'media/visual/canvas.css'),
+      canvasJs: assetUri(webview, this.extensionUri, 'media/visual/canvas.js'),
       cardColors: JSON.stringify(CARD_COLORS),
       allowCrud: JSON.stringify(this.context.allowCrud)
     });
