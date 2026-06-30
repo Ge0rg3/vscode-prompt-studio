@@ -21,43 +21,6 @@ interface EditorStyle {
   tabSize: number;
 }
 
-// --- helpers ---
-
-// panel tab label for a note opened as a template
-function titleFor(notePath: string): string {
-  return `${path.basename(notePath).replace(/\.md$/i, '')} (template)`;
-}
-
-// scripts on, asset loads limited to the bundled media folder
-function webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
-  return {
-    enableScripts: true,
-    localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
-  };
-}
-
-// the user's editor font and spacing
-function editorStyle(): EditorStyle {
-  const editorConfig = vscode.workspace.getConfiguration('editor');
-  const fontFamily = editorConfig.get<string>('fontFamily', 'monospace');
-  const fontSize = editorConfig.get<number>('fontSize', 14);
-  const fontWeight = editorConfig.get<string>('fontWeight', 'normal');
-  const tabSize = editorConfig.get<number>('tabSize', 4);
-  const lineHeightSetting = editorConfig.get<number>('lineHeight', 0);
-
-  // convert editor.lineHeight to pixels (0 auto, under 8 a multiplier)
-  let lineHeight = lineHeightSetting;
-  if (lineHeightSetting === 0) {
-    lineHeight = Math.round(1.5 * fontSize);
-  } else if (lineHeightSetting < 8) {
-    lineHeight = Math.round(lineHeightSetting * fontSize);
-  }
-
-  return { fontFamily, fontSize, fontWeight, lineHeight, tabSize };
-}
-
-// --- exports ---
-
 export class TemplatePanel {
   static readonly viewType = 'promptStudio.template';
 
@@ -76,9 +39,9 @@ export class TemplatePanel {
 
     const panel = vscode.window.createWebviewPanel(
       TemplatePanel.viewType,
-      titleFor(notePath),
+      TemplatePanel.titleFor(notePath),
       vscode.ViewColumn.Active,
-      { ...webviewOptions(extensionUri), retainContextWhenHidden: true }
+      { ...TemplatePanel.webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
     new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
   }
@@ -90,7 +53,7 @@ export class TemplatePanel {
     notePath: string,
     claudeCommand?: string
   ): void {
-    panel.webview.options = webviewOptions(extensionUri);
+    panel.webview.options = TemplatePanel.webviewOptions(extensionUri);
     new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
   }
 
@@ -103,7 +66,7 @@ export class TemplatePanel {
     private claudeCommand: string | undefined
   ) {
     TemplatePanel.openPanels.set(notePath, this);
-    this.panel.title = titleFor(notePath);
+    this.panel.title = TemplatePanel.titleFor(notePath);
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
@@ -128,7 +91,7 @@ export class TemplatePanel {
           text,
           notePath: this.notePath,
           claudeCommand: this.claudeCommand,
-          style: editorStyle()
+          style: TemplatePanel.editorStyle()
         });
         return;
       }
@@ -177,5 +140,38 @@ export class TemplatePanel {
       templateCss: templateCss.toString(),
       templateJs: templateJs.toString()
     });
+  }
+
+  // panel tab label for a note opened as a template
+  private static titleFor(notePath: string): string {
+    return `${path.basename(notePath).replace(/\.md$/i, '')} (template)`;
+  }
+
+  // scripts on, asset loads limited to the bundled media folder
+  private static webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+    return {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
+    };
+  }
+
+  // the user's editor font and spacing
+  private static editorStyle(): EditorStyle {
+    const editorConfig = vscode.workspace.getConfiguration('editor');
+    const fontFamily = editorConfig.get<string>('fontFamily', 'monospace');
+    const fontSize = editorConfig.get<number>('fontSize', 14);
+    const fontWeight = editorConfig.get<string>('fontWeight', 'normal');
+    const tabSize = editorConfig.get<number>('tabSize', 4);
+    const lineHeightSetting = editorConfig.get<number>('lineHeight', 0);
+
+    // convert editor.lineHeight to pixels (0 auto, under 8 a multiplier)
+    let lineHeight = lineHeightSetting;
+    if (lineHeightSetting === 0) {
+      lineHeight = Math.round(1.5 * fontSize);
+    } else if (lineHeightSetting < 8) {
+      lineHeight = Math.round(lineHeightSetting * fontSize);
+    }
+
+    return { fontFamily, fontSize, fontWeight, lineHeight, tabSize };
   }
 }

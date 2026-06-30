@@ -7,27 +7,6 @@ const CONFIG_KEY = 'vaultPath';
 const FULL_CONFIG_KEY = `${CONFIG_SECTION}.${CONFIG_KEY}`;
 const HAS_VAULT_CONTEXT = 'promptStudio.hasVault';
 
-// --- helpers ---
-
-// read the configured vault path or fall back to a per-workspace storage dir
-function resolveVaultRoot(globalStorageDir: string): string | undefined {
-  const configured = vscode.workspace
-    .getConfiguration(CONFIG_SECTION)
-    .get<string>(CONFIG_KEY)
-    ?.trim();
-  if (configured) {
-    return ensureDir(configured);
-  }
-
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  if (!workspace) {
-    return undefined;
-  }
-  return ensureDir(projectStorageDir(globalStorageDir, workspace.uri.fsPath));
-}
-
-// --- exports ---
-
 export class VaultManager implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<string | undefined>();
   private readonly disposables: vscode.Disposable[] = [];
@@ -36,7 +15,7 @@ export class VaultManager implements vscode.Disposable {
   readonly onDidChangeVault: vscode.Event<string | undefined> = this.emitter.event;
 
   constructor(private readonly globalStorageDir: string) {
-    this.current = resolveVaultRoot(globalStorageDir);
+    this.current = this.resolveVaultRoot();
     this.publishContext();
 
     this.disposables.push(
@@ -67,8 +46,9 @@ export class VaultManager implements vscode.Disposable {
     }
   }
 
+  // re-resolve the root, fire only when it actually changed
   private recompute(): void {
-    const next = resolveVaultRoot(this.globalStorageDir);
+    const next = this.resolveVaultRoot();
     if (next === this.current) {
       return;
     }
@@ -77,7 +57,25 @@ export class VaultManager implements vscode.Disposable {
     this.emitter.fire(next);
   }
 
+  // drive the when-clause context that shows or hides the view
   private publishContext(): void {
     void vscode.commands.executeCommand('setContext', HAS_VAULT_CONTEXT, this.current !== undefined);
+  }
+
+  // read the configured vault path or fall back to a per-workspace storage dir
+  private resolveVaultRoot(): string | undefined {
+    const configured = vscode.workspace
+      .getConfiguration(CONFIG_SECTION)
+      .get<string>(CONFIG_KEY)
+      ?.trim();
+    if (configured) {
+      return ensureDir(configured);
+    }
+
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    if (!workspace) {
+      return undefined;
+    }
+    return ensureDir(projectStorageDir(this.globalStorageDir, workspace.uri.fsPath));
   }
 }

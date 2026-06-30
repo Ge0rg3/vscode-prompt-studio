@@ -73,6 +73,7 @@ Every decision here is in service of two goals: a new reader can open any file a
   - *Services / exports* are the public functions or classes the rest of the extension reaches for.
   - Mark the boundaries with hairline divider comments when the file has more than a handful of helpers (`// --- helpers ---`, `// --- exports ---`).
   - Do not zigzag: helpers must not appear *between* or *after* services. If you find yourself adding a helper next to its caller, move it up into the helpers block.
+- A helper used by only one class goes inside it as a `private` method (`private static` if a static factory needs it), not a module-level function.
 - No one-line pass-through wrappers. `export function listTitles(): string[] { return index.titles(); }` is noise; the caller can call `index.titles()` directly. Wrappers are only justified when they *do work* (compose, transform, build a typed shape, union multiple sources). If the body is one return statement, delete the wrapper and update its callers.
 
 ### Spacing inside functions

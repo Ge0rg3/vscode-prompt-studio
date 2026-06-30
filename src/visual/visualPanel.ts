@@ -45,23 +45,6 @@ const ALLOWED_COMMANDS = new Set([
 // the commands that change the folder's structure, suppressed on a read-only canvas
 const CRUD_COMMANDS = new Set(['promptStudio.rename', 'promptStudio.delete']);
 
-// --- helpers ---
-
-// panel tab label for a folder
-function titleFor(folder: string): string {
-  return `Visual: ${path.basename(folder) || folder}`;
-}
-
-// scripts on, asset loads limited to the bundled media folder
-function webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
-  return {
-    enableScripts: true,
-    localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
-  };
-}
-
-// --- exports ---
-
 export class VisualPanel {
   static readonly viewType = 'promptStudio.visual';
 
@@ -78,9 +61,9 @@ export class VisualPanel {
 
     const panel = vscode.window.createWebviewPanel(
       VisualPanel.viewType,
-      titleFor(folder),
+      VisualPanel.titleFor(folder),
       vscode.ViewColumn.Active,
-      { ...webviewOptions(extensionUri), retainContextWhenHidden: true }
+      { ...VisualPanel.webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
     VisualPanel.panels.set(context.root, new VisualPanel(panel, extensionUri, context, folder));
   }
@@ -92,7 +75,7 @@ export class VisualPanel {
     context: CanvasContext,
     folder: string
   ): void {
-    panel.webview.options = webviewOptions(extensionUri);
+    panel.webview.options = VisualPanel.webviewOptions(extensionUri);
     VisualPanel.panels.set(context.root, new VisualPanel(panel, extensionUri, context, folder));
   }
 
@@ -109,7 +92,7 @@ export class VisualPanel {
     initialFolder: string
   ) {
     this.folder = initialFolder;
-    this.panel.title = titleFor(initialFolder);
+    this.panel.title = VisualPanel.titleFor(initialFolder);
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
@@ -142,7 +125,7 @@ export class VisualPanel {
     }
 
     this.folder = folder;
-    this.panel.title = titleFor(folder);
+    this.panel.title = VisualPanel.titleFor(folder);
     this.rebuildWatcher();
     void this.postState();
     this.emitActiveFolder();
@@ -291,5 +274,18 @@ export class VisualPanel {
       cardColors: JSON.stringify(CARD_COLORS),
       allowCrud: JSON.stringify(this.context.allowCrud)
     });
+  }
+
+  // panel tab label for a folder
+  private static titleFor(folder: string): string {
+    return `Visual: ${path.basename(folder) || folder}`;
+  }
+
+  // scripts on, asset loads limited to the bundled media folder
+  private static webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
+    return {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
+    };
   }
 }

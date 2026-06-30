@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+// give the chat input time to take focus before pasting
 const FOCUS_SETTLE_MS = 60;
 
 // drop text into claude code's chat input

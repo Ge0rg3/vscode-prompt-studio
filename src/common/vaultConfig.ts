@@ -11,93 +11,9 @@ type NoteMetadata = Record<string, unknown>;
 
 export const CONFIG_FILENAME = 'config.yml';
 const WRITE_DEBOUNCE_MS = 200;
+// grace window after a self-write to skip the watcher event it triggers
 const SELF_WRITE_GRACE_MS = 1000;
 const BANNER = '# Prompt Studio per-entry metadata. Safe to edit and commit.\n';
-
-// --- helpers ---
-
-// config.yml keys are vault-relative with forward slashes on every platform
-function toConfigKey(relPath: string): string {
-  return relPath.split(path.sep).join('/');
-}
-
-// the visual block within an entry's metadata, or undefined if absent or malformed
-function visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
-  const visual = meta?.visual;
-  if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
-    return undefined;
-  }
-  return visual as Record<string, unknown>;
-}
-
-// a mutable copy of the visual block
-function cloneVisual(meta: NoteMetadata): Record<string, unknown> {
-  const visual = visualOf(meta);
-  return visual ? { ...visual } : {};
-}
-
-// the x/y position saved in an entry's metadata
-function positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
-  const visual = visualOf(meta);
-  if (!visual) {
-    return undefined;
-  }
-  const { x, y } = visual;
-  if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
-    return { x, y };
-  }
-  return undefined;
-}
-
-// the width/height saved in an entry's metadata
-function sizeOf(meta: NoteMetadata | undefined): CardSize | undefined {
-  const visual = visualOf(meta);
-  if (!visual) {
-    return undefined;
-  }
-  const { width, height } = visual;
-  if (
-    typeof width === 'number' &&
-    Number.isFinite(width) &&
-    typeof height === 'number' &&
-    Number.isFinite(height)
-  ) {
-    return { width, height };
-  }
-  return undefined;
-}
-
-// the palette color saved in an entry's metadata
-function colorOf(meta: NoteMetadata | undefined): string | undefined {
-  const color = visualOf(meta)?.color;
-  return typeof color === 'string' ? color : undefined;
-}
-
-// the stacking order saved in an entry's metadata
-function zOf(meta: NoteMetadata | undefined): number | undefined {
-  const z = visualOf(meta)?.z;
-  return typeof z === 'number' && Number.isFinite(z) ? z : undefined;
-}
-
-// read the `notes` map out of parsed config.yml, skipping malformed entries
-function notesFrom(parsed: unknown): Map<string, NoteMetadata> {
-  const out = new Map<string, NoteMetadata>();
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return out;
-  }
-  const notes = (parsed as Record<string, unknown>).notes;
-  if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
-    return out;
-  }
-  for (const [relPath, meta] of Object.entries(notes as Record<string, unknown>)) {
-    if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
-      out.set(toConfigKey(relPath), meta as NoteMetadata);
-    }
-  }
-  return out;
-}
-
-// --- exports ---
 
 // per-entry metadata stored in <root>/config.yml, keeps any keys it does not use when rewriting
 export class VaultConfig implements vscode.Disposable, CardLayoutStore {
@@ -108,6 +24,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   private entries = new Map<string, NoteMetadata>();
   private vaultRoot: string | undefined;
   private writeTimer: ReturnType<typeof setTimeout> | undefined;
+  // time of the last self-write, checked against SELF_WRITE_GRACE_MS
   private lastSelfWrite = 0;
 
   readonly onDidChange: vscode.Event<void> = this.emitter.event;
@@ -122,7 +39,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   getPosition(absPath: string): NotePosition | undefined {
     const key = this.configKeyOf(absPath);
-    return key === undefined ? undefined : positionOf(this.entries.get(key));
+    return key === undefined ? undefined : this.positionOf(this.entries.get(key));
   }
 
   setPosition(absPath: string, position: NotePosition): void {
@@ -132,7 +49,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
 
     const meta = this.entries.get(key) ?? {};
-    const visual = cloneVisual(meta);
+    const visual = this.cloneVisual(meta);
     visual.x = Math.round(position.x);
     visual.y = Math.round(position.y);
     meta.visual = visual;
@@ -143,7 +60,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   getSize(absPath: string): CardSize | undefined {
     const key = this.configKeyOf(absPath);
-    return key === undefined ? undefined : sizeOf(this.entries.get(key));
+    return key === undefined ? undefined : this.sizeOf(this.entries.get(key));
   }
 
   setSize(absPath: string, size: CardSize): void {
@@ -153,7 +70,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
 
     const meta = this.entries.get(key) ?? {};
-    const visual = cloneVisual(meta);
+    const visual = this.cloneVisual(meta);
     visual.width = Math.round(size.width);
     visual.height = Math.round(size.height);
     meta.visual = visual;
@@ -164,7 +81,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   getZ(absPath: string): number | undefined {
     const key = this.configKeyOf(absPath);
-    return key === undefined ? undefined : zOf(this.entries.get(key));
+    return key === undefined ? undefined : this.zOf(this.entries.get(key));
   }
 
   // raise a card's stacking order so it sits in front of overlapping cards
@@ -175,7 +92,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
 
     const meta = this.entries.get(key) ?? {};
-    const visual = cloneVisual(meta);
+    const visual = this.cloneVisual(meta);
     visual.z = Math.round(z);
     meta.visual = visual;
     this.entries.set(key, meta);
@@ -185,7 +102,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   getColor(absPath: string): string | undefined {
     const key = this.configKeyOf(absPath);
-    return key === undefined ? undefined : colorOf(this.entries.get(key));
+    return key === undefined ? undefined : this.colorOf(this.entries.get(key));
   }
 
   // set a palette color, or pass undefined to clear it back to the theme default
@@ -196,7 +113,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
 
     const meta = this.entries.get(key) ?? {};
-    const visual = cloneVisual(meta);
+    const visual = this.cloneVisual(meta);
     if (color === undefined) {
       delete visual.color;
     } else {
@@ -269,10 +186,11 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     this.emitter.dispose();
   }
 
+  // vault-relative config.yml key for an absolute path
   private configKeyOf(absPath: string): string | undefined {
     return this.vaultRoot === undefined
       ? undefined
-      : toConfigKey(path.relative(this.vaultRoot, absPath));
+      : this.toConfigKey(path.relative(this.vaultRoot, absPath));
   }
 
   // re-point at the current root, reloading config.yml and rearming its watcher
@@ -296,6 +214,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     void this.loadFromDisk(this.vaultRoot).then(() => this.emitter.fire());
   }
 
+  // dispose the config.yml watcher and its subscriptions
   private teardownWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -305,6 +224,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     this.watcher = undefined;
   }
 
+  // read and parse config.yml into entries, skip silently when the file is absent
   private async loadFromDisk(root: string): Promise<void> {
     const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
     let raw: string;
@@ -315,7 +235,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
 
     try {
-      this.entries = notesFrom(parse(raw));
+      this.entries = this.notesFrom(parse(raw));
     } catch (err) {
       void vscode.window.showWarningMessage(
         `Prompt Studio: could not parse ${CONFIG_FILENAME} - ${(err as Error).message}`
@@ -339,6 +259,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     })();
   }
 
+  // debounce a flush so a burst of edits collapses into one write
   private scheduleWrite(): void {
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
@@ -349,12 +270,14 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }, WRITE_DEBOUNCE_MS);
   }
 
+  // write the entries map back to config.yml
   private async flush(): Promise<void> {
     const root = this.vaultRoot;
     if (!root) {
       return;
     }
 
+    // collect entries in stable order, dropping any that have no metadata left
     const notes: Record<string, NoteMetadata> = {};
     const keys = [...this.entries.keys()].sort(compareCaseInsensitive);
     for (const key of keys) {
@@ -379,5 +302,86 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
         `Prompt Studio: could not write ${CONFIG_FILENAME} - ${(err as Error).message}`
       );
     }
+  }
+
+  // config.yml keys are vault-relative with forward slashes on every platform
+  private toConfigKey(relPath: string): string {
+    return relPath.split(path.sep).join('/');
+  }
+
+  // the visual block within an entry's metadata, or undefined if absent or malformed
+  private visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
+    const visual = meta?.visual;
+    if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
+      return undefined;
+    }
+    return visual as Record<string, unknown>;
+  }
+
+  // a mutable copy of the visual block
+  private cloneVisual(meta: NoteMetadata): Record<string, unknown> {
+    const visual = this.visualOf(meta);
+    return visual ? { ...visual } : {};
+  }
+
+  // the x/y position saved in an entry's metadata
+  private positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
+    const visual = this.visualOf(meta);
+    if (!visual) {
+      return undefined;
+    }
+    const { x, y } = visual;
+    if (typeof x === 'number' && Number.isFinite(x) && typeof y === 'number' && Number.isFinite(y)) {
+      return { x, y };
+    }
+    return undefined;
+  }
+
+  // the width/height saved in an entry's metadata
+  private sizeOf(meta: NoteMetadata | undefined): CardSize | undefined {
+    const visual = this.visualOf(meta);
+    if (!visual) {
+      return undefined;
+    }
+    const { width, height } = visual;
+    if (
+      typeof width === 'number' &&
+      Number.isFinite(width) &&
+      typeof height === 'number' &&
+      Number.isFinite(height)
+    ) {
+      return { width, height };
+    }
+    return undefined;
+  }
+
+  // the palette color saved in an entry's metadata
+  private colorOf(meta: NoteMetadata | undefined): string | undefined {
+    const color = this.visualOf(meta)?.color;
+    return typeof color === 'string' ? color : undefined;
+  }
+
+  // the stacking order saved in an entry's metadata
+  private zOf(meta: NoteMetadata | undefined): number | undefined {
+    const z = this.visualOf(meta)?.z;
+    return typeof z === 'number' && Number.isFinite(z) ? z : undefined;
+  }
+
+  // read the `notes` map out of parsed config.yml, skipping malformed entries
+  private notesFrom(parsed: unknown): Map<string, NoteMetadata> {
+    const out = new Map<string, NoteMetadata>();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return out;
+    }
+    const notes = (parsed as Record<string, unknown>).notes;
+    if (!notes || typeof notes !== 'object' || Array.isArray(notes)) {
+      return out;
+    }
+    for (const [relPath, meta] of Object.entries(notes as Record<string, unknown>)) {
+      if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+        out.set(this.toConfigKey(relPath), meta as NoteMetadata);
+      }
+    }
+    return out;
   }
 }
