@@ -2,13 +2,13 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
-import { CARD_COLORS, isCardColor } from './cardColors';
 import { readFolder } from './folderContents';
 
 // what one canvas is bound to
@@ -16,6 +16,7 @@ export interface CanvasContext {
   store: CardLayoutStore;
   root: string;
   allowCrud: boolean;
+  colorPreviewEmitter: vscode.EventEmitter<ColorPreview>;
   activeFolderEmitter?: vscode.EventEmitter<string | undefined>;
 }
 
@@ -26,6 +27,7 @@ type InboundMessage =
   | { type: 'moveCard'; path: string; x: number; y: number; z: number }
   | { type: 'resizeCard'; path: string; width: number; height: number }
   | { type: 'setColor'; path: string; color: string | null }
+  | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'newEntry'; kind: 'note' | 'folder'; x: number; y: number }
   | { type: 'command'; command: string; node: VaultNode };
 
@@ -97,7 +99,8 @@ export class VisualPanel {
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
       this.panel.onDidDispose(() => this.dispose()),
       this.panel.onDidChangeViewState(() => this.emitActiveFolder()),
-      this.context.store.onDidChange(() => this.scheduleRefresh())
+      this.context.store.onDidChange(() => this.scheduleRefresh()),
+      this.context.colorPreviewEmitter.event((preview) => postColorPreview(this.panel.webview, preview))
     );
     this.rebuildWatcher();
     this.emitActiveFolder();
@@ -191,11 +194,10 @@ export class VisualPanel {
         this.context.store.setSize(msg.path, { width: msg.width, height: msg.height });
         return;
       case 'setColor':
-        if (msg.color === null) {
-          this.context.store.setColor(msg.path, undefined);
-        } else if (isCardColor(msg.color)) {
-          this.context.store.setColor(msg.path, msg.color);
-        }
+        applyColorMessage(this.context.store, msg);
+        return;
+      case 'previewColor':
+        this.context.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
         return;
       case 'newEntry':
         if (this.context.allowCrud) {
@@ -244,6 +246,7 @@ export class VisualPanel {
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       canvasCss: assetUri(webview, this.extensionUri, 'media/visual/canvas.css'),
       canvasJs: assetUri(webview, this.extensionUri, 'media/visual/canvas.js'),
       cardColors: JSON.stringify(CARD_COLORS),

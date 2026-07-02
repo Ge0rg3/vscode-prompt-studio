@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { isWithin } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
@@ -12,6 +13,8 @@ type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; path: string }
   | { type: 'move'; source: string; destDir: string }
+  | { type: 'setColor'; path: string; color: string | null }
+  | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'command'; command: string; node?: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
@@ -43,7 +46,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
   constructor(
     private readonly vaultManager: VaultManager,
     private readonly config: VaultConfig,
-    private readonly extensionUri: vscode.Uri
+    private readonly extensionUri: vscode.Uri,
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
   ) {
     this.rebuildWatcher();
     this.disposables.push(
@@ -52,7 +56,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         void this.postState();
       }),
       config.onDidChange(() => this.scheduleRefresh()),
-      vscode.window.onDidChangeActiveTextEditor(() => this.syncSelection())
+      vscode.window.onDidChangeActiveTextEditor(() => this.syncSelection()),
+      colorPreviewEmitter.event((preview) => postColorPreview(this.view?.webview, preview))
     );
   }
 
@@ -170,6 +175,12 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         }
         return;
       }
+      case 'setColor':
+        applyColorMessage(this.config, msg);
+        return;
+      case 'previewColor':
+        this.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
+        return;
       case 'command':
         if (!ALLOWED_COMMANDS.has(msg.command)) {
           return;
@@ -185,8 +196,10 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
-      treeJs: assetUri(webview, this.extensionUri, 'media/vault/tree.js')
+      treeJs: assetUri(webview, this.extensionUri, 'media/vault/tree.js'),
+      cardColors: JSON.stringify(CARD_COLORS)
     });
   }
 }

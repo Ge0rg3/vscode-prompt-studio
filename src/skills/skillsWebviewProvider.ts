@@ -2,10 +2,11 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
-import { CONFIG_FILENAME } from '../common/vaultConfig';
+import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
 import { SkillTreeNode } from './skillNode';
 import { skillsRoot } from './skillScanner';
 import { buildSkillsTree } from './skillsTree';
@@ -13,6 +14,8 @@ import { buildSkillsTree } from './skillsTree';
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; path: string }
+  | { type: 'setColor'; path: string; color: string | null }
+  | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'command'; command: string; node?: SkillTreeNode };
 
 const HAS_SKILLS_CONTEXT = 'promptStudio.hasSkills';
@@ -42,13 +45,19 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
   private children: SkillTreeNode[] = [];
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly extensionUri: vscode.Uri) {
+  constructor(
+    private readonly extensionUri: vscode.Uri,
+    private readonly config: VaultConfig,
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
+  ) {
     this.rebuildWatchers();
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
         this.rebuildWatchers();
         this.scheduleRefresh();
-      })
+      }),
+      config.onDidChange(() => this.scheduleRefresh()),
+      colorPreviewEmitter.event((preview) => postColorPreview(this.view?.webview, preview))
     );
     void this.refresh();
   }
@@ -76,7 +85,7 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
 
   // re-scan and repaint the tree
   async refresh(): Promise<void> {
-    this.children = await buildSkillsTree();
+    this.children = await buildSkillsTree(this.config);
     await vscode.commands.executeCommand(
       'setContext',
       HAS_SKILLS_CONTEXT,
@@ -106,6 +115,12 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
         return;
       case 'openNote':
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
+        return;
+      case 'setColor':
+        applyColorMessage(this.config, msg);
+        return;
+      case 'previewColor':
+        this.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
         return;
       case 'command':
         if (!ALLOWED_COMMANDS.has(msg.command)) {
@@ -185,10 +200,13 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
   private renderHtml(webview: vscode.Webview): string {
     return renderWebviewHtml(webview, this.extensionUri, 'media/skills/tree.html', {
       codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+      paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
       treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
-      treeJs: assetUri(webview, this.extensionUri, 'media/skills/tree.js')
+      paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
+      treeJs: assetUri(webview, this.extensionUri, 'media/skills/tree.js'),
+      cardColors: JSON.stringify(CARD_COLORS)
     });
   }
 }

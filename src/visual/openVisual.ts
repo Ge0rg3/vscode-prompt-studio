@@ -2,6 +2,7 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { ColorPreview } from '../common/cardColors';
 import { CardLayoutStore } from '../common/cardLayoutStore';
 import { pathExists } from '../common/utils/fs';
 import { isWithin } from '../common/utils/paths';
@@ -16,7 +17,8 @@ export class VisualCommands {
     private readonly vaultManager: VaultManager,
     private readonly config: VaultConfig,
     private readonly extensionUri: vscode.Uri,
-    private readonly activeFolderEmitter: vscode.EventEmitter<string | undefined>
+    private readonly activeFolderEmitter: vscode.EventEmitter<string | undefined>,
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
   ) {}
 
   // open the vault canvas at the context node's folder, or the root when nothing is selected
@@ -55,9 +57,15 @@ export class VisualCommands {
     });
   }
 
-  // the editable vault canvas, navigation tracks the sidebar selection
+  // the editable vault canvas context
   private vaultContext(root: string): CanvasContext {
-    return { store: this.config, root, allowCrud: true, activeFolderEmitter: this.activeFolderEmitter };
+    return {
+      store: this.config,
+      root,
+      allowCrud: true,
+      activeFolderEmitter: this.activeFolderEmitter,
+      colorPreviewEmitter: this.colorPreviewEmitter
+    };
   }
 
   // the folder to open as a canvas, a note uses its parent folder
@@ -71,9 +79,9 @@ export class VisualCommands {
     return vaultRoot;
   }
 
-  // a read-only canvas over a skill folder, layout kept in .claude/skills/config.yml
+  // a read-only canvas context over a skill folder
   private skillContext(store: CardLayoutStore, root: string): CanvasContext {
-    return { store, root, allowCrud: false };
+    return { store, root, allowCrud: false, colorPreviewEmitter: this.colorPreviewEmitter };
   }
 
   // the folder to restore the canvas to, falling back to the root when the saved one is gone

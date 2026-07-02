@@ -5,9 +5,12 @@
   const menuEl = document.getElementById('context-menu');
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
+  const { applyTint } = window.PromptStudioPalette;
+  const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
 
   let children = [];
   const expanded = new Set();
+  let activePreview = null;
 
   // --- helpers ---
 
@@ -26,6 +29,7 @@
     for (const node of children) {
       renderNode(node, 0);
     }
+    reapplyPreview();
   }
 
   // the expand-state key for a node
@@ -56,6 +60,11 @@
     return action;
   }
 
+  // set a row's color classes, clearing any previous tint
+  function applyRowColor(row, color) {
+    applyTint(row, color, 'colored');
+  }
+
   function renderNode(node, depth) {
     const expandable = node.kind !== 'file';
     const hasChildren = expandable && node.children && node.children.length > 0;
@@ -64,6 +73,8 @@
 
     const row = document.createElement('div');
     row.className = 'row';
+    row.dataset.path = node.absPath;
+    applyRowColor(row, node.color);
 
     for (let level = 0; level < depth; level++) {
       const guide = document.createElement('span');
@@ -168,10 +179,93 @@
     ];
   }
 
+  // find a node anywhere in the tree by absolute path
+  function findNode(absPath, nodes) {
+    for (const node of nodes) {
+      if (node.absPath === absPath) {
+        return node;
+      }
+      if (node.children) {
+        const found = findNode(absPath, node.children);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  // the color saved for a path in the current tree
+  function nodeColorOf(absPath) {
+    const node = findNode(absPath, children);
+    return node ? node.color : undefined;
+  }
+
+  // the rendered row for a path, absent when its parent is collapsed
+  function rowFor(absPath) {
+    for (const row of treeEl.querySelectorAll('.row')) {
+      if (row.dataset.path === absPath) {
+        return row;
+      }
+    }
+    return undefined;
+  }
+
+  // tint the live row for a path without persisting
+  function tintRow(absPath, color) {
+    const row = rowFor(absPath);
+    if (row) {
+      applyRowColor(row, color);
+    }
+  }
+
+  // tint the row and tell the host so any open canvas matches
+  function previewColor(absPath, color) {
+    tintRow(absPath, color);
+    vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
+  }
+
+  // remember the live preview, drop it once it matches the saved color
+  function trackPreview(absPath, color) {
+    activePreview = (nodeColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
+  }
+
+  // re-apply the preview if it still differs from the saved color
+  function reapplyPreview() {
+    if (!activePreview) {
+      return;
+    }
+    trackPreview(activePreview.path, activePreview.color);
+    if (activePreview) {
+      tintRow(activePreview.path, activePreview.color);
+    }
+  }
+
+  // apply the color to the live row and local state, then persist it
+  function recolor(absPath, color) {
+    const node = findNode(absPath, children);
+    if (node) {
+      node.color = color || undefined;
+    }
+    tintRow(absPath, color);
+    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
+  }
+
+  // swatch target for a node, tints its row live
+  function colorTarget(node) {
+    return {
+      currentColor: () => nodeColorOf(node.absPath),
+      preview: (color) => previewColor(node.absPath, color),
+      commit: (color) => recolor(node.absPath, color)
+    };
+  }
+
   // the right-click menu for a node
   function menuFor(node) {
     if (node.kind === 'skill') {
       return [
+        { kind: 'swatches', target: colorTarget(node) },
+        'sep',
         { label: 'Open SKILL.md', icon: 'go-to-file', cmd: 'promptStudio.openSkill' },
         { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openSkillTemplate' },
         { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openSkillVisual' },
@@ -184,6 +278,8 @@
     }
     if (node.kind === 'file') {
       return [
+        { kind: 'swatches', target: colorTarget(node) },
+        'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
@@ -192,6 +288,8 @@
     }
     if (node.kind === 'folder') {
       return [
+        { kind: 'swatches', target: colorTarget(node) },
+        'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
         COPY_PATH_ITEM
       ];
@@ -201,7 +299,7 @@
 
   // --- wiring ---
 
-  const menu = create(menuEl, postCommand);
+  const menu = create(menuEl, postCommand, CARD_COLORS);
 
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -217,6 +315,9 @@
     } else if (message.type === 'collapseAll') {
       expanded.clear();
       render();
+    } else if (message.type === 'previewColor') {
+      tintRow(message.path, message.color);
+      trackPreview(message.path, message.color);
     }
   });
 

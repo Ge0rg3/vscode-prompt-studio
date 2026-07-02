@@ -5,9 +5,12 @@
   const expanded = new Set();
   let selectedPath = null;
   let dragSource = null;
+  let activePreview = null;
 
   const treeEl = document.getElementById('tree');
   const menuEl = document.getElementById('context-menu');
+  const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
+  const { applyTint } = window.PromptStudioPalette;
 
   // --- focus tracking ---
 
@@ -35,6 +38,9 @@
       render();
     } else if (message.type === 'select') {
       select(message.path);
+    } else if (message.type === 'previewColor') {
+      tintRow(message.path, message.color);
+      trackPreview(message.path, message.color);
     }
   });
 
@@ -55,6 +61,7 @@
     for (const node of state.children) {
       renderNode(node, 0);
     }
+    reapplyPreview();
   }
 
   function renderWelcome() {
@@ -82,6 +89,11 @@
     treeEl.appendChild(hint);
   }
 
+  // set a row's color classes, clearing any previous tint
+  function applyRowColor(row, color) {
+    applyTint(row, color, 'colored');
+  }
+
   // a hover-row icon that runs a command on the node
   function actionButton(icon, title, command, node) {
     const action = document.createElement('span');
@@ -105,9 +117,7 @@
     if (node.absPath === selectedPath) {
       row.classList.add('selected');
     }
-    if (node.color) {
-      row.classList.add('colored', 'color-' + node.color);
-    }
+    applyRowColor(row, node.color);
 
     for (let level = 0; level < depth; level++) {
       const guide = document.createElement('span');
@@ -305,7 +315,7 @@
     vscode.postMessage({ type: 'command', command, node: node ? serialize(node) : undefined });
   }
 
-  const menu = create(menuEl, postCommand);
+  const menu = create(menuEl, postCommand, CARD_COLORS);
 
   // expand the folder first, then create a note or folder inside it
   function newInFolder(command, node) {
@@ -314,9 +324,92 @@
     postCommand(command, node);
   }
 
+  // find a node anywhere in the tree by absolute path
+  function findNode(absPath, nodes) {
+    for (const node of nodes) {
+      if (node.absPath === absPath) {
+        return node;
+      }
+      if (node.children) {
+        const found = findNode(absPath, node.children);
+        if (found) {
+          return found;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  // the color saved for a path in the current tree
+  function nodeColorOf(absPath) {
+    const node = state ? findNode(absPath, state.children) : undefined;
+    return node ? node.color : undefined;
+  }
+
+  // the rendered row for a path, absent when its parent is collapsed
+  function rowFor(absPath) {
+    for (const row of treeEl.querySelectorAll('.row')) {
+      if (row.dataset.path === absPath) {
+        return row;
+      }
+    }
+    return undefined;
+  }
+
+  // tint the live row for a path without persisting
+  function tintRow(absPath, color) {
+    const row = rowFor(absPath);
+    if (row) {
+      applyRowColor(row, color);
+    }
+  }
+
+  // tint the row and tell the host so any open canvas matches
+  function previewColor(absPath, color) {
+    tintRow(absPath, color);
+    vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
+  }
+
+  // remember the live preview, drop it once it matches the saved color
+  function trackPreview(absPath, color) {
+    activePreview = (nodeColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
+  }
+
+  // re-apply the preview if it still differs from the saved color
+  function reapplyPreview() {
+    if (!activePreview) {
+      return;
+    }
+    trackPreview(activePreview.path, activePreview.color);
+    if (activePreview) {
+      tintRow(activePreview.path, activePreview.color);
+    }
+  }
+
+  // apply the color to the live row and local state, then persist it
+  function recolor(absPath, color) {
+    const node = state ? findNode(absPath, state.children) : undefined;
+    if (node) {
+      node.color = color || undefined;
+    }
+    tintRow(absPath, color);
+    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
+  }
+
+  // swatch target for a node, tints its row live
+  function colorTarget(node) {
+    return {
+      currentColor: () => nodeColorOf(node.absPath),
+      preview: (color) => previewColor(node.absPath, color),
+      commit: (color) => recolor(node.absPath, color)
+    };
+  }
+
   function menuFor(node) {
     if (node.kind === 'note') {
       return [
+        { kind: 'swatches', target: colorTarget(node) },
+        'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
         { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openTemplate' },
         'sep',
@@ -332,6 +425,8 @@
       ];
     }
     return [
+      { kind: 'swatches', target: colorTarget(node) },
+      'sep',
       { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openVisual' },
       'sep',
       { label: 'New Note', icon: 'new-file', action: () => newInFolder('promptStudio.newNote', node) },

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { stringify } from 'yaml';
 
+import { ColorPreview } from '../common/cardColors';
 import { CardLayoutStore } from '../common/cardLayoutStore';
 import { sendTextToClaude } from '../common/sendToClaude';
 import { pathExists } from '../common/utils/fs';
@@ -17,7 +18,8 @@ export class SkillCommands {
   constructor(
     private readonly provider: SkillsWebviewProvider,
     private readonly extensionUri: vscode.Uri,
-    private readonly skillStore: CardLayoutStore
+    private readonly skillStore: CardLayoutStore,
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
   ) {}
 
   // the skill row and empty-area action commands
@@ -44,8 +46,7 @@ export class SkillCommands {
           return;
         }
 
-        const context: CanvasContext = { store: this.skillStore, root: target.absPath, allowCrud: false };
-        VisualPanel.show(this.extensionUri, context, target.absPath);
+        VisualPanel.show(this.extensionUri, this.skillCanvasContext(target.absPath), target.absPath);
       }),
 
       vscode.commands.registerCommand('promptStudio.sendSkillToClaude', async (target?: SkillTreeNode) => {
@@ -110,8 +111,12 @@ export class SkillCommands {
       return;
     }
 
-    const context: CanvasContext = { store: this.skillStore, root, allowCrud: false };
-    VisualPanel.show(this.extensionUri, context, root);
+    VisualPanel.show(this.extensionUri, this.skillCanvasContext(root), root);
+  }
+
+  // a read-only canvas context over a skill folder
+  private skillCanvasContext(root: string): CanvasContext {
+    return { store: this.skillStore, root, allowCrud: false, colorPreviewEmitter: this.colorPreviewEmitter };
   }
 
   // the slash command that invokes a skill in Claude Code

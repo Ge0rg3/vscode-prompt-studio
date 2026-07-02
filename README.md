@@ -63,8 +63,9 @@ Once a vault is set:
 
 - **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
 - **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root, plus **Open as Canvas** (detailed under Visual canvas).
-- **Right-click a folder.** Offers **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (a submenu offering **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
-- **Right-click a note.** Offers **Open**, **Open as Template** (opens an editable copy in its own tab, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
+- **Right-click a folder.** Offers a row of color swatches, **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (a submenu offering **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
+- **Right-click a note.** Offers a row of color swatches, **Open**, **Open as Template** (opens an editable copy in its own tab, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
+- **Color swatches.** Hover a swatch to preview a color, click to apply it, or pick the leftmost clear swatch to remove it. The tint colors the entry's icon and is the same color used by the visual canvas.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
 
@@ -120,7 +121,7 @@ A second sidebar section, **Claude Skills**, appears whenever the workspace has 
 
 - A skill row shows the name from its `SKILL.md` frontmatter.
 - Hover a skill for quick **Open SKILL.md**, **Open as Canvas**, and **Send to Claude** buttons, or expand it to browse and open every file in the skill folder.
-- Right-click a skill for **Open SKILL.md**, **Open as Template**, **Open as Canvas**, **Send to Claude**, **Reveal in Explorer**, and **Copy as Path**.
+- Right-click a skill, or a file or folder inside it, for a row of color swatches. A skill also offers **Open SKILL.md**, **Open as Template**, **Open as Canvas**, **Send to Claude**, **Reveal in Explorer**, and **Copy as Path**.
 - The view header carries **New Skill**, **Open Visual Canvas** (the skills root as a card canvas), **Expand All**, and **Collapse All**. Right-clicking the empty area offers **Open as Canvas** and **New Skill**.
 - **New Skill** scaffolds `.claude/skills/<name>/SKILL.md` and opens it for editing.
 

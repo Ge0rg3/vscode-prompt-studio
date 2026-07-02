@@ -6,8 +6,8 @@ export interface SkillRef {
 
 // one row in the skills webview tree
 export type SkillTreeNode =
-  | { kind: 'skill'; name: string; absPath: string; skill: SkillRef; children: SkillTreeNode[] }
-  | { kind: 'file'; name: string; absPath: string }
-  | { kind: 'folder'; name: string; absPath: string; children: SkillTreeNode[] };
+  | { kind: 'skill'; name: string; absPath: string; skill: SkillRef; color?: string; children: SkillTreeNode[] }
+  | { kind: 'file'; name: string; absPath: string; color?: string }
+  | { kind: 'folder'; name: string; absPath: string; color?: string; children: SkillTreeNode[] };
 
 export type SkillNode = Extract<SkillTreeNode, { kind: 'skill' }>;

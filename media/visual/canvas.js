@@ -19,8 +19,10 @@
   let state = null;
   let cards = [];
   let cardEls = new Map();
+  let activePreview = null;
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
+  const { applyTint } = window.PromptStudioPalette;
 
   // one context-menu controller, commands post back to the host
   const menu = create(menuEl, (command, node) => vscode.postMessage({ type: 'command', command, node: serialize(node) }), CARD_COLORS);
@@ -41,26 +43,12 @@
 
   // tint the canvas backdrop with the open folder's color, clearing any previous tint
   function applyFolderTint(color) {
-    for (const cls of [...canvasEl.classList]) {
-      if (cls === 'surface-tinted' || cls.startsWith('color-')) {
-        canvasEl.classList.remove(cls);
-      }
-    }
-    if (color) {
-      canvasEl.classList.add('surface-tinted', 'color-' + color);
-    }
+    applyTint(canvasEl, color, 'surface-tinted');
   }
 
   // set a card element's color classes, clearing any previous tint
   function applyCardColor(el, color) {
-    for (const cls of [...el.classList]) {
-      if (cls === 'colored' || cls.startsWith('color-')) {
-        el.classList.remove(cls);
-      }
-    }
-    if (color) {
-      el.classList.add('colored', 'color-' + color);
-    }
+    applyTint(el, color, 'colored');
   }
 
   // raise a card above every other so the most recently dragged one stays on top
@@ -359,6 +347,7 @@
       surfaceEl.appendChild(el);
     }
     resizeSurface();
+    reapplyPreview();
   }
 
   // --- context menu ---
@@ -383,6 +372,45 @@
     }
   }
 
+  // tint the matching card, or the backdrop when the path is the open folder
+  function applyIncomingPreview(absPath, color) {
+    if (state && absPath === currentFolderNode().absPath) {
+      applyFolderTint(color || undefined);
+    } else {
+      tintCard(absPath, color);
+    }
+  }
+
+  // tint locally, then tell the host so the sidebar and other canvases match
+  function previewColor(absPath, color) {
+    applyIncomingPreview(absPath, color);
+    vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
+  }
+
+  // the saved color for a path, the folder color when it is the open folder
+  function savedColorOf(absPath) {
+    if (state && absPath === currentFolderNode().absPath) {
+      return state.folderColor;
+    }
+    return cardColorOf(absPath);
+  }
+
+  // remember the live preview, drop it once it matches the saved color
+  function trackPreview(absPath, color) {
+    activePreview = (savedColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
+  }
+
+  // re-apply the preview if it still differs from the saved color
+  function reapplyPreview() {
+    if (!activePreview) {
+      return;
+    }
+    trackPreview(activePreview.path, activePreview.color);
+    if (activePreview) {
+      applyIncomingPreview(activePreview.path, activePreview.color);
+    }
+  }
+
   // apply the color to the live card, then persist it
   function recolor(absPath, color) {
     const card = cards.find((entry) => entry.absPath === absPath);
@@ -404,7 +432,7 @@
   function cardColorTarget(card) {
     return {
       currentColor: () => cardColorOf(card.absPath),
-      preview: (color) => tintCard(card.absPath, color),
+      preview: (color) => previewColor(card.absPath, color),
       commit: (color) => recolor(card.absPath, color)
     };
   }
@@ -414,7 +442,7 @@
     const folder = currentFolderNode();
     return {
       currentColor: () => state.folderColor,
-      preview: (color) => applyFolderTint(color || undefined),
+      preview: (color) => previewColor(folder.absPath, color),
       commit: (color) => recolorFolder(folder.absPath, color)
     };
   }
@@ -514,6 +542,9 @@
       render(message.state);
       // stash what VSCode needs to restore the canvas after a reload
       vscode.setState({ folder: currentFolderNode().absPath, root: state.breadcrumbs[0].path, allowCrud: ALLOW_CRUD });
+    } else if (message && message.type === 'previewColor') {
+      applyIncomingPreview(message.path, message.color);
+      trackPreview(message.path, message.color);
     }
   });
 

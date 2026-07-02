@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 
+import { ColorPreview } from './common/cardColors';
 import { VaultConfig } from './common/vaultConfig';
 import { VaultManager } from './common/vaultManager';
 import { SkillCommands } from './skills/skillCommands';
@@ -30,17 +31,20 @@ export function activate(context: vscode.ExtensionContext): void {
   const activeFolderEmitter = new vscode.EventEmitter<string | undefined>();
   context.subscriptions.push(activeFolderEmitter);
 
-  const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri);
-  context.subscriptions.push(provider);
+  const colorPreviewEmitter = new vscode.EventEmitter<ColorPreview>();
+  context.subscriptions.push(colorPreviewEmitter);
 
-  const skillsProvider = new SkillsWebviewProvider(context.extensionUri);
-  context.subscriptions.push(skillsProvider);
+  const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri, colorPreviewEmitter);
+  context.subscriptions.push(provider);
 
   const skillsConfig = new VaultConfig(() => skillsRoot(), vscode.workspace.onDidChangeWorkspaceFolders);
   context.subscriptions.push(skillsConfig);
 
-  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfig);
-  const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter);
+  const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfig, colorPreviewEmitter);
+  context.subscriptions.push(skillsProvider);
+
+  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfig, colorPreviewEmitter);
+  const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter, colorPreviewEmitter);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(VaultWebviewProvider.viewType, provider, {

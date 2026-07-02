@@ -4,14 +4,16 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
   <link rel="stylesheet" href="{{codiconCss}}" />
+  <link rel="stylesheet" href="{{paletteCss}}" />
   <link rel="stylesheet" href="{{contextMenuCss}}" />
   <link rel="stylesheet" href="{{treeCss}}" />
   <title>Claude Skills</title>
 </head>
-<body>
+<body data-card-colors='{{cardColors}}'>
   <div id="tree" tabindex="0"></div>
   <div id="context-menu" class="hidden"></div>
   <script nonce="{{nonce}}" src="{{contextMenuJs}}"></script>
+  <script nonce="{{nonce}}" src="{{paletteJs}}"></script>
   <script nonce="{{nonce}}" src="{{treeJs}}"></script>
 </body>
 </html>
