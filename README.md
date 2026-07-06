@@ -55,7 +55,7 @@ Open the activity-bar icon, click **Configure Vault** in the empty view (or run 
 2. **Custom folder.** Any absolute path on disk.
 3. **Folder inside this workspace.** A subfolder of the current workspace, e.g. `<workspace>/prompts`, so the vault is versioned alongside your code.
 
-The path persists in the `promptStudio.vaultPath` setting (empty string means "per-workspace default").
+Each workspace remembers its own choice, so different projects can point at different vaults.
 
 ### Create and organize notes
 

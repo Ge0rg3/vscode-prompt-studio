@@ -3,9 +3,7 @@ import * as vscode from 'vscode';
 import { ensureDir } from './utils/fs';
 import { projectStorageDir } from './utils/paths';
 
-const CONFIG_SECTION = 'promptStudio';
-const CONFIG_KEY = 'vaultPath';
-const FULL_CONFIG_KEY = `${CONFIG_SECTION}.${CONFIG_KEY}`;
+const STATE_KEY = 'vaultPath';
 const HAS_VAULT_CONTEXT = 'promptStudio.hasVault';
 
 export class VaultManager implements vscode.Disposable {
@@ -15,16 +13,14 @@ export class VaultManager implements vscode.Disposable {
 
   readonly onDidChangeVault: vscode.Event<string | undefined> = this.emitter.event;
 
-  constructor(private readonly globalStorageDir: string) {
+  constructor(
+    private readonly globalStorageDir: string,
+    private readonly workspaceState: vscode.Memento
+  ) {
     this.current = this.resolveVaultRoot();
     this.publishContext();
 
     this.disposables.push(
-      vscode.workspace.onDidChangeConfiguration((event) => {
-        if (event.affectsConfiguration(FULL_CONFIG_KEY)) {
-          this.recompute();
-        }
-      }),
       vscode.workspace.onDidChangeWorkspaceFolders(() => this.recompute())
     );
   }
@@ -33,11 +29,10 @@ export class VaultManager implements vscode.Disposable {
     return this.current;
   }
 
-  // write the setting, empty string reverts to the per-workspace default
+  // save the per-project choice, empty string reverts to the per-workspace default
   async setVaultPath(value: string): Promise<void> {
-    await vscode.workspace
-      .getConfiguration(CONFIG_SECTION)
-      .update(CONFIG_KEY, value, vscode.ConfigurationTarget.Global);
+    await this.workspaceState.update(STATE_KEY, value);
+    this.recompute();
   }
 
   dispose(): void {
@@ -63,12 +58,9 @@ export class VaultManager implements vscode.Disposable {
     void vscode.commands.executeCommand('setContext', HAS_VAULT_CONTEXT, this.current !== undefined);
   }
 
-  // read the configured vault path or fall back to a per-workspace storage dir
+  // read the project's saved path or fall back to a per-workspace storage dir
   private resolveVaultRoot(): string | undefined {
-    const configured = vscode.workspace
-      .getConfiguration(CONFIG_SECTION)
-      .get<string>(CONFIG_KEY)
-      ?.trim();
+    const configured = this.workspaceState.get<string>(STATE_KEY)?.trim();
     if (configured) {
       return ensureDir(configured);
     }

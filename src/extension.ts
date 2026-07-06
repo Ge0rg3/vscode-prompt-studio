@@ -22,7 +22,7 @@ import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWe
 import { VisualCommands } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
-  const vaultManager = new VaultManager(context.globalStorageUri.fsPath);
+  const vaultManager = new VaultManager(context.globalStorageUri.fsPath, context.workspaceState);
   context.subscriptions.push(vaultManager);
 
   const config = new VaultConfig(() => vaultManager.getVaultRoot(), vaultManager.onDidChangeVault);

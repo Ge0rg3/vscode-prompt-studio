@@ -18,16 +18,6 @@
     "onWebviewPanel:promptStudio.template"
   ],
   "contributes": {
-    "configuration": {
-      "title": "Prompt Studio",
-      "properties": {
-        "promptStudio.vaultPath": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Absolute path to the vault folder. Leave empty to use a per-workspace vault stored under the extension's global storage. Run **Prompt Studio: Configure Vault** for a guided picker."
-        }
-      }
-    },
     "commands": [
       {
         "command": "promptStudio.configureVault",
