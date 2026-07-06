@@ -151,6 +151,28 @@ body.focused .row.selected {
   padding-left: 4px;
 }
 
+.row .rename-input {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  height: calc(var(--row-height) - 4px);
+  margin-left: 2px;
+  padding: 0 3px;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+  border: 1px solid var(--vscode-focusBorder);
+  border-radius: 2px;
+  outline: none;
+  cursor: text;
+  user-select: text;
+}
+
+.row .rename-input.invalid {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  background: var(--vscode-inputValidation-errorBackground, var(--vscode-input-background));
+}
+
 .row .actions {
   display: none;
   align-items: center;

@@ -99,6 +99,21 @@ export function registerCopyPathRelative(vaultManager: VaultManager): vscode.Dis
   );
 }
 
+// rename an entry and follow its metadata, returns false on a no-op or conflict
+export async function renameEntry(
+  config: VaultConfig,
+  node: VaultNode,
+  newName: string
+): Promise<boolean> {
+  const destination = await renameVaultEntry(node, newName);
+  if (!destination) {
+    return false;
+  }
+
+  config.relocate(node.absPath, destination);
+  return true;
+}
+
 export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
   return vscode.commands.registerCommand('promptStudio.rename', async (target?: VaultNode) => {
     if (!target) {
@@ -116,10 +131,7 @@ export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
       return;
     }
 
-    const destination = await renameVaultEntry(target, input.trim());
-    if (destination) {
-      config.relocate(target.absPath, destination);
-    }
+    await renameEntry(config, target, input.trim());
   });
 }
 

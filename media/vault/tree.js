@@ -6,6 +6,8 @@
   let selectedPath = null;
   let dragSource = null;
   let activePreview = null;
+  let activeRename = null;
+  let deferredRender = false;
 
   const treeEl = document.getElementById('tree');
   const menuEl = document.getElementById('context-menu');
@@ -23,6 +25,171 @@
   window.addEventListener('focus', () => setFocused(true));
   window.addEventListener('blur', () => setFocused(false));
 
+  // --- keyboard ---
+
+  // rename the selected entry on F2
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'F2' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+    if (!state || !selectedPath || !rowFor(selectedPath)) {
+      return;
+    }
+    const node = findNode(selectedPath, state.children);
+    if (node) {
+      event.preventDefault();
+      beginRename(node);
+    }
+  });
+
+  // --- inline rename ---
+
+  // why the name is invalid for this node
+  function renameError(candidateName, node) {
+    const name = candidateName.trim();
+    if (!name) {
+      return 'A name is required';
+    }
+    if (name.startsWith('.')) {
+      return 'Name must not start with a dot';
+    }
+    if (/[\\/:*?"<>|]/.test(name)) {
+      return 'Name must not contain / \\ : * ? " < > |';
+    }
+    if (hasSiblingNamed(node, name)) {
+      return 'A file or folder with that name already exists';
+    }
+    return null;
+  }
+
+  // the entries sharing a folder with the given path
+  function siblingsOf(absPath) {
+    const parentPath = absPath.replace(/[\/\\][^\/\\]+$/, '');
+    if (parentPath === state.root) {
+      return state.children;
+    }
+    const parent = findNode(parentPath, state.children);
+    return parent && parent.children ? parent.children : [];
+  }
+
+  // whether a sibling other than the node already carries the target name
+  function hasSiblingNamed(node, name) {
+    const target = (node.kind === 'note' ? ensureMdExt(name) : name).toLowerCase();
+    for (const sibling of siblingsOf(node.absPath)) {
+      if (sibling.absPath !== node.absPath && sibling.name.toLowerCase() === target) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // flag the input while its value is invalid
+  function validateRename() {
+    if (!activeRename) {
+      return;
+    }
+    const error = renameError(activeRename.input.value, activeRename.node);
+    activeRename.input.classList.toggle('invalid', Boolean(error));
+    activeRename.input.title = error || '';
+  }
+
+  // swap the editing input back for a label carrying the given text
+  function endRename(text) {
+    const rename = activeRename;
+    activeRename = null;
+    const keepFocus = document.activeElement === rename.input;
+    rename.row.draggable = true;
+    rename.label.textContent = text;
+    rename.input.replaceWith(rename.label);
+    if (keepFocus) {
+      treeEl.focus();
+    }
+  }
+
+  function cancelRename() {
+    if (!activeRename) {
+      return;
+    }
+    endRename(activeRename.original);
+    // apply any state update that arrived mid-edit
+    if (deferredRender) {
+      render();
+    }
+  }
+
+  // send a valid, changed name to the host, staying open while it is invalid
+  function commitRename() {
+    if (!activeRename) {
+      return;
+    }
+    const { node, original, input } = activeRename;
+    const value = input.value.trim();
+    if (!value || value === original) {
+      cancelRename();
+      return;
+    }
+    if (renameError(value, node)) {
+      return;
+    }
+
+    const fullName = node.kind === 'note' ? ensureMdExt(value) : value;
+    selectedPath = node.absPath.slice(0, node.absPath.length - node.name.length) + fullName;
+    endRename(node.kind === 'note' ? stripMdExt(value) : value);
+    vscode.postMessage({ type: 'rename', node: serialize(node), newName: value });
+  }
+
+  // turn a row's label into an editable name field
+  function beginRename(node) {
+    if (activeRename) {
+      return;
+    }
+
+    const row = rowFor(node.absPath);
+    const label = row ? row.querySelector('.label') : null;
+    if (!label) {
+      return;
+    }
+
+    const original = label.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'rename-input';
+    input.value = original;
+    input.spellcheck = false;
+    row.draggable = false;
+    label.replaceWith(input);
+    activeRename = { node, row, input, label, original };
+
+    input.addEventListener('keydown', (event) => {
+      event.stopPropagation();
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        commitRename();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        cancelRename();
+      }
+    });
+    input.addEventListener('input', validateRename);
+    input.addEventListener('click', (event) => event.stopPropagation());
+    input.addEventListener('dragstart', (event) => event.stopPropagation());
+    input.addEventListener('blur', () => {
+      if (!activeRename) {
+        return;
+      }
+      const value = activeRename.input.value.trim();
+      if (!value || value === activeRename.original || renameError(value, activeRename.node)) {
+        cancelRename();
+      } else {
+        commitRename();
+      }
+    });
+
+    input.focus();
+    input.select();
+    validateRename();
+  }
+
   // --- inbound state ---
 
   window.addEventListener('message', (event) => {
@@ -30,6 +197,10 @@
     if (!message) return;
     if (message.type === 'state') {
       state = message.state;
+      if (activeRename) {
+        deferredRender = true;
+        return;
+      }
       render();
     } else if (message.type === 'expandAll') {
       expandAll();
@@ -49,6 +220,8 @@
   // --- rendering ---
 
   function render() {
+    activeRename = null;
+    deferredRender = false;
     treeEl.replaceChildren();
     if (!state) {
       renderWelcome();
@@ -173,7 +346,7 @@
       if (isFolder) {
         toggleExpand(node);
       } else {
-        vscode.postMessage({ type: 'openNote', path: node.absPath });
+        vscode.postMessage({ type: 'openNote', path: node.absPath, preserveFocus: true });
       }
     });
 
@@ -221,6 +394,10 @@
 
   function stripMdExt(name) {
     return name.replace(/\.md$/i, '');
+  }
+
+  function ensureMdExt(name) {
+    return /\.md$/i.test(name) ? name : name + '.md';
   }
 
   function toggleExpand(node) {
@@ -415,7 +592,7 @@
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
-        { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+        { label: 'Rename', icon: 'edit', action: () => beginRename(node) },
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
@@ -432,7 +609,7 @@
       { label: 'New Note', icon: 'new-file', action: () => newInFolder('promptStudio.newNote', node) },
       { label: 'New Folder', icon: 'new-folder', action: () => newInFolder('promptStudio.newFolder', node) },
       'sep',
-      { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' },
+      { label: 'Rename', icon: 'edit', action: () => beginRename(node) },
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM,

@@ -6,13 +6,16 @@ import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
+import { renameEntry } from './entryActions';
+import { validateEntryName } from './entryName';
 import { moveVaultEntry } from './moveEntry';
 import { readTree, TreeState } from './vaultTree';
 
 type InboundMessage =
   | { type: 'ready' }
-  | { type: 'openNote'; path: string }
+  | { type: 'openNote'; path: string; preserveFocus?: boolean }
   | { type: 'move'; source: string; destDir: string }
+  | { type: 'rename'; node: VaultNode; newName: string }
   | { type: 'setColor'; path: string; color: string | null }
   | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'command'; command: string; node?: VaultNode };
@@ -22,7 +25,6 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.newNote',
   'promptStudio.newFolder',
   'promptStudio.configureVault',
-  'promptStudio.rename',
   'promptStudio.delete',
   'promptStudio.copyContents',
   'promptStudio.openTemplate',
@@ -164,7 +166,9 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         this.syncSelection();
         return;
       case 'openNote':
-        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path), {
+          preserveFocus: msg.preserveFocus === true
+        });
         return;
       case 'move': {
         const root = this.vaultManager.getVaultRoot();
@@ -172,6 +176,19 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         const destination = await moveVaultEntry(root, msg.source, msg.destDir);
         if (destination) {
           this.config.relocate(msg.source, destination);
+        }
+        return;
+      }
+      case 'rename': {
+        const root = this.vaultManager.getVaultRoot();
+        // re-validate the untrusted renderer message before touching disk
+        if (!root || !isWithin(msg.node.absPath, root) || validateEntryName(msg.newName)) {
+          return;
+        }
+
+        const renamed = await renameEntry(this.config, msg.node, msg.newName);
+        if (!renamed) {
+          await this.postState();
         }
         return;
       }

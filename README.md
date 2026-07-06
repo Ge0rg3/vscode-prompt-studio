@@ -67,6 +67,7 @@ Once a vault is set:
 - **Right-click a note.** Offers a row of color swatches, **Open**, **Open as Template** (opens an editable copy in its own tab, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
 - **Color swatches.** Hover a swatch to preview a color, click to apply it, or pick the leftmost clear swatch to remove it. The tint colors the entry's icon and is the same color used by the visual canvas.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
+- **Keyboard.** Press **F2** on the selected note or folder to rename it.
 - **Command palette.** **Prompt Studio: New Note**, **Prompt Studio: New Folder**, and **Prompt Studio: Configure Vault** are all available.
 
 ### Template view
