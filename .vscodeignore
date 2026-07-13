@@ -1,9 +1,12 @@
 .vscode/**
 .vscode-test/**
+.claude/**
 src/**
+webview/**
 poc/**
 test/**
 node_modules/**
+**/*.map
 tsconfig.json
 esbuild.js
 .gitignore

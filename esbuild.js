@@ -6,8 +6,9 @@ const esbuild = require('esbuild');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
+// the extension host bundle
 /** @type {import('esbuild').BuildOptions} */
-const options = {
+const extensionBuild = {
   entryPoints: ['src/extension.ts'],
   bundle: true,
   outfile: 'dist/extension.js',
@@ -15,6 +16,20 @@ const options = {
   platform: 'node',
   target: 'node18',
   external: ['vscode'],
+  sourcemap: !production,
+  minify: production,
+  logLevel: 'info'
+};
+
+// the template webview bundles CodeMirror into a self-contained browser script
+/** @type {import('esbuild').BuildOptions} */
+const templateBuild = {
+  entryPoints: ['webview/template/main.ts'],
+  bundle: true,
+  outfile: 'media/template/template.js',
+  format: 'iife',
+  platform: 'browser',
+  target: 'es2020',
   sourcemap: !production,
   minify: production,
   logLevel: 'info'
@@ -33,11 +48,14 @@ function copyCodicons() {
 async function main() {
   copyCodicons();
 
+  const builds = [extensionBuild, templateBuild];
   if (watch) {
-    const ctx = await esbuild.context(options);
-    await ctx.watch();
+    for (const options of builds) {
+      const ctx = await esbuild.context(options);
+      await ctx.watch();
+    }
   } else {
-    await esbuild.build(options);
+    await Promise.all(builds.map((options) => esbuild.build(options)));
   }
 }
 

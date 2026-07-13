@@ -20,7 +20,7 @@ All commands run from the project root.
 
 ```bash
 npm install          # one-time
-npm run build        # esbuild bundle into dist/
+npm run build        # esbuild bundle: extension into dist/, template webview into media/template/
 npm run watch        # rebuild on change, leave running during F5 debug
 npm run vsix         # produce a local .vsix for sideloading
 npm run publish      # publish to the VSCode Marketplace via vsce
@@ -44,11 +44,12 @@ Every decision here is in service of two goals: a new reader can open any file a
 
 ### File and folder structure
 
-- Standard VSCode extension layout: `src/extension.ts` for `activate` / `deactivate`, `src/<feature>/` for each feature folder (commands, providers, views, services that belong to that feature), `media/` for icons and static webview assets.
+- Three roots, split by build target. `src/` is extension-host source (node): `src/extension.ts` for `activate` / `deactivate`, `src/<feature>/` for each feature folder (commands, providers, views, services that belong to that feature). `webview/` is browser source, one folder per webview, with its own `tsconfig.json` (DOM types, no node types). `media/` is only what a webview loads at runtime: HTML, CSS, icons, fonts, and built bundles. Keep build inputs out of `media/`, it is the extension's `localResourceRoots` and everything in it ships.
 - One folder per feature surface. The folder, its commands, its providers, and its services live together.
 - Generic, stateless, domain-agnostic helpers go in `src/common/utils/` (parsing, formatting, path builders, filesystem predicates, etc.). Placement here is by nature, not usage count: a helper with no domain meaning belongs in `utils/` even when only one feature uses it today.
 - The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader, the `config.yml` metadata store) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
-- Webviews keep their renderer in `media/<feature>/` (HTML, CSS, plain JS or a small built bundle). The extension-host side that hosts the panel and brokers messages lives in `src/<feature>/`. Styles and scripts shared by more than one webview live in `media/common/` (the color palette, the context menu), mirroring `src/common/`.
+- A webview has up to three parts: the host that opens the panel and brokers messages in `src/<feature>/`, the markup and styles it loads from `media/<feature>/`, and, when it needs one, a bundled script whose source is `webview/<feature>/`. Styles and scripts shared by more than one webview live in `media/common/` (the color palette, the context menu), mirroring `src/common/`.
+- A webview earns a bundle only when it needs a real dependency. Simple renderers stay plain committed JS in `media/<feature>/` (the trees, the canvas). The template editor is the one bundled webview today: `webview/template/` holds `main.ts` (the entry), `livePreview.ts` for the inline markdown styling, `codeHighlight.ts` for fenced-code languages and token colors, and `listIndent.ts` for tab and shift-tab on bullets. esbuild bundles it to `media/template/template.js`, gitignored and rebuilt like `dist/`. To add another, drop a `webview/<feature>/main.ts` beside it and add one build config in `esbuild.js`.
 - No `utils.ts`, `helpers.ts`, or `misc.ts`. If a helper does not have a specific name, it does not have a clear purpose. `src/common/utils/` is the *folder* for purpose-named helpers (`parse.ts`, `format.ts`, `paths.ts`); each file inside still earns its name.
 - No barrel `index.ts` re-exports to "flatten" import paths. The path reflects the structure; do not hide it.
 

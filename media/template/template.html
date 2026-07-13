@@ -7,18 +7,12 @@
   <link rel="stylesheet" href="{{templateCss}}" />
   <title>Template</title>
 </head>
-<body>
-  <div id="content">
-    <div id="editor-wrap" class="hidden">
-      <div id="gutter"><div id="gutter-lines"></div></div>
-      <textarea id="editor" spellcheck="false" wrap="off"></textarea>
-    </div>
-    <div id="preview"></div>
-  </div>
+<body data-nonce="{{nonce}}">
+  <div id="editor"></div>
   <div id="toolbar">
     <button id="toggle" class="bar-button" type="button">
-      <span id="toggle-icon" class="codicon codicon-edit"></span>
-      <span id="toggle-label">Edit</span>
+      <span id="toggle-icon" class="codicon codicon-code"></span>
+      <span id="toggle-label">Source</span>
     </button>
     <span class="spacer"></span>
     <button id="copy" class="bar-button" type="button">

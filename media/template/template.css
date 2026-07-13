@@ -15,126 +15,192 @@ body {
   flex-direction: column;
 }
 
-.hidden {
-  display: none !important;
-}
-
-#content {
-  position: relative;
-  flex: 1;
-  overflow: hidden;
-}
-
-#editor-wrap {
-  display: flex;
-  height: 100%;
-  overflow: hidden;
-  background: var(--vscode-editor-background);
-}
-
-#gutter {
-  flex: 0 0 auto;
-  overflow: hidden;
-  box-sizing: border-box;
-  padding-top: 8px;
-  background: var(--vscode-editorGutter-background, var(--vscode-editor-background));
-  color: var(--vscode-editorLineNumber-foreground);
-  user-select: none;
-}
-
-#gutter-lines {
-  text-align: right;
-}
-
-#gutter .ln {
-  padding: 0 12px 0 16px;
-}
-
 #editor {
   flex: 1;
-  height: 100%;
-  box-sizing: border-box;
-  margin: 0;
-  padding: 8px 16px 8px 4px;
-  border: none;
-  outline: none;
-  resize: none;
-  overflow: auto;
-  color: var(--vscode-editor-foreground);
-  background: var(--vscode-editor-background);
+  min-height: 0;
+  overflow: hidden;
 }
 
-#preview {
+/* --- codemirror surface --- */
+
+.cm-editor {
   height: 100%;
-  box-sizing: border-box;
-  padding: 12px 20px;
-  overflow: auto;
-  line-height: 1.6;
+  background: var(--vscode-editor-background);
+  color: var(--vscode-editor-foreground);
+}
+
+.cm-editor.cm-focused {
+  outline: none;
+}
+
+.cm-editor .cm-scroller {
+  padding: 1.5rem 2rem 40vh;
+  font-family: var(--vscode-font-family);
+  line-height: 1.7;
+}
+
+.cm-editor .cm-content {
+  max-width: 46rem;
+  margin: 0 auto;
+  tab-size: 4;
+}
+
+.cm-cursor,
+.cm-dropCursor {
+  border-left-color: var(--vscode-editorCursor-foreground) !important;
+}
+
+.cm-selectionBackground {
+  background: var(--vscode-editor-selectionBackground) !important;
 }
 
 /* --- rendered markdown --- */
 
-#preview h1,
-#preview h2,
-#preview h3 {
-  margin: 0.8em 0 0.4em;
+.cm-line.cm-heading {
+  font-weight: 600;
   line-height: 1.3;
 }
 
-#preview h1 {
-  font-size: 1.6em;
-  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  padding-bottom: 0.2em;
+.cm-h1 {
+  font-size: 1.9em;
 }
 
-#preview h2 {
+.cm-h2 {
+  font-size: 1.55em;
+}
+
+.cm-h3 {
   font-size: 1.3em;
 }
 
-#preview h3 {
-  font-size: 1.1em;
+.cm-h4 {
+  font-size: 1.15em;
 }
 
-#preview p,
-#preview ul,
-#preview ol,
-#preview blockquote {
-  margin: 0.5em 0;
+.cm-h5 {
+  font-size: 1em;
 }
 
-#preview ul,
-#preview ol {
-  padding-left: 1.6em;
+.cm-h6 {
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
 }
 
-#preview a {
+.cm-syntax {
+  opacity: 0.5;
+}
+
+.cm-strong {
+  font-weight: 600;
+}
+
+.cm-em {
+  font-style: italic;
+}
+
+.cm-strike {
+  text-decoration: line-through;
+  color: var(--vscode-descriptionForeground);
+}
+
+.cm-link {
   color: var(--vscode-textLink-foreground);
+  text-decoration: underline;
 }
 
-#preview code {
-  font-family: monospace;
+.cm-inline-code {
+  font-family: var(--vscode-editor-font-family, monospace);
   font-size: 0.92em;
   background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.18));
   border-radius: 3px;
   padding: 0.1em 0.35em;
 }
 
-#preview pre {
-  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.18));
-  border-radius: 5px;
-  padding: 10px 12px;
-  overflow: auto;
+.cm-line.cm-code-block {
+  font-family: var(--vscode-editor-font-family, monospace);
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
 }
 
-#preview pre code {
-  background: none;
-  padding: 0;
+.cm-line.cm-list {
+  padding-left: 1.6em;
+  text-indent: -1.6em;
 }
 
-#preview blockquote {
-  border-left: 3px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+.cm-line.cm-blockquote {
+  border-left: 3px solid var(--vscode-textBlockQuote-border, var(--vscode-panel-border, rgba(128, 128, 128, 0.35)));
   padding-left: 0.8em;
+  color: var(--vscode-textBlockQuote-foreground, var(--vscode-descriptionForeground));
+}
+
+.cm-line.cm-hr {
   color: var(--vscode-descriptionForeground);
+  border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+/* --- fenced code token colors (dark base, light override) --- */
+
+.cmt-keyword {
+  color: #569cd6;
+}
+
+.cmt-string {
+  color: #ce9178;
+}
+
+.cmt-number {
+  color: #b5cea8;
+}
+
+.cmt-comment {
+  color: #6a9955;
+  font-style: italic;
+}
+
+.cmt-function {
+  color: #dcdcaa;
+}
+
+.cmt-type {
+  color: #4ec9b0;
+}
+
+.cmt-name {
+  color: #9cdcfe;
+}
+
+body.vscode-light .cmt-keyword,
+body.vscode-high-contrast-light .cmt-keyword {
+  color: #0000ff;
+}
+
+body.vscode-light .cmt-string,
+body.vscode-high-contrast-light .cmt-string {
+  color: #a31515;
+}
+
+body.vscode-light .cmt-number,
+body.vscode-high-contrast-light .cmt-number {
+  color: #098658;
+}
+
+body.vscode-light .cmt-comment,
+body.vscode-high-contrast-light .cmt-comment {
+  color: #008000;
+}
+
+body.vscode-light .cmt-function,
+body.vscode-high-contrast-light .cmt-function {
+  color: #795e26;
+}
+
+body.vscode-light .cmt-type,
+body.vscode-high-contrast-light .cmt-type {
+  color: #267f99;
+}
+
+body.vscode-light .cmt-name,
+body.vscode-high-contrast-light .cmt-name {
+  color: #001080;
 }
 
 /* --- bottom bar --- */

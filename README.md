@@ -74,9 +74,15 @@ Once a vault is set:
 
 **Open as Template** on a note opens an editable copy in its own editor tab, titled `<note> (template)`. Edits live only in the tab and never write back to the note, so there is nothing to save.
 
+The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Copy and Send hand off exactly what you wrote, `{{variables}}` and all.
+
+- **Inline styling.** Headings render large, emphasis bold or italic, and code, quotes, and links formatted. Tables and images stay as plain markdown.
+- **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
+- **Keyboard.** **Tab** at the start of a bullet nests it under the one above, **Shift+Tab** lifts it back out. Anywhere else **Tab** inserts a tab, or indents every line of a selection, and **Shift+Tab** outdents. Press **Escape** first to move focus out of the editor instead.
+
 A bar along the bottom offers:
 
-- **Preview / Edit.** Toggle between the raw markdown and a rendered preview of it.
+- **Source / Rendered.** Toggle the inline styling off to read the note as plain markdown, and back on.
 - **Copy.** Put the current text on the clipboard.
 - **Send to Claude.** Drop the current text into the Claude Code chat input.
 
@@ -138,7 +144,7 @@ Wikilinks and prompts are not built yet.
 
 ```bash
 npm install        # one-time
-npm run build      # esbuild bundle into dist/
+npm run build      # esbuild bundle: extension into dist/, template webview into media/template/
 npm run watch      # rebuild on change, leave running during F5 debug
 ```
 

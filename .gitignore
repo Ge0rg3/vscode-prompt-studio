@@ -1,6 +1,8 @@
 node_modules/
 dist/
 media/codicons/
+media/template/template.js
+media/template/template.js.map
 poc/
 *.vsix
 *.log

@@ -1,6 +1,5 @@
 import * as path from 'node:path';
 
-import { marked } from 'marked';
 import * as vscode from 'vscode';
 
 import { sendTextToClaude } from '../common/sendToClaude';
@@ -8,17 +7,8 @@ import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 
 type InboundMessage =
   | { type: 'ready' }
-  | { type: 'render'; text: string }
   | { type: 'copy'; text: string }
   | { type: 'sendToClaude'; text: string };
-
-interface EditorStyle {
-  fontFamily: string;
-  fontSize: number;
-  fontWeight: string;
-  lineHeight: number;
-  tabSize: number;
-}
 
 export class TemplatePanel {
   static readonly viewType = 'promptStudio.template';
@@ -89,14 +79,8 @@ export class TemplatePanel {
           type: 'content',
           text,
           notePath: this.notePath,
-          claudeCommand: this.claudeCommand,
-          style: TemplatePanel.editorStyle()
+          claudeCommand: this.claudeCommand
         });
-        return;
-      }
-      case 'render': {
-        const html = await marked.parse(msg.text);
-        await this.panel.webview.postMessage({ type: 'rendered', html });
         return;
       }
       case 'copy':
@@ -111,11 +95,17 @@ export class TemplatePanel {
 
   private renderHtml(): string {
     const webview = this.panel.webview;
-    return renderWebviewHtml(webview, this.extensionUri, 'media/template/template.html', {
-      codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
-      templateCss: assetUri(webview, this.extensionUri, 'media/template/template.css'),
-      templateJs: assetUri(webview, this.extensionUri, 'media/template/template.js')
-    });
+    return renderWebviewHtml(
+      webview,
+      this.extensionUri,
+      'media/template/template.html',
+      {
+        codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+        templateCss: assetUri(webview, this.extensionUri, 'media/template/template.css'),
+        templateJs: assetUri(webview, this.extensionUri, 'media/template/template.js')
+      },
+      true
+    );
   }
 
   // panel tab label for a note opened as a template
@@ -129,25 +119,5 @@ export class TemplatePanel {
       enableScripts: true,
       localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'media')]
     };
-  }
-
-  // the user's editor font and spacing
-  private static editorStyle(): EditorStyle {
-    const editorConfig = vscode.workspace.getConfiguration('editor');
-    const fontFamily = editorConfig.get<string>('fontFamily', 'monospace');
-    const fontSize = editorConfig.get<number>('fontSize', 14);
-    const fontWeight = editorConfig.get<string>('fontWeight', 'normal');
-    const tabSize = editorConfig.get<number>('tabSize', 4);
-    const lineHeightSetting = editorConfig.get<number>('lineHeight', 0);
-
-    // convert editor.lineHeight to pixels (0 auto, under 8 a multiplier)
-    let lineHeight = lineHeightSetting;
-    if (lineHeightSetting === 0) {
-      lineHeight = Math.round(1.5 * fontSize);
-    } else if (lineHeightSetting < 8) {
-      lineHeight = Math.round(lineHeightSetting * fontSize);
-    }
-
-    return { fontFamily, fontSize, fontWeight, lineHeight, tabSize };
   }
 }

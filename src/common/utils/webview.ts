@@ -24,13 +24,11 @@ function randomNonce(): string {
 }
 
 // the content-security policy shared by every bundled webview
-function buildCsp(webview: vscode.Webview, nonce: string): string {
-  return [
-    `default-src 'none'`,
-    `style-src ${webview.cspSource}`,
-    `font-src ${webview.cspSource}`,
-    `script-src 'nonce-${nonce}'`
-  ].join('; ');
+function buildCsp(webview: vscode.Webview, nonce: string, styleNonce: boolean): string {
+  const styleSrc = styleNonce
+    ? `style-src ${webview.cspSource} 'nonce-${nonce}'`
+    : `style-src ${webview.cspSource}`;
+  return [`default-src 'none'`, styleSrc, `font-src ${webview.cspSource}`, `script-src 'nonce-${nonce}'`].join('; ');
 }
 
 // --- exports ---
@@ -45,11 +43,12 @@ export function renderWebviewHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
   templatePath: string,
-  replacements: Record<string, string>
+  replacements: Record<string, string>,
+  styleNonce = false
 ): string {
   const nonce = randomNonce();
   const template = fs.readFileSync(vscode.Uri.joinPath(extensionUri, templatePath).fsPath, 'utf8');
-  return fillTemplate(template, { csp: buildCsp(webview, nonce), nonce, ...replacements });
+  return fillTemplate(template, { csp: buildCsp(webview, nonce, styleNonce), nonce, ...replacements });
 }
 
 // the string at key in a restored webview-panel state
