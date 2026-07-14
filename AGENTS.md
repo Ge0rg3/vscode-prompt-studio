@@ -266,6 +266,8 @@ A relative `@path` in the template editor resolves against the first workspace f
 
 A leading slash (`@/home/`) browses the disk instead, which no index can cover, so `src/template/mentionFilesystem.ts` reads one directory per request and the editor asks for each level as the user walks down. The same file confirms the absolute paths already sitting in a note, since the tint cannot know they exist otherwise. Only the host touches the filesystem, the webview holds what it has been told.
 
+Browsing ignores case everywhere: the workspace popup ranks against lowercased paths, and a failed absolute read retries with each segment matched to its on-disk casing, so `@/HOME/` still lists `/home` on a case-sensitive disk. A picked completion always inserts the on-disk spelling. The tint stays exact-case on purpose: Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
+
 The popup is CodeMirror's, restyled in `media/template/template.css` to match the VSCode suggest widget. Every rule there is prefixed with `.cm-editor` to reach the specificity of CodeMirror's own base theme, and the selected-row rule carries both `.cm-tooltip` and `.cm-tooltip-autocomplete` to outrank its light and dark variants. Drop a class from those selectors and the popup silently reverts to CodeMirror's colors.
 
 ### Editor selection
