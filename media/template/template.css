@@ -46,7 +46,6 @@ body {
   caret-color: var(--vscode-editorCursor-foreground);
 }
 
-/* see AGENTS section on editor selection */
 .cm-editor ::selection {
   background: var(--vscode-editor-selectionBackground);
 }
@@ -111,7 +110,6 @@ body.vscode-high-contrast-light .cm-editor ::selection {
   text-decoration: underline;
 }
 
-/* see AGENTS section on webview fonts */
 .cm-inline-code {
   font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace;
   font-size: 0.92em;

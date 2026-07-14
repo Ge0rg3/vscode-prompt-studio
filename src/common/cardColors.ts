@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 import { CardLayoutStore } from './cardLayoutStore';
 
-// palette keys for note and folder cards, the matching fill and accent live in media/common/palette.css
+// palette keys for any colored entry, the matching fill and accent live in media/common/palette.css
 export const CARD_COLORS = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'gray'] as const;
 
 export type CardColor = (typeof CARD_COLORS)[number];

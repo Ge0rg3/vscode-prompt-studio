@@ -1,4 +1,4 @@
-/* sticky-note palette shared across webviews, fill tints cards and swatches, accent tints sidebar folder icons */
+/* sticky-note palette shared across webviews */
 .color-red {
   --ps-fill: #f7c9c4;
   --ps-accent: #cf5b54;
@@ -30,6 +30,6 @@
 }
 
 .color-gray {
-  --ps-fill: #dcdcdc;
-  --ps-accent: #8a8a8a;
+  --ps-fill: #c6d0da;
+  --ps-accent: #64809b;
 }

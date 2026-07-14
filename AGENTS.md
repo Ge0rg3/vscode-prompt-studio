@@ -110,7 +110,7 @@ The single most important rule in this section: **the code is the explanation; a
 - **One line per comment block, full stop.** A comment block is a contiguous run of `//` lines (or one `/* ... */` block). Two lines is the absolute maximum and only justified when one line genuinely cannot fit the label. Three or more is a bug. Subtle code that needs paragraphs of comment is code that needs to be rewritten or documented in the AGENTS.md section that owns the concept.
 - **JSDoc / TSDoc: forbidden by default.** Only add a doc block when the function's *contract* (what it returns under edge conditions, what it throws, an ordering or threading constraint the signature cannot express) is non-obvious from the name and signature. One sentence. If the doc restates the function name or describes the implementation, delete it. No `@param` / `@returns` ceremony when the types already say it.
 - **Interface / class doc blocks: forbidden by default.** An `interface` or `class` with well-named fields is self-documenting. Add a one-sentence doc block only when the type represents a non-obvious concept (e.g. a discriminated-union sentinel) that the name does not convey.
-- **No background, no history, no justification, no upstream-quirk essays in code.** If the *why* is load-bearing, write it once in AGENTS.md and let the code reference the concept by name (`// see AGENTS section on vault metadata`). If the why is not load-bearing enough for AGENTS.md, it does not belong in the codebase at all.
+- **No background, no history, no justification, no upstream-quirk essays in code.** If the *why* is load-bearing, write it once in AGENTS.md. If the why is not load-bearing enough for AGENTS.md, it does not belong in the codebase at all.
 - **No "no/avoid/never X" rationale comments.** Do not explain why the code is *not* doing something. The reader is not arguing with you. State the current behaviour, not the rejected alternative.
 
 **What a good comment looks like.**
@@ -256,7 +256,7 @@ When in doubt, read the comment or sentence aloud. If it sounds like a polished 
 
 ## Feature notes
 
-What a surface does is in the README. This section holds the constraints behind it that the code cannot state for itself, so a comment can point here by name rather than carry an explanation inline. Everything below is load-bearing: change it and something breaks quietly.
+What a surface does is in the README. This section holds the constraints behind it that the code cannot state for itself. Nothing in the source points here, so read this section before touching one of the surfaces below. Everything below is load-bearing: change it and something breaks quietly.
 
 ### Workspace mentions
 
@@ -285,3 +285,9 @@ The toolbar cancels its `mousedown` for the same reason: a click on Copy or Send
 VSCode hands `--vscode-editor-font-family` to a webview as the raw `editor.fontFamily` setting, which is often one bare family name (`IBM Plex Mono`). The editor itself appends the platform default stack behind it, a webview gets nothing. So when that font is not installed, Chromium falls back to its default *standard* font, Times New Roman, not to a monospace one.
 
 Every webview rule that reads the var therefore carries a fallback stack outside it: `font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace`. The `monospace` inside `var()` only covers the variable being undefined, so it is the list after the `var()` that catches a missing font. The named families lead because an Electron renderer resolves the bare `monospace` generic to Courier New.
+
+### Palette accents
+
+A palette class in `media/common/palette.css` sets two vars. `--ps-fill` backs the cards, the swatches, and the canvas wash. `--ps-accent` colors the icon of a tinted row in the sidebar and the scrollbar thumb of a tinted card.
+
+The accent is the only thing that carries a color into the tree, so no accent sits on the neutral grey axis. An accent close to `--vscode-icon-foreground` leaves a tinted icon looking untinted, and that swatch then reads as the clear swatch at the other end of the row. `gray` is a slate blue-grey to stay clear of it.
