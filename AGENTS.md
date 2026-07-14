@@ -36,7 +36,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 
 - Readability beats cleverness. If a junior engineer would need to pause to parse it, rewrite it.
 - DRY, but not prematurely. Two similar code paths are fine; three is the point at which extraction is justified.
-- Modularity by feature, not by layer. Each surface (`vault`, `visual`, `skills`, `prompts`, etc.) owns its own commands, providers, views, and helpers in its own folder.
+- Modularity by feature, not by layer. Each surface (`vault`, `template`, `visual`, `skills`, `prompts`, etc.) owns its own commands, providers, views, and helpers in its own folder.
 - Reconsider file and folder structure on every meaningful change. If a new function does not have an obvious home, the structure is wrong, not the function. Move things, rename folders, split a file once it has grown to cover more than one concern. Treat ~200 lines as a prompt to check whether that has happened, not a hard cap. A single cohesive file may run well past it when splitting would only scatter one concern across two, so split by concern, not by line count.
 - No half-finished implementations. If a command is wired up, every code path off it must work or be visibly disabled.
 - No speculative abstractions. Build for the features listed in the README, not for hypothetical future ones.
@@ -49,7 +49,7 @@ Every decision here is in service of two goals: a new reader can open any file a
 - Generic, stateless, domain-agnostic helpers go in `src/common/utils/` (parsing, formatting, path builders, filesystem predicates, etc.). Placement here is by nature, not usage count: a helper with no domain meaning belongs in `utils/` even when only one feature uses it today.
 - The rest of `src/common/` holds shared infrastructure with state (the vault root resolver, file watcher, settings reader, the `config.yml` metadata store) and shared domain types. Resist putting anything there until it is imported by at least two feature folders.
 - A webview has up to three parts: the host that opens the panel and brokers messages in `src/<feature>/`, the markup and styles it loads from `media/<feature>/`, and, when it needs one, a bundled script whose source is `webview/<feature>/`. Styles and scripts shared by more than one webview live in `media/common/` (the color palette, the context menu), mirroring `src/common/`.
-- A webview earns a bundle only when it needs a real dependency. Simple renderers stay plain committed JS in `media/<feature>/` (the trees, the canvas). The template editor is the one bundled webview today: `webview/template/` holds `main.ts` (the entry), `livePreview.ts` for the inline markdown styling, `codeHighlight.ts` for fenced-code languages and token colors, and `listIndent.ts` for tab and shift-tab on bullets. esbuild bundles it to `media/template/template.js`, gitignored and rebuilt like `dist/`. To add another, drop a `webview/<feature>/main.ts` beside it and add one build config in `esbuild.js`.
+- A webview earns a bundle only when it needs a real dependency. Simple renderers stay plain committed JS in `media/<feature>/` (the trees, the canvas). The template editor is the one bundled webview today: `webview/template/` holds `main.ts` (the entry), `livePreview.ts` for the inline markdown styling, `codeHighlight.ts` for fenced-code languages and token colors, `listIndent.ts` for tab and shift-tab on bullets, and `fileMentions.ts` for the `@` path popup and the tint on a resolved mention. esbuild bundles it to `media/template/template.js`, gitignored and rebuilt like `dist/`. To add another, drop a `webview/<feature>/main.ts` beside it and add one build config in `esbuild.js`.
 - No `utils.ts`, `helpers.ts`, or `misc.ts`. If a helper does not have a specific name, it does not have a clear purpose. `src/common/utils/` is the *folder* for purpose-named helpers (`parse.ts`, `format.ts`, `paths.ts`); each file inside still earns its name.
 - No barrel `index.ts` re-exports to "flatten" import paths. The path reflects the structure; do not hide it.
 
@@ -200,6 +200,16 @@ If you are unsure, read the comment aloud. If it sounds like a sentence from a d
 - Webview message handling is the same pattern: the host validates the incoming message shape, calls a service, posts back a typed reply. The renderer (in `media/`) only renders and emits intent messages.
 - Settings come from `vscode.workspace.getConfiguration('promptStudio')` at the boundary; pass plain values down. Do not read configuration from arbitrary call sites.
 - Filesystem operations go through `vscode.workspace.fs` (URI-based, works across remote workspaces) rather than raw `node:fs`, unless the operation is specifically about the extension's own storage on the local disk.
+
+### Workspace mentions
+
+A relative `@path` in the template editor resolves against the first workspace folder, because that is the one directory Claude Code runs in. Extra roots are not offered: a path from the second root would not resolve for Claude anyway.
+
+`src/template/mentionIndex.ts` scans that folder on startup, and again once a burst of file creates or deletes settles, and `TemplatePanel` posts the whole list to the webview. The renderer never queries the host per keystroke, because the tint has to answer "is this a real path" synchronously on every document change, so it needs the set locally regardless.
+
+A leading slash (`@/home/`) browses the disk instead, which no index can cover, so `src/template/mentionFilesystem.ts` reads one directory per request and the editor asks for each level as the user walks down. The same file confirms the absolute paths already sitting in a note, since the tint cannot know they exist otherwise. Only the host touches the filesystem, the webview holds what it has been told.
+
+The popup is CodeMirror's, restyled in `media/template/template.css` to match the VSCode suggest widget. Every rule there is prefixed with `.cm-editor` to reach the specificity of CodeMirror's own base theme, and the selected-row rule carries both `.cm-tooltip` and `.cm-tooltip-autocomplete` to outrank its light and dark variants. Drop a class from those selectors and the popup silently reverts to CodeMirror's colors.
 
 ### Avoiding common AI tells
 

@@ -4,11 +4,15 @@ import * as vscode from 'vscode';
 
 import { sendTextToClaude } from '../common/sendToClaude';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
+import { existingPaths, listDirectory } from './mentionFilesystem';
+import { MentionIndex } from './mentionIndex';
 
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'copy'; text: string }
-  | { type: 'sendToClaude'; text: string };
+  | { type: 'sendToClaude'; text: string }
+  | { type: 'listDir'; id: number; dirPath: string }
+  | { type: 'checkPaths'; paths: string[] };
 
 export class TemplatePanel {
   static readonly viewType = 'promptStudio.template';
@@ -16,7 +20,7 @@ export class TemplatePanel {
   private static readonly openPanels = new Map<string, TemplatePanel>();
 
   // reveal the note's template panel, creating it on first use
-  static show(extensionUri: vscode.Uri, notePath: string, claudeCommand?: string): void {
+  static show(extensionUri: vscode.Uri, mentionIndex: MentionIndex, notePath: string, claudeCommand?: string): void {
     const existing = TemplatePanel.openPanels.get(notePath);
     if (existing) {
       if (claudeCommand !== undefined) {
@@ -32,18 +36,19 @@ export class TemplatePanel {
       vscode.ViewColumn.Active,
       { ...TemplatePanel.webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
-    new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
+    new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);
   }
 
   // reattach to a template panel VSCode restored after a window reload
   static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
+    mentionIndex: MentionIndex,
     notePath: string,
     claudeCommand?: string
   ): void {
     panel.webview.options = TemplatePanel.webviewOptions(extensionUri);
-    new TemplatePanel(panel, extensionUri, notePath, claudeCommand);
+    new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);
   }
 
   private readonly disposables: vscode.Disposable[] = [];
@@ -51,6 +56,7 @@ export class TemplatePanel {
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
+    private readonly mentionIndex: MentionIndex,
     private readonly notePath: string,
     private claudeCommand: string | undefined
   ) {
@@ -59,6 +65,7 @@ export class TemplatePanel {
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
       this.panel.webview.onDidReceiveMessage((msg: InboundMessage) => this.handle(msg)),
+      this.mentionIndex.onDidChange(() => void this.postMentions()),
       this.panel.onDidDispose(() => this.dispose())
     );
   }
@@ -81,6 +88,7 @@ export class TemplatePanel {
           notePath: this.notePath,
           claudeCommand: this.claudeCommand
         });
+        await this.postMentions();
         return;
       }
       case 'copy':
@@ -90,7 +98,21 @@ export class TemplatePanel {
       case 'sendToClaude':
         await sendTextToClaude(this.claudeCommand ?? msg.text);
         return;
+      case 'listDir':
+        await this.panel.webview.postMessage({
+          type: 'dirEntries',
+          id: msg.id,
+          entries: await listDirectory(msg.dirPath)
+        });
+        return;
+      case 'checkPaths':
+        await this.panel.webview.postMessage({ type: 'verifiedPaths', entries: await existingPaths(msg.paths) });
+        return;
     }
+  }
+
+  private async postMentions(): Promise<void> {
+    await this.panel.webview.postMessage({ type: 'mentions', entries: await this.mentionIndex.entries() });
   }
 
   private renderHtml(): string {

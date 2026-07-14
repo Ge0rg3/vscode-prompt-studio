@@ -78,7 +78,10 @@ The editor styles markdown inline as you type. The marks themselves (`#`, `**`, 
 
 - **Inline styling.** Headings render large, emphasis bold or italic, and code, quotes, and links formatted. Tables and images stay as plain markdown.
 - **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
-- **Keyboard.** **Tab** at the start of a bullet nests it under the one above, **Shift+Tab** lifts it back out. Anywhere else **Tab** inserts a tab, or indents every line of a selection, and **Shift+Tab** outdents. Press **Escape** first to move focus out of the editor instead.
+- **Workspace mentions.** Type `@` to search the workspace by path, the way you would in Claude Code. Search matches the file name, the folder path, or a loose subsequence of either, so `@tmplpanel` and `@template/temp` both find `src/template/templatePanel.ts`. Picking a file inserts its path, picking a folder browses into it. Mentions inside code, mid-word (an email address), or naming a path that does not exist are left alone.
+- **Absolute paths.** Start the path with a slash to browse the disk itself instead of the workspace: `@/` lists the filesystem root, `@/home/` lists what is in `/home`. Each directory is read as you reach it, so anything on disk can be mentioned, not just workspace files.
+- **Mention highlight.** A mention that names a real file or folder is tinted, in both Rendered and Source mode, so you can see what Claude Code will resolve before you send. A path with a space in it cannot be mentioned, and workspace search covers the first workspace folder, since that is the folder Claude Code runs in.
+- **Keyboard.** While the `@` popup is open, **Up** and **Down** move the selection, **Enter** or **Tab** accepts, and **Escape** closes it. Otherwise **Tab** at the start of a bullet nests it under the one above, **Shift+Tab** lifts it back out. Anywhere else **Tab** inserts a tab, or indents every line of a selection, and **Shift+Tab** outdents. Press **Escape** first to move focus out of the editor instead.
 
 A bar along the bottom offers:
 

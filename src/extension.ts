@@ -6,6 +6,8 @@ import { VaultManager } from './common/vaultManager';
 import { SkillCommands } from './skills/skillCommands';
 import { skillsRoot } from './skills/skillScanner';
 import { SkillsWebviewProvider } from './skills/skillsWebviewProvider';
+import { MentionIndex } from './template/mentionIndex';
+import { registerOpenTemplate, registerTemplateSerializer } from './template/openTemplate';
 import { registerConfigureVault } from './vault/configureVault';
 import { registerCreateFolder, registerCreateNote } from './vault/createEntries';
 import {
@@ -16,7 +18,6 @@ import {
   registerRenameEntry,
   registerRevealInOS
 } from './vault/entryActions';
-import { registerOpenTemplate, registerTemplateSerializer } from './vault/openTemplate';
 import { registerSendToClaude } from './vault/sendToClaude';
 import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWebviewProvider';
 import { VisualCommands } from './visual/openVisual';
@@ -43,7 +44,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfig, colorPreviewEmitter);
   context.subscriptions.push(skillsProvider);
 
-  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfig, colorPreviewEmitter);
+  const mentionIndex = new MentionIndex();
+  context.subscriptions.push(mentionIndex);
+
+  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfig, colorPreviewEmitter, mentionIndex);
   const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter, colorPreviewEmitter);
 
   context.subscriptions.push(
@@ -65,8 +69,8 @@ export function activate(context: vscode.ExtensionContext): void {
     registerRenameEntry(config),
     registerDeleteEntry(config),
     registerCopyContents(),
-    registerOpenTemplate(context.extensionUri),
-    registerTemplateSerializer(context.extensionUri),
+    registerOpenTemplate(context.extensionUri, mentionIndex),
+    registerTemplateSerializer(context.extensionUri, mentionIndex),
     registerSendToClaude(),
     registerCopyPathStatic(),
     registerCopyPathRelative(vaultManager),

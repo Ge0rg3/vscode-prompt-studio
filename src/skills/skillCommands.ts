@@ -7,8 +7,9 @@ import { ColorPreview } from '../common/cardColors';
 import { CardLayoutStore } from '../common/cardLayoutStore';
 import { sendTextToClaude } from '../common/sendToClaude';
 import { pathExists } from '../common/utils/fs';
+import { MentionIndex } from '../template/mentionIndex';
+import { TemplatePanel } from '../template/templatePanel';
 import { validateEntryName } from '../vault/entryName';
-import { TemplatePanel } from '../vault/templatePanel';
 import { CanvasContext, VisualPanel } from '../visual/visualPanel';
 import { SkillNode, SkillTreeNode } from './skillNode';
 import { scanSkills, SKILL_FILE, skillsRoot } from './skillScanner';
@@ -19,7 +20,8 @@ export class SkillCommands {
     private readonly provider: SkillsWebviewProvider,
     private readonly extensionUri: vscode.Uri,
     private readonly skillStore: CardLayoutStore,
-    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>,
+    private readonly mentionIndex: MentionIndex
   ) {}
 
   // the skill row and empty-area action commands
@@ -38,7 +40,7 @@ export class SkillCommands {
           return;
         }
 
-        TemplatePanel.show(this.extensionUri, target.skill.skillFile, this.slashCommand(target));
+        TemplatePanel.show(this.extensionUri, this.mentionIndex, target.skill.skillFile, this.slashCommand(target));
       }),
 
       vscode.commands.registerCommand('promptStudio.openSkillVisual', (target?: SkillTreeNode) => {

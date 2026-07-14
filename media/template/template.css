@@ -203,6 +203,101 @@ body.vscode-high-contrast-light .cmt-name {
   color: #001080;
 }
 
+/* --- mention popup --- */
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete {
+  border: 1px solid var(--vscode-editorSuggestWidget-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+  border-radius: 4px;
+  background: var(--vscode-editorSuggestWidget-background, var(--vscode-editorWidget-background));
+  color: var(--vscode-editorSuggestWidget-foreground, var(--vscode-foreground));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul {
+  min-width: 320px;
+  max-width: min(560px, 90vw);
+  max-height: 220px;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+}
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete > ul > li {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  line-height: 22px;
+}
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete ul li:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected] {
+  color: var(--vscode-editorSuggestWidget-selectedForeground, var(--vscode-list-activeSelectionForeground));
+  background: var(--vscode-editorSuggestWidget-selectedBackground, var(--vscode-list-activeSelectionBackground));
+}
+
+.cm-editor .cm-completionIcon {
+  flex: none;
+  width: 16px;
+  padding-right: 6px;
+  font-family: 'codicon';
+  font-size: 14px;
+  text-align: center;
+  opacity: 1;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+
+.cm-editor .cm-completionIcon-file::after {
+  content: '\ea7b';
+}
+
+.cm-editor .cm-completionIcon-folder::after {
+  content: '\ea83';
+}
+
+.cm-editor .cm-completionLabel {
+  flex: none;
+}
+
+.cm-editor .cm-completionMatchedText {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--vscode-editorSuggestWidget-highlightForeground, var(--vscode-list-highlightForeground));
+}
+
+.cm-editor .cm-tooltip.cm-tooltip-autocomplete ul li[aria-selected] .cm-completionMatchedText {
+  color: var(--vscode-editorSuggestWidget-focusHighlightForeground, inherit);
+}
+
+.cm-editor .cm-completionDetail {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: 0.6em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: normal;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+/* --- resolved mention --- */
+
+.cm-mention {
+  color: var(--vscode-textLink-foreground);
+  background: color-mix(in srgb, var(--vscode-textLink-foreground) 14%, transparent);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  -webkit-box-decoration-break: clone;
+}
+
+body.vscode-high-contrast .cm-mention,
+body.vscode-high-contrast-light .cm-mention {
+  background: transparent;
+  outline: 1px solid var(--vscode-contrastBorder);
+}
+
 /* --- bottom bar --- */
 
 #toolbar {
