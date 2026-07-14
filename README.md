@@ -64,7 +64,7 @@ Once a vault is set:
 - **Title-bar buttons.** The view header shows **New Note** and **New Folder** for creating entries, plus **Expand All** and **Collapse All** to toggle every folder in the tree at once. New entries land in the parent folder of the selected entry, or at the vault root when nothing is selected.
 - **Right-click empty area.** Offers **New Note** and **New Folder** at the vault root, plus **Open as Canvas** (detailed under Visual canvas).
 - **Right-click a folder.** Offers a row of color swatches, **New Note**, **New Folder**, **Rename**, **Reveal in Explorer**, **Copy as Path** (a submenu offering **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root), and **Delete**, plus **Open as Canvas** (detailed under Visual canvas).
-- **Right-click a note.** Offers a row of color swatches, **Open**, **Open as Template** (opens an editable copy in its own tab, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
+- **Right-click a note.** Offers a row of color swatches, **Open**, **Open as Template** (opens the note in an editable tab of its own, detailed under Template view), **Send to Claude** (pastes the note into the Claude Code chat input), **Rename**, **Copy Contents** (copies the markdown body to the clipboard), **Reveal in Explorer**, **Copy as Path**, and **Delete**. Hovering a note row also shows quick **Open as Template** and **Send to Claude** buttons.
 - **Color swatches.** Hover a swatch to preview a color, click to apply it, or pick the leftmost clear swatch to remove it. The tint colors the entry's icon and is the same color used by the visual canvas.
 - **Drag and drop.** Drag any note or folder onto another folder row to move it. Drop onto the empty area to lift to the vault root. Moves into a folder's own descendants or onto a colliding name are rejected.
 - **Keyboard.** Press **F2** on the selected note or folder to rename it.
@@ -72,9 +72,9 @@ Once a vault is set:
 
 ### Template view
 
-**Open as Template** on a note opens an editable copy in its own editor tab, titled `<note> (template)`. Edits live only in the tab and never write back to the note, so there is nothing to save.
+**Open as Template** on a note opens it in an editable tab of its own, titled `<note> (template)`. Edits stay in the tab until you save, which overwrites the note.
 
-The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Copy and Send hand off exactly what you wrote, `{{variables}}` and all.
+The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Save, Copy, and Send hand off exactly what you wrote, `{{variables}}` and all.
 
 - **Inline styling.** Headings render large, emphasis bold or italic, and code, quotes, and links formatted. Tables and images stay as plain markdown.
 - **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
@@ -86,6 +86,7 @@ The editor styles markdown inline as you type. The marks themselves (`#`, `**`, 
 A bar along the bottom offers:
 
 - **Rendered / Source.** Names the mode you are looking at. Click it to read the note as plain markdown, and again to bring the inline styling back.
+- **Save.** Write the current text back over the note. **Ctrl+S** anywhere in the tab does the same.
 - **Copy.** Put the current text on the clipboard.
 - **Send to Claude.** Drop the current text into the Claude Code chat input.
 

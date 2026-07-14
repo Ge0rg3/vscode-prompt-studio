@@ -9,6 +9,8 @@ import { MentionIndex } from './mentionIndex';
 
 type InboundMessage =
   | { type: 'ready' }
+  | { type: 'save'; text: string }
+  | { type: 'dirty'; dirty: boolean }
   | { type: 'copy'; text: string }
   | { type: 'sendToClaude'; text: string }
   | { type: 'listDir'; id: number; dirPath: string }
@@ -91,6 +93,14 @@ export class TemplatePanel {
         await this.postMentions();
         return;
       }
+      case 'save':
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(this.notePath), new TextEncoder().encode(msg.text));
+        await this.panel.webview.postMessage({ type: 'saved', text: msg.text });
+        void vscode.window.setStatusBarMessage(`Saved "${path.basename(this.notePath)}".`, 2000);
+        return;
+      case 'dirty':
+        this.markDirty(msg.dirty);
+        return;
       case 'copy':
         await vscode.env.clipboard.writeText(msg.text);
         void vscode.window.setStatusBarMessage('Copied template to clipboard.', 2000);
@@ -113,6 +123,11 @@ export class TemplatePanel {
 
   private async postMentions(): Promise<void> {
     await this.panel.webview.postMessage({ type: 'mentions', entries: await this.mentionIndex.entries() });
+  }
+
+  // suffix the tab title with a white circle while the editor differs from what is on disk
+  private markDirty(dirty: boolean): void {
+    this.panel.title = TemplatePanel.titleFor(this.notePath) + (dirty ? ' \u26AA' : '');
   }
 
   private renderHtml(): string {
