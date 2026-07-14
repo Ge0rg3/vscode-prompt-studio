@@ -2,7 +2,7 @@ import { acceptCompletion } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentLess, insertTab } from '@codemirror/commands';
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
-import { drawSelection, EditorView, keymap, tooltips } from '@codemirror/view';
+import { EditorView, keymap, tooltips } from '@codemirror/view';
 import { GFM } from '@lezer/markdown';
 
 import { codeHighlighting, codeLanguages } from './codeHighlight';
@@ -67,7 +67,6 @@ const view = new EditorView({
     extensions: [
       EditorView.cspNonce.of(document.body.dataset.nonce ?? ''),
       history(),
-      drawSelection(),
       EditorView.lineWrapping,
       keymap.of([
         { key: 'Tab', run: acceptCompletion },
@@ -121,12 +120,12 @@ function setContent(text: string): void {
   });
 }
 
-// switch between the inline render and the raw markdown source
+// switch between the inline render and the raw markdown source, the button names the mode on screen
 function setSourceMode(on: boolean): void {
   sourceMode = on;
   view.dispatch({ effects: live.reconfigure(on ? [] : livePreview()) });
-  toggleIcon.className = on ? 'codicon codicon-eye' : 'codicon codicon-code';
-  toggleLabel.textContent = on ? 'Rendered' : 'Source';
+  toggleIcon.className = on ? 'codicon codicon-code' : 'codicon codicon-eye';
+  toggleLabel.textContent = on ? 'Source' : 'Rendered';
   view.focus();
 }
 
@@ -161,6 +160,9 @@ window.addEventListener('message', (event) => {
 });
 
 // --- toolbar ---
+
+// hold focus in the editor, the native selection only stays lit while the editor has it
+toolbar.addEventListener('mousedown', (event) => event.preventDefault());
 
 toggle.addEventListener('click', () => setSourceMode(!sourceMode));
 copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));

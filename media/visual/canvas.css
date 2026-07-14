@@ -144,7 +144,8 @@ body {
   scrollbar-width: thin;
   scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
   color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family, monospace);
+  /* see AGENTS section on webview fonts */
+  font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.4;
 }
@@ -227,7 +228,7 @@ body {
   white-space: pre-wrap;
   overflow: hidden;
   color: var(--vscode-descriptionForeground);
-  font-family: var(--vscode-editor-font-family, monospace);
+  font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.4;
 }

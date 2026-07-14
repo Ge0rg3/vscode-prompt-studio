@@ -85,7 +85,7 @@ The editor styles markdown inline as you type. The marks themselves (`#`, `**`, 
 
 A bar along the bottom offers:
 
-- **Source / Rendered.** Toggle the inline styling off to read the note as plain markdown, and back on.
+- **Rendered / Source.** Names the mode you are looking at. Click it to read the note as plain markdown, and again to bring the inline styling back.
 - **Copy.** Put the current text on the clipboard.
 - **Send to Claude.** Drop the current text into the Claude Code chat input.
 
