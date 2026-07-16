@@ -1,4 +1,11 @@
-import { autocompletion, Completion, CompletionContext, CompletionResult, pickedCompletion } from '@codemirror/autocomplete';
+import {
+  autocompletion,
+  Completion,
+  CompletionContext,
+  CompletionResult,
+  pickedCompletion,
+  selectedCompletion
+} from '@codemirror/autocomplete';
 import { syntaxTree } from '@codemirror/language';
 import { EditorState, Extension, Range, StateEffect, StateField } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
@@ -13,6 +20,8 @@ export interface MentionEntry {
 // what the editor asks the extension host for, since only the host can read the disk
 export interface MentionHost {
   listDirectory(dirPath: string): Promise<MentionEntry[]>;
+  cachedDirectory(dirPath: string): MentionEntry[] | undefined;
+  prefetchDirectory(dirPath: string): void;
   verifyPaths(paths: string[]): void;
 }
 
@@ -39,6 +48,14 @@ interface MentionScan {
   unverified: string[];
 }
 
+// the @ token before the cursor and the range its options replace
+interface MentionToken {
+  typed: string;
+  query: string;
+  from: number;
+  to: number;
+}
+
 // the @ token before the cursor, opened at a line start or after a space, a bracket, or an emphasis mark
 const MENTION_AT_CURSOR = /(?:^|[\s([{<"'*_~])@([^\s@]*)$/;
 
@@ -55,6 +72,9 @@ const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"*_~`>]+$/;
 const CODE_NODES = new Set(['FencedCode', 'CodeBlock', 'CodeText', 'CodeMark', 'CodeInfo', 'InlineCode']);
 
 const MAX_OPTIONS = 50;
+
+// how long the popup highlight rests on a folder before its listing is prefetched
+const PREFETCH_SETTLE_MS = 150;
 
 const EMPTY_CATALOG: MentionCatalog = { candidates: [], paths: new Set() };
 
@@ -256,7 +276,7 @@ function matchRange(name: string, query: string): readonly number[] {
 }
 
 // turn the ranked candidates into a popup result over the token
-function toResult(matches: readonly MentionCandidate[], from: number, to: number, query: string): CompletionResult | null {
+function toResult(matches: readonly MentionCandidate[], token: MentionToken, host: MentionHost): CompletionResult | null {
   if (matches.length === 0) {
     return null;
   }
@@ -267,36 +287,21 @@ function toResult(matches: readonly MentionCandidate[], from: number, to: number
   }
 
   return {
-    from,
-    to,
+    from: token.from,
+    to: token.to,
     options,
     filter: false,
-    getMatch: (completion) => matchRange(completion.displayLabel ?? completion.label, query)
+    getMatch: (completion) => matchRange(completion.displayLabel ?? completion.label, token.query),
+    // keystrokes re-rank in place, a null falls back to a fresh source query
+    update: (_current, _from, _to, context) => {
+      const next = mentionToken(context);
+      return next ? syncOptions(context, next, host) : null;
+    }
   };
 }
 
-// browse the disk itself, the directory named by everything up to the last slash
-async function absoluteOptions(
-  host: MentionHost,
-  typed: string,
-  query: string,
-  from: number,
-  to: number
-): Promise<CompletionResult | null> {
-  const dirPath = typed.slice(0, typed.lastIndexOf('/') + 1);
-  const children = await host.listDirectory(dirPath);
-
-  const prefix = query.slice(dirPath.length);
-  const candidates: MentionCandidate[] = [];
-  for (const child of children) {
-    candidates.push(toCandidate(child));
-  }
-
-  return toResult(bestMatches(candidates, (candidate) => scoreChild(candidate, prefix)), from, to, query);
-}
-
-// the file and folder options for the @ token before the cursor
-function mentionSource(context: CompletionContext, host: MentionHost): CompletionResult | Promise<CompletionResult | null> | null {
+// the @ token before the cursor, or null when there is none or it sits in code
+function mentionToken(context: CompletionContext): MentionToken | null {
   const line = context.state.doc.lineAt(context.pos);
   const caret = context.pos - line.from;
   const token = MENTION_AT_CURSOR.exec(line.text.slice(0, caret));
@@ -309,18 +314,67 @@ function mentionSource(context: CompletionContext, host: MentionHost): Completio
     return null;
   }
 
-  // replace the whole token, not just the part before the caret
+  // the options replace the whole token, not just the part before the caret
   const tail = TOKEN_TAIL.exec(line.text.slice(caret))?.[0].length ?? 0;
-  const to = context.pos + tail;
+  return { typed: token[1], query: token[1].toLowerCase(), from, to: context.pos + tail };
+}
 
-  const typed = token[1];
-  const query = typed.toLowerCase();
-  if (typed.startsWith('/')) {
-    return absoluteOptions(host, typed, query, from, to);
+// the directory named by everything up to the token's last slash
+function directoryOf(typed: string): string {
+  return typed.slice(0, typed.lastIndexOf('/') + 1);
+}
+
+// rank a directory listing against what is typed after the last slash
+function childResult(children: readonly MentionEntry[], token: MentionToken, host: MentionHost): CompletionResult | null {
+  const prefix = token.query.slice(token.query.lastIndexOf('/') + 1);
+  const candidates: MentionCandidate[] = [];
+  for (const child of children) {
+    candidates.push(toCandidate(child));
+  }
+
+  return toResult(bestMatches(candidates, (candidate) => scoreChild(candidate, prefix)), token, host);
+}
+
+// the options answerable without the host, the workspace catalog or a cached directory
+function syncOptions(context: CompletionContext, token: MentionToken, host: MentionHost): CompletionResult | null {
+  if (token.typed.startsWith('/')) {
+    const cached = host.cachedDirectory(directoryOf(token.typed));
+    return cached ? childResult(cached, token, host) : null;
   }
 
   const catalog = context.state.field(mentionCatalog);
-  return toResult(bestMatches(catalog.candidates, (candidate) => scoreCandidate(candidate, query)), from, to, query);
+  return toResult(bestMatches(catalog.candidates, (candidate) => scoreCandidate(candidate, token.query)), token, host);
+}
+
+// the file and folder options for the @ token before the cursor
+function mentionSource(context: CompletionContext, host: MentionHost): CompletionResult | Promise<CompletionResult | null> | null {
+  const token = mentionToken(context);
+  if (!token) {
+    return null;
+  }
+
+  const sync = syncOptions(context, token, host);
+  if (sync || !token.typed.startsWith('/')) {
+    return sync;
+  }
+
+  return host.listDirectory(directoryOf(token.typed)).then((children) => childResult(children, token, host));
+}
+
+// once the highlight rests on a disk folder, warm its listing so stepping in is instant
+function prefetchHighlighted(host: MentionHost): Extension {
+  let settleTimer: number | undefined;
+  return EditorView.updateListener.of((update) => {
+    const selected = selectedCompletion(update.state);
+    if (selected === selectedCompletion(update.startState)) {
+      return;
+    }
+
+    clearTimeout(settleTimer);
+    if (selected?.type === 'folder' && selected.label.startsWith('/')) {
+      settleTimer = setTimeout(() => host.prefetchDirectory(`${selected.label}/`), PREFETCH_SETTLE_MS);
+    }
+  });
 }
 
 // the path an @ token names, trailing punctuation trimmed off
@@ -393,8 +447,11 @@ export function fileMentions(host: MentionHost): Extension {
     verifiedPaths,
     autocompletion({
       override: [(context) => mentionSource(context, host)],
-      activateOnCompletion: (completion) => completion.type === 'folder'
+      activateOnCompletion: (completion) => completion.type === 'folder',
+      // keystrokes are answered locally, so skip the type-ahead debounce
+      activateOnTypingDelay: 0
     }),
+    prefetchHighlighted(host),
     ViewPlugin.fromClass(
       class {
         decorations: DecorationSet;

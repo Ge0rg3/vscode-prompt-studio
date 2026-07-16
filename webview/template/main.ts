@@ -6,6 +6,7 @@ import { EditorView, keymap, tooltips } from '@codemirror/view';
 import { GFM } from '@lezer/markdown';
 
 import { codeHighlighting, codeLanguages } from './codeHighlight';
+import { DirectoryCache } from './directoryCache';
 import { addVerifiedPaths, fileMentions, MentionEntry, setMentionEntries } from './fileMentions';
 import { listIndentKeymap } from './listIndent';
 import { livePreview } from './livePreview';
@@ -53,13 +54,25 @@ interface PersistedState {
   text: string;
 }
 
+// a listDir request awaiting its reply, resolved with undefined when the timer fires first
+interface PendingDirectory {
+  resolve: (entries: MentionEntry[] | undefined) => void;
+  timer: number;
+}
+
+const LIST_TIMEOUT_MS = 8000;
+const VERIFY_DEBOUNCE_MS = 200;
+
 // --- setup ---
 
 const vscode = acquireVsCodeApi();
 
-const pendingDirectories = new Map<number, (entries: MentionEntry[]) => void>();
+const pendingDirectories = new Map<number, PendingDirectory>();
+const directoryCache = new DirectoryCache(fetchDirectory);
 const checkingPaths = new Set<string>();
+const queuedVerifies = new Set<string>();
 let nextRequestId = 1;
+let verifyTimer: number | undefined;
 
 const editorEl = document.getElementById('editor') as HTMLElement;
 const toolbar = document.getElementById('toolbar') as HTMLElement;
@@ -102,7 +115,12 @@ const view = new EditorView({
       }),
       markdown({ base: markdownLanguage, extensions: GFM, codeLanguages }),
       codeHighlighting,
-      fileMentions({ listDirectory, verifyPaths }),
+      fileMentions({
+        listDirectory: (dirPath) => directoryCache.list(dirPath),
+        cachedDirectory: (dirPath) => directoryCache.cached(dirPath),
+        prefetchDirectory: (dirPath) => directoryCache.prefetch(dirPath),
+        verifyPaths
+      }),
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !loading) {
           onDocChanged();
@@ -115,26 +133,48 @@ const view = new EditorView({
 
 // --- helpers ---
 
-// ask the host to list an absolute directory for the @ popup
-function listDirectory(dirPath: string): Promise<MentionEntry[]> {
+// ask the host to list an absolute directory, undefined when the reply never lands
+function fetchDirectory(dirPath: string): Promise<MentionEntry[] | undefined> {
   const id = nextRequestId++;
   vscode.postMessage({ type: 'listDir', id, dirPath });
-  return new Promise((resolve) => pendingDirectories.set(id, resolve));
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => settleDirectory(id, undefined), LIST_TIMEOUT_MS);
+    pendingDirectories.set(id, { resolve, timer });
+  });
 }
 
-// ask the host which absolute paths exist, skipping any already being checked
+// hand a listing, or a timeout, to whoever asked for it
+function settleDirectory(id: number, entries: MentionEntry[] | undefined): void {
+  const pending = pendingDirectories.get(id);
+  if (!pending) {
+    return;
+  }
+
+  pendingDirectories.delete(id);
+  clearTimeout(pending.timer);
+  pending.resolve(entries);
+}
+
+// queue absolute paths for one existence check once the scans settle
 function verifyPaths(paths: string[]): void {
-  const fresh: string[] = [];
+  let queued = false;
   for (const path of paths) {
     if (!checkingPaths.has(path)) {
       checkingPaths.add(path);
-      fresh.push(path);
+      queuedVerifies.add(path);
+      queued = true;
     }
   }
 
-  if (fresh.length > 0) {
-    vscode.postMessage({ type: 'checkPaths', paths: fresh });
+  if (!queued) {
+    return;
   }
+
+  clearTimeout(verifyTimer);
+  verifyTimer = setTimeout(() => {
+    vscode.postMessage({ type: 'checkPaths', paths: [...queuedVerifies] });
+    queuedVerifies.clear();
+  }, VERIFY_DEBOUNCE_MS);
 }
 
 // swap the note's text into the editor, kept out of the undo history and the dirty check
@@ -222,11 +262,8 @@ window.addEventListener('message', (event) => {
     return;
   }
 
-  // everything the host listed exists, so tint it without asking again
   if (msg?.type === 'dirEntries') {
-    pendingDirectories.get(msg.id)?.(msg.entries);
-    pendingDirectories.delete(msg.id);
-    view.dispatch({ effects: addVerifiedPaths.of(msg.entries) });
+    settleDirectory(msg.id, msg.entries);
     return;
   }
 
