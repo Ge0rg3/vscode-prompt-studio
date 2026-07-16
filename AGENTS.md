@@ -272,6 +272,16 @@ Browsing ignores case everywhere: the workspace popup ranks against lowercased p
 
 The popup is CodeMirror's, restyled in `media/template/template.css` to match the VSCode suggest widget. Every rule there is prefixed with `.cm-editor` to reach the specificity of CodeMirror's own base theme, and the selected-row rule carries both `.cm-tooltip` and `.cm-tooltip-autocomplete` to outrank its light and dark variants. Drop a class from those selectors and the popup silently reverts to CodeMirror's colors.
 
+### Sidebar note click
+
+A single click on a note opens its template view with `preserveFocus`, so the sidebar webview keeps focus and F2 can rename the row just clicked. The explicit open actions on the menu and hover row omit it and move focus to the editor.
+
+### Sidebar copy and paste
+
+Ctrl+C records the entry's path in the vault tree webview (`clipboardPath`), not the OS clipboard, and Ctrl+V pastes it from there. The menu's Duplicate File / Duplicate Folder run the same paste with the entry as its own target, so the copy lands beside it without touching the clipboard.
+
+Paste resolves its target the way `createEntries.ts` places a new note, dropping to the source's parent when that would nest a folder inside itself. After `src/vault/copyEntry.ts` copies the entry, the host calls `VaultConfig.duplicate` to deep-copy its `config.yml` metadata, and any descendants', onto the new path, mirroring how `relocate` follows a move.
+
 ### Editor selection
 
 The template editor selects with the browser's native selection, not CodeMirror's `drawSelection()`. That extension paints the highlight into a layer *behind* `.cm-content`, so any opaque background on the content covers it, and a select-all leaves fenced code, inline code, and resolved mentions looking unselected. The native highlight paints above an element's background and below its glyphs, which covers all three at once.

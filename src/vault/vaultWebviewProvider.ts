@@ -6,6 +6,7 @@ import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
+import { pasteVaultEntry } from './copyEntry';
 import { renameEntry } from './entryActions';
 import { validateEntryName } from './entryName';
 import { moveVaultEntry } from './moveEntry';
@@ -14,7 +15,9 @@ import { readTree, TreeState } from './vaultTree';
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; path: string; preserveFocus?: boolean }
+  | { type: 'openTemplate'; node: VaultNode; preserveFocus?: boolean }
   | { type: 'move'; source: string; destDir: string }
+  | { type: 'paste'; source: string; contextNode?: VaultNode }
   | { type: 'rename'; node: VaultNode; newName: string }
   | { type: 'setColor'; path: string; color: string | null }
   | { type: 'previewColor'; path: string; color: string | null }
@@ -170,6 +173,9 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
           preserveFocus: msg.preserveFocus === true
         });
         return;
+      case 'openTemplate':
+        await vscode.commands.executeCommand('promptStudio.openTemplate', msg.node, msg.preserveFocus === true);
+        return;
       case 'move': {
         const root = this.vaultManager.getVaultRoot();
         if (!root) return;
@@ -177,6 +183,17 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         if (destination) {
           this.config.relocate(msg.source, destination);
         }
+        return;
+      }
+      case 'paste': {
+        const root = this.vaultManager.getVaultRoot();
+        if (!root) return;
+        const destination = await pasteVaultEntry(root, msg.source, msg.contextNode);
+        if (!destination) return;
+
+        this.config.duplicate(msg.source, destination);
+        await this.postState();
+        await this.view?.webview.postMessage({ type: 'reveal', path: destination });
         return;
       }
       case 'rename': {

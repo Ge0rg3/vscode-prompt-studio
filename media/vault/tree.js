@@ -4,6 +4,7 @@
   let state = null;
   const expanded = new Set();
   let selectedPath = null;
+  let clipboardPath = null;
   let dragSource = null;
   let activePreview = null;
   let activeRename = null;
@@ -42,6 +43,45 @@
     }
   });
 
+  // delete the selected entry on Delete
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Delete' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
+      return;
+    }
+    if (activeRename || !state || !selectedPath || !rowFor(selectedPath)) {
+      return;
+    }
+    const node = findNode(selectedPath, state.children);
+    if (node) {
+      event.preventDefault();
+      postCommand('promptStudio.delete', node);
+    }
+  });
+
+  // copy the selected entry on ctrl/cmd C, paste a duplicate on V
+  document.addEventListener('keydown', (event) => {
+    if (activeRename || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey)) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === 'c') {
+      if (state && selectedPath && findNode(selectedPath, state.children)) {
+        clipboardPath = selectedPath;
+      }
+    } else if (key === 'v') {
+      if (!state || !clipboardPath) {
+        return;
+      }
+      event.preventDefault();
+      const context = selectedPath ? findNode(selectedPath, state.children) : null;
+      vscode.postMessage({
+        type: 'paste',
+        source: clipboardPath,
+        contextNode: context ? serialize(context) : undefined
+      });
+    }
+  });
+
   // --- inline rename ---
 
   // why the name is invalid for this node
@@ -62,9 +102,14 @@
     return null;
   }
 
+  // the path with its last segment stripped
+  function parentDir(absPath) {
+    return absPath.replace(/[\/\\][^\/\\]+$/, '');
+  }
+
   // the entries sharing a folder with the given path
   function siblingsOf(absPath) {
-    const parentPath = absPath.replace(/[\/\\][^\/\\]+$/, '');
+    const parentPath = parentDir(absPath);
     if (parentPath === state.root) {
       return state.children;
     }
@@ -209,6 +254,8 @@
       render();
     } else if (message.type === 'select') {
       select(message.path);
+    } else if (message.type === 'reveal') {
+      reveal(message.path);
     } else if (message.type === 'previewColor') {
       tintRow(message.path, message.color);
       trackPreview(message.path, message.color);
@@ -267,14 +314,14 @@
     applyTint(row, color, 'colored');
   }
 
-  // a hover-row icon that runs a command on the node
-  function actionButton(icon, title, command, node) {
+  // a hover-row icon that runs onClick without selecting the row
+  function actionButton(icon, title, onClick) {
     const action = document.createElement('span');
     action.className = `action codicon codicon-${icon}`;
     action.title = title;
     action.addEventListener('click', (event) => {
       event.stopPropagation();
-      vscode.postMessage({ type: 'command', command, node: serialize(node) });
+      onClick();
     });
     return action;
   }
@@ -334,10 +381,10 @@
     actions.className = 'actions';
 
     if (!isFolder) {
-      actions.appendChild(actionButton('files', 'Open as Template', 'promptStudio.openTemplate', node));
-      actions.appendChild(actionButton('claude', 'Send to Claude', 'promptStudio.sendToClaude', node));
+      actions.appendChild(actionButton('file-code', 'Open as File', () => vscode.postMessage({ type: 'openNote', path: node.absPath })));
+      actions.appendChild(actionButton('claude', 'Send to Claude', () => postCommand('promptStudio.sendToClaude', node)));
     }
-    actions.appendChild(actionButton('layout', 'Open Visual Canvas', 'promptStudio.openVisual', node));
+    actions.appendChild(actionButton('layout', 'Open Visual Canvas', () => postCommand('promptStudio.openVisual', node)));
     row.appendChild(actions);
 
     row.addEventListener('click', (event) => {
@@ -346,7 +393,7 @@
       if (isFolder) {
         toggleExpand(node);
       } else {
-        vscode.postMessage({ type: 'openNote', path: node.absPath, preserveFocus: true });
+        vscode.postMessage({ type: 'openTemplate', node: serialize(node), preserveFocus: true });
       }
     });
 
@@ -440,13 +487,32 @@
     }
   }
 
+  // expand every ancestor folder of a path so its row renders, then select it
+  function reveal(path) {
+    if (!state) {
+      return;
+    }
+
+    let parent = parentDir(path);
+    while (parent && parent !== state.root) {
+      expanded.add(parent);
+      const next = parentDir(parent);
+      if (next === parent) {
+        break;
+      }
+      parent = next;
+    }
+
+    render();
+    select(path);
+  }
+
   // reject self-into-self moves and same-parent no-ops
   function canDrop(src, destDir) {
     if (!src || !destDir) return false;
     if (src === destDir) return false;
     if (destDir.startsWith(src + '/') || destDir.startsWith(src + '\\')) return false;
-    const parent = src.replace(/[\/\\][^\/\\]+$/, '');
-    if (parent === destDir) return false;
+    if (parentDir(src) === destDir) return false;
     return true;
   }
 
@@ -587,12 +653,13 @@
       return [
         { kind: 'swatches', target: colorTarget(node) },
         'sep',
-        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
-        { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openTemplate' },
+        { label: 'Open', icon: 'go-to-file', cmd: 'promptStudio.openTemplate' },
+        { label: 'Open as File', icon: 'file-code', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
         { label: 'Rename', icon: 'edit', action: () => beginRename(node) },
+        { label: 'Duplicate File', icon: 'files', action: () => vscode.postMessage({ type: 'paste', source: node.absPath, contextNode: serialize(node) }) },
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
         { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
@@ -610,6 +677,7 @@
       { label: 'New Folder', icon: 'new-folder', action: () => newInFolder('promptStudio.newFolder', node) },
       'sep',
       { label: 'Rename', icon: 'edit', action: () => beginRename(node) },
+      { label: 'Duplicate Folder', icon: 'files', action: () => vscode.postMessage({ type: 'paste', source: node.absPath, contextNode: serialize(node) }) },
       'sep',
       { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM,

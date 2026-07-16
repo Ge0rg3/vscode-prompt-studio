@@ -123,6 +123,34 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
+  // copy an entry's metadata, and any descendants', onto a duplicated path
+  duplicate(sourceAbsPath: string, copyAbsPath: string): void {
+    const sourceKey = this.configKeyOf(sourceAbsPath);
+    const copyKey = this.configKeyOf(copyAbsPath);
+    if (sourceKey === undefined || copyKey === undefined || sourceKey === copyKey) {
+      return;
+    }
+
+    let changed = false;
+    for (const key of [...this.entries.keys()]) {
+      let nextKey: string | undefined;
+      if (key === sourceKey) {
+        nextKey = copyKey;
+      } else if (key.startsWith(`${sourceKey}/`)) {
+        nextKey = copyKey + key.slice(sourceKey.length);
+      }
+      if (nextKey !== undefined) {
+        this.entries.set(nextKey, structuredClone(this.entries.get(key)!));
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.scheduleWrite();
+      this.emitter.fire();
+    }
+  }
+
   // drop a deleted entry and any descendants from the metadata
   remove(absPath: string): void {
     const key = this.configKeyOf(absPath);

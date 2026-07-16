@@ -22,20 +22,26 @@ export class TemplatePanel {
   private static readonly openPanels = new Map<string, TemplatePanel>();
 
   // reveal the note's template panel, creating it on first use
-  static show(extensionUri: vscode.Uri, mentionIndex: MentionIndex, notePath: string, claudeCommand?: string): void {
+  static show(
+    extensionUri: vscode.Uri,
+    mentionIndex: MentionIndex,
+    notePath: string,
+    claudeCommand?: string,
+    preserveFocus = false
+  ): void {
     const existing = TemplatePanel.openPanels.get(notePath);
     if (existing) {
       if (claudeCommand !== undefined) {
         existing.claudeCommand = claudeCommand;
       }
-      existing.panel.reveal(vscode.ViewColumn.Active);
+      existing.panel.reveal(vscode.ViewColumn.Active, preserveFocus);
       return;
     }
 
     const panel = vscode.window.createWebviewPanel(
       TemplatePanel.viewType,
       TemplatePanel.titleFor(notePath),
-      vscode.ViewColumn.Active,
+      { viewColumn: vscode.ViewColumn.Active, preserveFocus },
       { ...TemplatePanel.webviewOptions(extensionUri), retainContextWhenHidden: true }
     );
     new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);

@@ -7,13 +7,16 @@ import { MentionIndex } from './mentionIndex';
 import { TemplatePanel } from './templatePanel';
 
 export function registerOpenTemplate(extensionUri: vscode.Uri, mentionIndex: MentionIndex): vscode.Disposable {
-  return vscode.commands.registerCommand('promptStudio.openTemplate', (target?: VaultNode) => {
-    if (!target || target.kind !== 'note') {
-      return;
-    }
+  return vscode.commands.registerCommand(
+    'promptStudio.openTemplate',
+    (target?: VaultNode, preserveFocus?: boolean) => {
+      if (!target || target.kind !== 'note') {
+        return;
+      }
 
-    TemplatePanel.show(extensionUri, mentionIndex, target.absPath);
-  });
+      TemplatePanel.show(extensionUri, mentionIndex, target.absPath, undefined, preserveFocus === true);
+    }
+  );
 }
 
 export function registerTemplateSerializer(extensionUri: vscode.Uri, mentionIndex: MentionIndex): vscode.Disposable {
