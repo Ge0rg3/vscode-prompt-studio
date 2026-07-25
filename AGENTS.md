@@ -223,7 +223,7 @@ These patterns make code look obviously machine-generated. Don't do any of these
 - **VS5** Webview message handling follows the same split: the host validates the incoming message shape, calls a service, and posts back a typed reply. The renderer in `media/` only renders and emits intent.
 - **VS6** Treat every field of a webview message as untrusted. Re-resolve a node from its path and re-run the same containment and name checks the host would run for a command.
 - **VS7** Filesystem operations go through `vscode.workspace.fs` rather than raw `node:fs`, unless the operation is specifically about the extension's own storage on the local disk.
-- **VS8** The extension contributes no settings today, and the vault location lives in workspace state. If a setting is added, read it through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down.
+- **VS8** The extension contributes no settings, and the vault location lives in workspace state. If a setting is added, read it through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down.
 - **VS9** Icons come from the product codicon font. No custom glyphs.
 
 ### Webview JavaScript (JS)
@@ -318,7 +318,9 @@ The trees and the canvas stay plain committed JS in `media/`, because none of th
 
 `activate` builds the shared services in dependency order, pushing each onto `context.subscriptions` as it goes, then registers every provider and command in one final push. There is no `deactivate` - cleanup runs entirely through the subscriptions.
 
-The order matters: `VaultManager` resolves the vault root and publishes `promptStudio.hasVault`, `VaultConfig` opens the vault's `config.yml`, then two shared emitters carry the active canvas folder and live color previews between the sidebar and any open canvas. `VaultWebviewProvider`, `SkillsConfigs`, `SkillsWebviewProvider`, and `MentionIndex` follow in that order. All but `SkillsConfigs` set up their own watchers in the constructor, and its per-root stores are built on demand.
+The order matters: `VaultManager` resolves the vault root and publishes `promptStudio.hasVault`, `VaultConfig` opens the vault's `config.yml`, then two shared emitters carry the active canvas folder and live color previews between the sidebar and any open canvas. `VaultWebviewProvider`, `SkillsConfigs`, `SkillsWebviewProvider`, and `MentionIndex` follow in that order.
+
+Each of those services sets up its watcher in its constructor. `SkillsConfigs` is the exception: it builds its per-root stores on demand.
 
 The watchers set up at activation cover the vault root, the vault's `config.yml`, three `.claude` patterns, and `**/*` for the mention index. Canvas and per-skills-root `config.yml` watchers are created lazily.
 
@@ -331,30 +333,32 @@ Neither sidebar is a `TreeView`. Both are `WebviewViewProvider`s rendering a tre
 <details>
 <summary><b>Per-entry metadata</b></summary>
 
-`src/common/vaultConfig.ts` is the store behind every `config.yml` in the repo, whichever root owns it. It is constructed with a function returning its root, so the same class serves the vault and each `.claude/skills` directory.
+`src/common/vaultConfig.ts` is the store behind every `config.yml`, whichever root owns it. It is constructed with a function returning its root, so the same class serves the vault and each `.claude/skills` directory.
 
 Everything below is load-bearing:
 
 - **It ignores the file change its own write causes.** Writes are debounced, and for a moment after each write the watcher event it caused is ignored. Drop that and every card drag reloads the file it just wrote.
 - **Unknown keys survive a rewrite.** The file is rewritten whole, so `type`, `tags`, and anything else a user adds are read back and re-emitted. An entry left with no metadata is dropped, and a root with nothing to store never gets a file.
 - **Metadata follows the entry.** `relocate` and `duplicate` remap the keys of an entry and all its descendants after a move or a copy. A code path that moves a file without calling them leaves its position and color behind, with no warning.
-- Keys are root-relative and always forward-slashed, on every platform.
+- Keys are root-relative and forward-slashed on every platform.
 
 </details>
 
 <details>
 <summary><b>Claude skills discovery</b></summary>
 
-The sub-project scan ([src/skills/projectScanner.ts](src/skills/projectScanner.ts)) walks the first workspace folder breadth-first, capped at depth 5 and 2000 directories read, skipping dot directories and `node_modules`. A deeper skills root does not appear. There is no cache, so the walk re-runs on every debounced refresh. The walk starts at the workspace root, and the root itself never becomes a project row, since its own skills render as the flat list below. A symlinked directory counts as a directory in both scans.
+The sub-project scan ([src/skills/projectScanner.ts](src/skills/projectScanner.ts)) walks the first workspace folder breadth-first, capped at depth 5 and 2000 directories read, skipping dot directories and `node_modules`. A deeper skills root does not appear. There is no cache, so the walk re-runs on every debounced refresh.
 
-A directory qualifies as a sub-project when it holds a `.claude` directory whose `.claude/skills` yields at least one skill. That last filter is what hides the whole view on a workspace that only has a `.claude` directory, since the view's `when` clause only passes once the tree has rows.
+The walk starts at the workspace root, and the root itself never becomes a project row, since its own skills render as the flat list below. Both the sub-project walk and the skill scan count a symlinked directory as a directory.
 
-`SkillsConfigs` hands out one `VaultConfig` per skills root, so a sub-project's colors and canvas layout write to that project's own `config.yml` rather than landing as `../`-keyed entries in the workspace one. Four constraints hold it up:
+A directory qualifies as a sub-project when it holds a `.claude` directory whose `.claude/skills` yields at least one skill. That last filter is why a sub-project with an empty `.claude/skills` gets no row. A workspace with no skills of its own then shows no view at all, since the view's `when` clause only passes once the tree has rows.
+
+`SkillsConfigs` hands out one `VaultConfig` per skills root, so a sub-project's colors and canvas layout write to that project's own `config.yml` rather than landing as `../`-keyed entries in the workspace one. Five constraints hold it up:
 
 - **`configFor` must keep caching what it builds.** Creating a config fires its change event. That schedules a refresh, the refresh rebuilds the tree, and the rebuild calls `configFor` again. Without the cache that loops forever.
 - **Nothing evicts a config.** A deleted sub-project's config and its `config.yml` watcher live until the extension shuts down.
 - **A skills config's root never changes.** Each one is handed a root-change event that is never fired, so it loads its file once at construction and afterwards only through its own watcher. This is safe because a skills directory path does not move.
-- **A newly seen root paints twice.** The config is created lazily during the tree build and loads its file asynchronously, so the colors arrive on the second render. The subscription to the merged change event is what delivers it. Drop that and a sub-project's skill colors never appear on first expand.
+- **A new root's colors arrive on the second render.** The config is created lazily during the tree build and loads its file asynchronously, so the first render has none. The subscription to the merged change event is what brings them in. Drop that and a sub-project's skill colors stay missing until the next refresh.
 - **A skill canvas needs its root's config.** The canvas context is built from `configFor`, so a folder outside every `.claude/skills` opens nothing, and a restored read-only panel whose root is gone is disposed rather than left with no store.
 
 Two separate guards stop `config.yml` writes from causing refresh storms: the store ignores its own write, and the skills provider drops any watcher event whose basename is `config.yml`. Without the second, every card drag on a skill canvas re-walks every project in the workspace.
@@ -366,26 +370,30 @@ Two smaller constraints:
 - **`skillsDir` has to survive serialization.** The skills renderer puts it on every node it sends, and **New Skill** reads it to pick which skills root to create in. Remove the field and New Skill on a sub-project row quietly creates the skill in the workspace `.claude/skills`.
 - **A compressed row keeps the deepest segment's path.** A run of folders that each hold only one child renders as one `a/b/c` row carrying the last directory's path, so expand state and **Reveal in Explorer** both key off the deepest directory.
 
-The skills host intercepts **Copy as Path > Relative** before it reaches the registered command, because the shared menu emits the vault's command id and that handler resolves against the vault root. The interception measures the path from the skills directory that owns the row, or from the workspace folder for a sub-project row, which sits above every skills directory. Remove it and the entry copies a wrong `../`-prefixed path and still reports success.
+The skills host intercepts **Copy as Path > Relative** before it reaches the registered command, because the shared menu emits the vault's command id and that handler resolves against the vault root. The interception measures the path from the skills directory that owns the row, or from the workspace folder for a sub-project row. Remove it and the entry copies a wrong `../`-prefixed path and still reports success.
 
 </details>
 
 <details>
-<summary><b>Workspace mentions</b></summary>
+<summary><b>@ mentions</b></summary>
 
 A relative `@path` in the template editor resolves against the first workspace folder, because that is the one directory Claude Code runs in. Extra roots are not offered, since a path from the second root would not resolve for Claude anyway.
 
-`src/template/mentionIndex.ts` scans that folder and `TemplatePanel` posts the whole list to the webview. The renderer never queries the host per keystroke, because the tint has to answer "is this a real path" synchronously on every document change, so it needs the set locally regardless. A burst of file creates or deletes drops the cached scan and announces the change once it settles, and the rescan itself runs when a panel next asks for the list.
+`src/template/mentionIndex.ts` scans that folder and `TemplatePanel` posts the whole list to the webview. The renderer never queries the host per keystroke, since the tint has to answer "is this a real path" synchronously on every document change and needs the whole list locally anyway.
+
+A burst of file creates or deletes drops the cached scan and announces the change once it settles, and the rescan itself runs when a panel next asks for the list.
 
 The index is capped at 20000 files and filtered by the enabled `files.exclude` and `search.exclude` patterns, so a large or heavily excluded workspace silently offers a partial list. Both the index and the on-disk browser also drop any path containing whitespace or an `@`, because the mention patterns in the renderer stop at those characters. Change either pattern and both filters go stale.
 
-A leading slash (`@/home/`) browses the disk instead, which no index can cover, so `src/template/mentionFilesystem.ts` reads one directory per request. The webview caches the last 100 listings it receives and answers keystrokes through the completion result's `update` hook, which re-ranks the cached listing synchronously. Both halves are load-bearing: without the cache each keystroke is a host round trip, and without the hook CodeMirror re-queries and debounces every keystroke, greying the popup while it waits.
+A leading slash (`@/home/`) browses the disk instead, which no index can cover, so `src/template/mentionFilesystem.ts` reads one directory per request.
+
+The webview caches the last 100 listings it receives and answers keystrokes through the completion result's `update` hook, which re-ranks the cached listing synchronously. Both halves are load-bearing: without the cache each keystroke is a host round trip, and without the hook CodeMirror re-queries and debounces every keystroke, greying the popup while it waits.
 
 - A listing refreshes in the background once it is two seconds old, so the popup can briefly offer a just-deleted file.
 - The folder under the popup highlight is prefetched once the arrows rest, so stepping into it is instant.
 - A listing request that never gets a reply times out, so a dead mount cannot wedge its directory for the session.
 
-A relative mention is tinted straight from the pushed index. An absolute one is tinted only after a debounced existence check of a path actually written in the note, never from a popup listing, so the verified set only ever holds paths the note names. Only the host touches the filesystem, and the webview holds what it has been told.
+A relative mention is tinted straight from the pushed index. An absolute one is tinted only after a debounced existence check of a path actually written in the note, never from a popup listing. Only the host touches the filesystem, and the webview holds what it has been told.
 
 Browsing ignores case everywhere: the workspace popup ranks against lowercased paths, and a failed absolute read retries with each segment matched to its on-disk casing, so `@/HOME/` still lists `/home` on a case-sensitive disk. A picked completion always inserts the on-disk spelling. The tint stays exact-case on purpose, because Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
 
@@ -396,7 +404,9 @@ The popup is CodeMirror's, restyled in `media/template/template.css` to match th
 <details>
 <summary><b>The two sidebar trees</b></summary>
 
-[media/vault/tree.js](media/vault/tree.js) and [media/skills/tree.js](media/skills/tree.js) are two files on purpose. The vault tree is a read-write explorer with selection, inline rename, delete, clipboard, and drag-moves. The skills tree is a read-only browser whose mutations are a color tint and **New Skill** on a sub-project row. They share row chrome and the color-preview protocol and nothing of their interaction model. Merging them means a config-driven abstraction over two genuinely different behaviours, so they stay separate until a third tree webview justifies the extraction.
+[media/vault/tree.js](media/vault/tree.js) and [media/skills/tree.js](media/skills/tree.js) are two files on purpose. The vault tree is a read-write explorer with selection, inline rename, delete, clipboard, and drag-moves. The skills tree only browses, apart from a color tint and **New Skill**.
+
+They share the way a row is drawn and the color-preview messages, and nothing of how they behave. Merging them would mean one renderer with options for two different trees, so they stay separate until a third tree webview comes along.
 
 They do share a stylesheet: the skills host is served [media/vault/tree.css](media/vault/tree.css), and there is no `media/skills/tree.css`. Editing that file restyles both sidebars.
 
@@ -408,7 +418,7 @@ A single click on a note opens its template view with `preserveFocus`, so the si
 
 Ctrl+C records the entry's path in the tree webview, not the OS clipboard, and Ctrl+V pastes it from there. The menu's **Duplicate File** and **Duplicate Folder** run the same paste with the entry as its own target, so the copy lands beside it without touching the clipboard.
 
-Paste resolves its target the way `createEntries.ts` places a new note, dropping to the source's parent when that would nest a folder inside itself. That parity is two copies of one rule rather than shared code, so a change to either has to be made twice. After `src/vault/copyEntry.ts` copies the entry, the host deep-copies its `config.yml` metadata onto the new path, mirroring how a move relocates it.
+Paste resolves its target the way `createEntries.ts` places a new note, dropping to the source's parent when that would nest a folder inside itself. Neither file calls the other, so the rule has to be kept in step by hand. After `src/vault/copyEntry.ts` copies the entry, the host deep-copies its `config.yml` metadata onto the new path, mirroring how a move relocates it.
 
 </details>
 
@@ -419,7 +429,7 @@ Paste resolves its target the way `createEntries.ts` places a new note, dropping
 
 The canvas the sidebar highlights flows through a shared emitter, so the active canvas folder wins over the active editor when the two disagree.
 
-A canvas opened from a skill is read-only. The renderer strips every mutating entry from both menus when the host says so, so the same canvas code serves the vault and the skills view.
+A canvas opened from a skill cannot create, rename, or delete an entry, though colors and card layout still write. The renderer strips those entries from both menus when the host says so. That is what lets the same canvas code serve the vault and the skills view.
 
 </details>
 
@@ -430,7 +440,7 @@ Sending pastes into the existing Claude Code chat input: copy to the clipboard, 
 
 If Claude Code is missing, the action falls back to leaving the text on the clipboard and saying so.
 
-The transport lives in `src/common/sendToClaude.ts` and takes plain text. What gets sent differs by caller: a vault note sends its contents, a skill sends its `/name` slash command, and the template panel sends the slash command when it was opened from a skill and the edited text otherwise.
+The sending code lives in `src/common/sendToClaude.ts` and takes plain text. What gets sent differs by caller: a vault note sends its contents, a skill sends its `/name` slash command, and the template panel sends the slash command when it was opened from a skill and the edited text otherwise.
 
 </details>
 
@@ -458,7 +468,7 @@ Every webview rule reading that var therefore carries a fallback stack outside i
 
 This applies to code spans and canvas previews. Prose and interface text read `--vscode-font-family`, which arrives as a full stack already.
 
-Form controls need more: VSCode injects an `!important` control-font rule, so an `<input>` or `<textarea>` needs the font declared inline with `!important` plus a `, monospace` fallback. The template editor is a CodeMirror contenteditable, so it is exempt.
+A form control needs more: VSCode injects an `!important` control-font rule, so an `<input>` or `<textarea>` that wants the editor font has to declare it inline with `!important` plus a `, monospace` fallback. The template editor is a CodeMirror contenteditable, so it is exempt.
 
 </details>
 
@@ -467,7 +477,7 @@ Form controls need more: VSCode injects an `!important` control-font rule, so an
 
 A palette class in `media/common/palette.css` sets two vars. `--ps-fill` backs the cards, the swatches, and the canvas wash. `--ps-accent` colors the icon of a tinted row in the sidebar and the scrollbar thumb of a tinted card.
 
-The accent is the only thing carrying a color into the tree, so no accent sits on the neutral grey axis. An accent close to `--vscode-icon-foreground` leaves a tinted icon looking untinted, and that swatch then reads as the clear swatch at the other end of the row. `gray` is a slate blue-grey to stay clear of it.
+The accent is the only thing carrying a color into the tree, so no accent is a neutral grey. An accent close to `--vscode-icon-foreground` leaves a tinted icon looking untinted, and that swatch then reads as the clear swatch at the other end of the row. `gray` is a slate blue-grey to stay clear of it.
 
 </details>
 

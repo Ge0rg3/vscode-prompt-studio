@@ -1,4 +1,4 @@
-// Reads .claude/skills off disk and pulls the name and description out of each SKILL.md.
+// Reads .claude/skills off disk and pulls the name and description out of each SKILL.md
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -21,7 +21,7 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 // --- helpers ---
 
-// pull name and description out of a SKILL.md's leading YAML frontmatter
+// Pull name and description out of a SKILL.md's leading YAML frontmatter
 function parseFrontmatter(text: string): { name?: string; description?: string } {
   const match = FRONTMATTER.exec(text);
   if (!match) {
@@ -45,7 +45,7 @@ function parseFrontmatter(text: string): { name?: string; description?: string }
   return { name, description };
 }
 
-// read one skill directory, or undefined when it has no SKILL.md
+// Read one skill directory, undefined when it has no SKILL.md
 async function readSkill(dirPath: string, dirName: string): Promise<Skill | undefined> {
   const skillFile = path.join(dirPath, SKILL_FILE);
   let raw: Uint8Array;
@@ -66,18 +66,18 @@ async function readSkill(dirPath: string, dirName: string): Promise<Skill | unde
 
 // --- exports ---
 
-// the .claude/skills directory belonging to a project directory
+// Build the .claude/skills path inside a project directory
 export function skillsDirIn(dirPath: string): string {
   return path.join(dirPath, CLAUDE_DIR, SKILLS_DIR);
 }
 
-// the workspace's .claude/skills directory, or undefined when no folder is open
+// Find the workspace's .claude/skills directory, undefined when no folder is open
 export function skillsRoot(): string | undefined {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   return workspace ? skillsDirIn(workspace.uri.fsPath) : undefined;
 }
 
-// walk up from a path to the .claude/skills folder it lives in
+// Walk up from a path to the .claude/skills folder it lives in
 export function owningSkillsDir(absPath: string): string | undefined {
   let dir = absPath;
   while (true) {
@@ -92,7 +92,7 @@ export function owningSkillsDir(absPath: string): string | undefined {
   }
 }
 
-// every skill directly under a .claude/skills root, sorted by display name
+// Read every skill directly under a .claude/skills root, sorted by display name
 export async function scanSkills(root: string): Promise<Skill[]> {
   let entries: [string, vscode.FileType][];
   try {

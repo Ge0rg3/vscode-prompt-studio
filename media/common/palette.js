@@ -1,6 +1,5 @@
-// shared palette-class helper for the sidebar and canvas webviews
+// Tints an element with one of the shared palette colors, clearing any previous tint
 (function () {
-  // set an element's tint classes, clearing any previous one
   function applyTint(element, color, baseClass) {
     for (const cls of [...element.classList]) {
       if (cls === baseClass || cls.startsWith('color-')) {

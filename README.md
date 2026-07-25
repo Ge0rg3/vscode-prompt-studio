@@ -1,5 +1,7 @@
 # Prompt Studio
-Prompt Studio turns a folder of markdown files into an Obsidian-like vault inside VSCode. It ships a sidebar tree, a live-preview template editor, a draggable card canvas, and a second sidebar section that lists the Claude skills across your workspace and its sub-projects. Storage stays plain markdown on disk, so a vault is portable, git-friendly, and readable without the extension.
+Prompt Studio turns a folder of markdown files into an Obsidian-like vault inside VSCode. It ships a sidebar tree, a live-preview template editor, a draggable card canvas, and a second sidebar section that lists the Claude skills across your workspace and its sub-projects.
+
+Storage stays plain markdown on disk, so a vault is portable, git-friendly, and readable without the extension.
 
 ## Quickstart
 
@@ -34,14 +36,14 @@ vscode-prompt-studio/
 +-- src/                    # Extension host source (node)
 |   +-- extension.ts        # activate(): builds the shared services, registers every provider and command
 |   +-- common/             # Shared state, domain types, and helpers
-|   |   +-- vaultConfig.ts      # config.yml store: parse, debounced write, keys that follow an entry
+|   |   +-- vaultConfig.ts      # The config.yml store, with debounced writes and metadata that moves with an entry
 |   |   +-- vaultManager.ts     # Which folder is the vault, remembered per workspace
 |   |   +-- cardLayoutStore.ts  # The interface a canvas needs from a metadata store
 |   |   +-- cardColors.ts       # The seven-color palette and its shared messages
 |   |   +-- sendToClaude.ts     # Paste text into the Claude Code chat input
 |   |   +-- vaultNode.ts        # The node shape passed between host, webviews, and commands
 |   |   +-- utils/              # Purpose-named stateless helpers: paths, fs, webview, clipboard, compare
-|   +-- vault/              # Vault sidebar host, entry CRUD, move/copy, vault configuration
+|   +-- vault/              # Vault sidebar host, create/rename/delete, move/copy, vault location
 |   +-- template/           # Template panel host, workspace mention index, on-disk path browsing
 |   +-- visual/             # Canvas panel host and the folder-to-cards reader
 |   +-- skills/             # Skills sidebar host, skill and sub-project scanners, per-root config
@@ -63,7 +65,7 @@ vscode-prompt-studio/
 +-- dist/                   # Built extension bundle
 ```
 
-`dist/`, `media/codicons/`, and `media/template/template.js` are build output and gitignored. They still ship in the `.vsix`. The `.vsix` excludes `src/`, `webview/`, source maps, the build config, and `AGENTS.md`.
+`dist/`, `media/codicons/`, and `media/template/template.js` are build output and gitignored, but they still ship in the `.vsix`. The `.vsix` excludes `src/`, `webview/`, source maps, the build config, and `AGENTS.md`.
 
 </details>
 
@@ -109,9 +111,9 @@ npm run watch      # rebuild on change, leave running during F5 debug
 <details>
 <summary><b>Running locally</b></summary>
 
-Open this folder in VSCode and press **F5**. That runs the `npm: watch` task, then opens an Extension Development Host window with the extension loaded. Press **Ctrl+R** in that window to reload it after a rebuild.
+Open this folder in VSCode and press **F5**. That runs the `npm: watch` task, then opens an Extension Development Host window with the extension loaded.
 
-The Prompt Studio icon appears in the activity bar of the development host. Open a folder in that window before testing the vault, since the vault location is resolved per workspace.
+The Prompt Studio icon appears in that window's activity bar. Open a folder there before testing the vault, since the vault location is resolved per workspace.
 
 </details>
 
@@ -143,7 +145,7 @@ Reload VSCode and the Prompt Studio icon appears in the activity bar.
 
 The extension publishes to the [VSCode Marketplace](https://marketplace.visualstudio.com/vscode) via `vsce`. Before the first publish:
 
-1. Register a publisher at https://marketplace.visualstudio.com/manage and replace `publisher` in [package.json](package.json) with that publisher id. It currently holds the placeholder `prompt-studio-dev`.
+1. Register a publisher at https://marketplace.visualstudio.com/manage and replace `publisher` in [package.json](package.json) with that publisher id. It holds the placeholder `prompt-studio-dev`.
 2. Create an Azure DevOps personal access token with **Marketplace > Manage** scope. See the [vsce docs](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token).
 3. Authenticate vsce once with `npx vsce login <publisher>`.
 4. Add a 128x128 `media/icon.png` and set `"icon": "media/icon.png"` in [package.json](package.json). The marketplace listing requires a PNG.
@@ -196,7 +198,7 @@ With a folder open, a vault is created automatically, so the extension works wit
 2. **Custom folder.** Any absolute path on disk.
 3. **Folder inside this workspace.** A subfolder such as `<workspace>/prompts`, so the vault is versioned alongside your code. Offered only when a folder is open.
 
-The choice is stored per workspace, so different projects can point at different vaults. It lives in workspace state rather than a setting, so it is not editable from `settings.json`.
+The choice lives in workspace state, so different projects can point at different vaults and there is nothing to edit in `settings.json`.
 
 </details>
 
@@ -214,7 +216,7 @@ Only `.md` files appear, and dotfiles are hidden.
 - **Copy as Path** offers **Static**, the absolute path on disk, or **Relative**, the path relative to the vault root.
 - **Hover.** A note row shows **Open as File**, **Send to Claude**, and **Open Visual Canvas**. A folder row shows **Open Visual Canvas**.
 - **Color swatches.** Hover to preview, click to apply, or pick the leftmost clear swatch to remove. The tint colors the entry's icon and is the same color the canvas uses.
-- **Drag and drop.** Drag a note or folder onto another folder row to move it, or onto empty space to lift it to the vault root. Moves into a folder's own descendants and moves onto a colliding name are rejected.
+- **Drag and drop.** Drag a note or folder onto another folder row to move it, or onto empty space to lift it to the vault root. Dropping a folder into itself or into anything inside it is refused, and so is a move onto a name already taken.
 - **Keyboard.** **F2** renames inline, **Delete** deletes after a confirmation, and **Ctrl+C** then **Ctrl+V** duplicates. A paste lands in the selected entry's folder, named `<name> (Copy)` when the name is taken.
 - **Command palette.** **New Note**, **New Folder**, **Open Visual Canvas**, and **Configure Vault**.
 
@@ -223,15 +225,19 @@ Only `.md` files appear, and dotfiles are hidden.
 <details>
 <summary><b>Template view</b></summary>
 
-Clicking a note opens it in the template view: an editable tab of its own, titled `<note> (template)`. Edits stay in the tab until you save, which overwrites the note. **Open as File** opens the raw markdown in a plain text editor instead.
+Clicking a note opens it in the template view: an editable tab of its own, titled `<note> (template)`. Edits stay in the tab until you save, and saving overwrites the note.
+
+**Open as File** opens the raw markdown in a plain text editor instead.
 
 The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Save, Copy, and Send hand off exactly what you wrote, `{{variables}}` and all.
 
 - **Inline styling.** Headings, emphasis, strikethrough, inline and fenced code, links, quotes, lists, and rules. Tables and images stay as plain markdown.
 - **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
-- **Workspace mentions.** Type `@` to search the workspace by path, the way you would in Claude Code. Search matches the file name, the folder path, or a loose subsequence of either, so `@tmplpanel` and `@template/temp` both find `src/template/templatePanel.ts`. Picking a file inserts its path, picking a folder browses into it. Mentions inside code, mid-word, or naming a path that does not exist are left alone.
+- **Workspace mentions.** Type `@` to search the workspace by path, the way you would in Claude Code. Picking a file inserts its path, picking a folder browses into it.
+- **Matching.** Search matches the file name, the folder path, or the typed letters in order anywhere in the path, so `@tmplpanel` and `@template/temp` both find `src/template/templatePanel.ts`. An `@` inside code, mid-word, or naming a path that does not exist is left alone.
 - **Absolute paths.** Start the path with a slash to browse the disk itself: `@/` lists the filesystem root, `@/home/` lists what is in `/home`. Each directory is read as you reach it, so anything on disk can be mentioned. Case does not have to match, and picking from the popup inserts the path as it is spelled on disk.
-- **Mention highlight.** A mention naming a real file or folder is tinted, in both Rendered and Source mode, so you can see what Claude Code will resolve before you send. A path with a space in it cannot be mentioned, and workspace search covers the first workspace folder, since that is the folder Claude Code runs in.
+- **Mention highlight.** A mention naming a real file or folder is tinted, in both Rendered and Source mode, so you can see what Claude Code will resolve before you send.
+- **Limits.** A path with a space in it cannot be mentioned, and search covers the first workspace folder, since that is the folder Claude Code runs in.
 - **Keyboard.** While the `@` popup is open, **Up** and **Down** move the selection, **Enter** or **Tab** accepts, and **Escape** closes it. Otherwise **Tab** at the start of a bullet nests it under the one above and **Shift+Tab** lifts it out. Anywhere else **Tab** inserts a tab or indents a selection, and **Shift+Tab** outdents. Press **Escape** first to move focus out of the editor instead.
 
 A bar along the bottom offers:
@@ -251,11 +257,11 @@ Open any folder, or the vault root, as a pinboard of cards in the editor area. B
 - **Note cards** show a title and the note body, scrolling when the text overflows. The title is the note's first heading, falling back to the filename.
 - **Folder cards** drill in on click, and preview their contents as a scaled-down render of their own canvas, inner cards at their saved spots.
 
-The folder preview recurses up to three layers deep, set in [src/visual/folderContents.ts](src/visual/folderContents.ts). An empty folder, or one past that depth, shows a plain folder glyph.
+The folder preview nests up to three layers deep, set in [src/visual/folderContents.ts](src/visual/folderContents.ts). An empty folder, or one past that depth, shows a plain folder icon.
 
-Launch it from the **Open Visual Canvas** title-bar button, the hover icon on a folder or note row, the **Open as Canvas** entry on a folder or empty-area menu, or **Prompt Studio: Open Visual Canvas** in the palette. A note's hover icon opens its parent folder.
+Every **Open Visual Canvas** and **Open as Canvas** action, in the sidebar or the palette, opens one. Launched from a note, it opens the note's parent folder.
 
-Once open, cards respond to pointer gestures:
+Once open, cards respond to the pointer:
 
 - **Drag.** Reposition a card anywhere, OneNote style.
 - **Resize.** Drag the handle at a card's bottom-right corner. Resizing a folder card reveals more of its preview.
@@ -266,7 +272,7 @@ Position, size, and stacking order save to the card's `visual` block in `config.
 - **Card menu.** Color swatches, **Rename**, **Reveal in Explorer**, **Copy as Path**, and **Delete**, with **Open**, **Open as Template**, **Send to Claude**, and **Copy Contents** on note cards.
 - **Background menu.** Color swatches, **New Note**, **New Folder**, **Reveal in Explorer**, and **Copy as Path**. New entries land in the open folder, their card placed where you right-clicked.
 
-A card swatch tints the card, a background swatch tints the open folder and washes the canvas. Tints preview live in the sidebar too, and save to the entry's `visual` block.
+A card swatch tints the card, a background swatch tints the open folder and the canvas behind the cards. Both save to the entry's `visual` block.
 
 A canvas opened from a skill is read-only: cards can be moved, resized, recolored, and opened, but not created, renamed, or deleted.
 
@@ -278,7 +284,8 @@ A canvas opened from a skill is read-only: cards can be moved, resized, recolore
 A second sidebar section, **Claude Skills**, appears whenever the workspace has skills in `<workspace>/.claude/skills`, or a sub-project inside it has its own. Each skill is a folder holding a `SKILL.md`.
 
 - A skill row shows the `name` from its `SKILL.md` frontmatter, falling back to the folder name, with the `description` as its tooltip.
-- **Sub-projects** with their own `.claude/skills` (nested repos, monorepo packages) sit above the workspace skills as a folder tree, pruned to the folders that lead to skills. A run of folders that each hold only one child collapses into one `a/b/c` row. The scan walks the first workspace folder breadth-first, capped at depth 5 and 2000 directories, skipping dot directories and `node_modules`. A skills root deeper than that does not appear.
+- **Sub-projects** with their own `.claude/skills` (nested repos, monorepo packages) sit above the workspace skills as a folder tree, showing only the folders that lead to skills. A run of folders that each hold only one child collapses into one `a/b/c` row.
+- **Scan limits.** The search covers the first workspace folder, skips dot directories and `node_modules`, and stops at five levels or 2000 directories. A skills root past that does not appear.
 - Expand a skill to browse and open the files in its folder, dotfiles aside. Clicking a file opens it directly.
 - **Hover a skill** for **Open SKILL.md**, **Open as Canvas**, and **Send to Claude**.
 - **Right-click a skill** for color swatches, **Open SKILL.md**, **Open as Template**, **Open as Canvas**, **Send to Claude**, **Reveal in Explorer**, and **Copy as Path**. A file inside a skill gets swatches plus **Open**, **Reveal in Explorer**, and **Copy as Path**. A folder gets the same without **Open**.
@@ -287,18 +294,18 @@ A second sidebar section, **Claude Skills**, appears whenever the workspace has 
 - **Title bar.** **New Skill**, **Open Visual Canvas**, **Expand All**, **Collapse All**, and **Refresh Skills**.
 - **Right-click empty area** for **Open as Canvas** and **New Skill**.
 
-Opening a `SKILL.md` or a supporting file opens the real file in an editor, so edits save straight to disk. The skill actions reuse the shared views and Claude integration:
+Opening a `SKILL.md` or a supporting file opens the real file in an editor, so edits save straight to disk.
 
 - **New Skill** creates `.claude/skills/<name>/SKILL.md` with `name` and `description` frontmatter, and opens it. It refuses a name already in use.
 - **Open as Template** opens the `SKILL.md` in the template view. Its **Send to Claude** button sends the skill's slash command, not the text.
 - **Open as Canvas** opens the skill folder as a read-only canvas.
-- **Send to Claude** drops the skill's slash command (`/<name>`, taken from the `SKILL.md` frontmatter) into the Claude Code chat.
+- **Send to Claude** drops the skill's `/name` slash command into the Claude Code chat.
 
 Each `.claude/skills` root keeps its own `config.yml`, so a sub-project's colors and card layout commit inside that sub-project rather than in the workspace root.
 
 The title-bar **Open Visual Canvas** and **New Skill** always act on the workspace's own `.claude/skills`. A sub-project's skills are reached from its own row: **New Skill** there creates the skill in that project, and a skill's **Open as Canvas** opens that skill.
 
-Deleting a whole sub-project fires no watcher event, so its row lingers until the next skills event. **Refresh Skills** clears it.
+A deleted sub-project's row can linger. **Refresh Skills** clears it.
 
 </details>
 

@@ -1,3 +1,4 @@
+// Builds the extension host and template webview bundles, and copies the codicons into media/
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -6,7 +7,7 @@ const esbuild = require('esbuild');
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
-// the extension host bundle
+// The extension host bundle, CommonJS for node with vscode left external
 /** @type {import('esbuild').BuildOptions} */
 const extensionBuild = {
   entryPoints: ['src/extension.ts'],
@@ -21,7 +22,7 @@ const extensionBuild = {
   logLevel: 'info'
 };
 
-// the template webview bundles CodeMirror into a self-contained browser script
+// The template webview bundle, CodeMirror compiled into a self-contained browser script
 /** @type {import('esbuild').BuildOptions} */
 const templateBuild = {
   entryPoints: ['webview/template/main.ts'],
@@ -35,7 +36,7 @@ const templateBuild = {
   logLevel: 'info'
 };
 
-// vendor codicon font + css into media/ so the webview can serve them
+// Copy the codicon font and CSS into media/, the only folder the webviews can load from
 function copyCodicons() {
   const src = path.join(__dirname, 'node_modules/@vscode/codicons/dist');
   const dst = path.join(__dirname, 'media/codicons');

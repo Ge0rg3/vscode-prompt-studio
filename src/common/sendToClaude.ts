@@ -1,9 +1,9 @@
+// Sends prompt text to the Claude Code chat input
 import * as vscode from 'vscode';
 
-// give the chat input time to take focus before pasting
+// Give the chat input time to take focus before pasting
 const FOCUS_SETTLE_MS = 60;
 
-// drop text into claude code's chat input
 export async function sendTextToClaude(text: string): Promise<void> {
   await vscode.env.clipboard.writeText(text);
 

@@ -1,3 +1,4 @@
+// Builds the template editor's CodeMirror view and wires it to the host and the toolbar
 import { acceptCompletion } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentLess, insertTab } from '@codemirror/commands';
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
@@ -47,14 +48,14 @@ interface SavedMessage {
 
 type InboundMessage = ContentMessage | MentionsMessage | DirEntriesMessage | VerifiedPathsMessage | SavedMessage;
 
-// the webview state kept across a window reload, with any unsaved buffer
+// The webview state kept across a window reload, with any unsaved text
 interface PersistedState {
   notePath: string;
   claudeCommand?: string;
   text: string;
 }
 
-// a listDir request awaiting its reply, resolved with undefined when the timer fires first
+// A listDir request waiting for its reply, resolved with undefined when the timer fires first
 interface PendingDirectory {
   resolve: (entries: MentionEntry[] | undefined) => void;
   timer: number;
@@ -109,7 +110,8 @@ const view = new EditorView({
         ...defaultKeymap,
         ...historyKeymap
       ]),
-      // keep the popup clear of the toolbar
+
+      // Keep the popup clear of the toolbar
       tooltips({
         tooltipSpace: () => ({ left: 0, top: 0, right: window.innerWidth, bottom: toolbar.getBoundingClientRect().top })
       }),
@@ -133,7 +135,7 @@ const view = new EditorView({
 
 // --- helpers ---
 
-// ask the host to list an absolute directory, undefined when the reply never lands
+// Ask the host to list an absolute directory, undefined when the reply never lands
 function fetchDirectory(dirPath: string): Promise<MentionEntry[] | undefined> {
   const id = nextRequestId++;
   vscode.postMessage({ type: 'listDir', id, dirPath });
@@ -143,7 +145,7 @@ function fetchDirectory(dirPath: string): Promise<MentionEntry[] | undefined> {
   });
 }
 
-// hand a listing, or a timeout, to whoever asked for it
+// Finish a waiting listDir request, with undefined when it timed out
 function settleDirectory(id: number, entries: MentionEntry[] | undefined): void {
   const pending = pendingDirectories.get(id);
   if (!pending) {
@@ -155,7 +157,7 @@ function settleDirectory(id: number, entries: MentionEntry[] | undefined): void 
   pending.resolve(entries);
 }
 
-// queue absolute paths for one existence check once the scans settle
+// Queue absolute paths for one existence check once the scans settle
 function verifyPaths(paths: string[]): void {
   let queued = false;
   for (const path of paths) {
@@ -177,7 +179,7 @@ function verifyPaths(paths: string[]): void {
   }, VERIFY_DEBOUNCE_MS);
 }
 
-// swap the note's text into the editor, kept out of the undo history and the dirty check
+// Swap the note's text into the editor, kept out of the undo history and the modified check
 function setContent(text: string): void {
   loading = true;
   view.dispatch({
@@ -187,24 +189,24 @@ function setContent(text: string): void {
   loading = false;
 }
 
-// ask the host to write the editor's text over the note
+// Ask the host to write the editor's text over the note
 function saveNote(): void {
   vscode.postMessage({ type: 'save', text: view.state.doc.toString() });
 }
 
-// ctrl+s or cmd+s, matched on key and code so any keyboard layout saves
+// Match ctrl+s or cmd+s on key and on code, so any keyboard layout saves
 function isSaveShortcut(event: KeyboardEvent): boolean {
   const held = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
   return held && (event.key.toLowerCase() === 's' || event.code === 'KeyS');
 }
 
-// after each edit, refresh the dirty marker and persist the buffer
+// Refresh the modified marker and store the text after each edit
 function onDocChanged(): void {
   setDirty(view.state.doc.toString() !== savedText);
   persist();
 }
 
-// tell the host to add or drop the tab's modified marker
+// Tell the host to add or drop the tab's modified marker
 function setDirty(next: boolean): void {
   if (next === dirty) {
     return;
@@ -214,12 +216,12 @@ function setDirty(next: boolean): void {
   vscode.postMessage({ type: 'dirty', dirty });
 }
 
-// keep the current buffer in webview state so a reload restores unsaved edits
+// Keep the current text in webview state so a reload restores unsaved edits
 function persist(): void {
   vscode.setState({ notePath, claudeCommand, text: view.state.doc.toString() });
 }
 
-// switch between the inline render and the raw markdown source, the button names the mode on screen
+// Switch between the rendered markdown and the raw source, the button names the mode on screen
 function setSourceMode(on: boolean): void {
   sourceMode = on;
   view.dispatch({ effects: live.reconfigure(on ? [] : livePreview()) });
@@ -236,10 +238,11 @@ window.addEventListener('message', (event) => {
     notePath = msg.notePath;
     claudeCommand = msg.claudeCommand;
 
-    // take the baseline from the editor, CodeMirror can normalize the text on load
+    // Take the baseline from the editor, CodeMirror can normalize the text on load
     setContent(msg.text);
     savedText = view.state.doc.toString();
 
+    // Put back the unsaved text from before the reload
     const buffer = typeof persisted?.text === 'string' ? persisted.text : undefined;
     if (buffer !== undefined && buffer !== savedText) {
       setContent(buffer);
@@ -250,7 +253,7 @@ window.addEventListener('message', (event) => {
     return;
   }
 
-  // the write landed, reset the baseline to what actually reached disk
+  // Reset the baseline to what actually reached disk once the write lands
   if (msg?.type === 'saved') {
     savedText = msg.text;
     setDirty(view.state.doc.toString() !== savedText);
@@ -267,7 +270,7 @@ window.addEventListener('message', (event) => {
     return;
   }
 
-  // clear the guard, so a path that was missing is checked again after the next edit
+  // Forget which paths were checked, so a missing one is checked again after the next edit
   if (msg?.type === 'verifiedPaths') {
     checkingPaths.clear();
     view.dispatch({ effects: addVerifiedPaths.of(msg.entries) });
@@ -276,7 +279,7 @@ window.addEventListener('message', (event) => {
 
 // --- toolbar ---
 
-// hold focus in the editor, the native selection only stays lit while the editor has it
+// Hold focus in the editor, the selection only stays lit while the editor has it
 toolbar.addEventListener('mousedown', (event) => event.preventDefault());
 
 toggle.addEventListener('click', () => setSourceMode(!sourceMode));
@@ -284,7 +287,7 @@ save.addEventListener('click', saveNote);
 copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));
 send.addEventListener('click', () => vscode.postMessage({ type: 'sendToClaude', text: view.state.doc.toString() }));
 
-// listen on the window, the editor only holds focus once the note has been clicked
+// Listen on the window, the editor only holds focus once the note has been clicked
 window.addEventListener('keydown', (event) => {
   if (isSaveShortcut(event)) {
     event.preventDefault();

@@ -1,3 +1,4 @@
+// Registers the command that drops a note's text into the Claude Code chat input
 import * as vscode from 'vscode';
 
 import { sendTextToClaude } from '../common/sendToClaude';

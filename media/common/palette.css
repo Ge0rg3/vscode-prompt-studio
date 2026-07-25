@@ -1,4 +1,4 @@
-/* sticky-note palette shared across webviews */
+/* The shared sticky-note colors, a fill and an accent for each */
 .color-red {
   --ps-fill: #f7c9c4;
   --ps-accent: #cf5b54;

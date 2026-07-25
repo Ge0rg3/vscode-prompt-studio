@@ -1,4 +1,4 @@
-// shared right-click menu, rendered into a #context-menu element
+// Renders the shared right-click menu into a webview's #context-menu element
 (function () {
   const SUBMENU_OPEN_DELAY_MS = 150;
 
@@ -12,12 +12,12 @@
     ]
   };
 
-  // a controller bound to one menu container, dispatching picks through onCommand(cmd, node)
+  // Build a controller bound to one menu element, sending each pick through onCommand
   function create(menuEl, onCommand, colors = []) {
     let colorTarget = null;
 
     function hide() {
-      // drop any uncommitted hover preview back to the saved color
+      // Drop any uncommitted hover preview back to the saved color
       if (colorTarget) {
         colorTarget.preview(colorTarget.currentColor());
         colorTarget = null;
@@ -25,7 +25,7 @@
       menuEl.classList.add('hidden');
     }
 
-    // a clickable row that runs its action or dispatches its command
+    // Build a clickable row that runs its action or posts its command
     function buildMenuItem(entry, node) {
       const item = document.createElement('div');
       item.className = 'menu-item';
@@ -47,9 +47,9 @@
       return item;
     }
 
-    // place the submenu beside its parent when it fits there, else expand it inline below
+    // Place the submenu beside its parent when it fits, else expand it inline below
     function openSubmenu(header, submenu, arrow) {
-      // a pending timer can fire after the menu was rebuilt or hidden, ignore the orphaned nodes
+      // Ignore a timer that fires after the menu was rebuilt or hidden
       if (!header.isConnected) {
         return;
       }
@@ -68,21 +68,22 @@
       } else {
         arrow.className = 'submenu-arrow codicon codicon-chevron-down';
         submenu.classList.add('inline');
-        // pull the menu up so the expanded rows stay on-screen
+
+        // Pull the menu up so the expanded rows stay on screen
         if (menuEl.getBoundingClientRect().bottom > window.innerHeight - 4) {
           menuEl.style.top = `${Math.max(4, window.innerHeight - menuEl.offsetHeight - 4)}px`;
         }
       }
     }
 
-    // reset the submenu to its closed state
+    // Reset the submenu to its closed state
     function closeSubmenu(submenu, arrow) {
       submenu.classList.add('hidden');
       submenu.classList.remove('inline');
       arrow.className = 'submenu-arrow codicon codicon-chevron-right';
     }
 
-    // a parent whose children fly out beside it, or expand inline when there is no room
+    // Build a parent row whose children fly out beside it, or inline when there is no room
     function buildSubmenuItem(entry, node) {
       const parent = document.createElement('div');
       parent.className = 'submenu-parent';
@@ -119,7 +120,7 @@
       return parent;
     }
 
-    // color dots with a leading clear-color swatch
+    // Build the row of color dots, led by a swatch that clears the color
     function buildSwatchRow(target) {
       const row = document.createElement('div');
       row.className = 'swatch-row';
@@ -151,7 +152,7 @@
       return row;
     }
 
-    // place the menu at the click point, clamped inside the window
+    // Rebuild the menu from its entries and open it at the click point
     function show(x, y, items, node) {
       colorTarget = null;
       menuEl.replaceChildren();
@@ -172,12 +173,14 @@
       }
       menuEl.classList.remove('hidden');
 
+      // Keep the menu inside the window
       const maxX = Math.max(0, window.innerWidth - menuEl.offsetWidth - 4);
       const maxY = Math.max(0, window.innerHeight - menuEl.offsetHeight - 4);
       menuEl.style.left = `${Math.min(x, maxX)}px`;
       menuEl.style.top = `${Math.min(y, maxY)}px`;
     }
 
+    // Close the menu on a click outside, Escape, a scroll, or the window losing focus
     document.addEventListener('mousedown', (event) => {
       if (!menuEl.contains(event.target)) hide();
     });

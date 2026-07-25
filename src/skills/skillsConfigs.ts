@@ -1,21 +1,21 @@
-// Keeps one config store per skills root, so each project's colors and layout stay in its own file.
+// Keeps the colors and layout config for each .claude/skills root in its own file
 import * as vscode from 'vscode';
 
 import { VaultConfig } from '../common/vaultConfig';
 import { owningSkillsDir } from './skillScanner';
 
-// one VaultConfig per .claude/skills root, created on demand and kept for the session
+// One VaultConfig per .claude/skills root, created on demand and kept for the session
 export class SkillsConfigs implements vscode.Disposable {
   private readonly changeEmitter = new vscode.EventEmitter<void>();
 
-  // never fires, a skills dir path never moves
+  // Never fires, a skills dir path never moves
   private readonly rootChangeEmitter = new vscode.EventEmitter<void>();
   private readonly configs = new Map<string, VaultConfig>();
   private readonly configSubs: vscode.Disposable[] = [];
 
   readonly onDidChange: vscode.Event<void> = this.changeEmitter.event;
 
-  // the config for the skills root a path sits in, or for that root itself
+  // Get the config for the skills root a path sits in, or for that root itself
   configFor(absPath: string): VaultConfig | undefined {
     const skillsDir = owningSkillsDir(absPath);
     if (!skillsDir) {

@@ -1,3 +1,4 @@
+// Registers the New Note and New Folder commands for the vault
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -11,7 +12,7 @@ import { ensureNoteExt, validateEntryName } from './entryName';
 
 // --- helpers ---
 
-// pick the directory new entries should land in, context node wins over vault root
+// Pick the folder a new entry lands in, the clicked row wins over the vault root
 function resolveParentDir(
   vaultManager: VaultManager,
   contextNode: VaultNode | undefined
@@ -26,7 +27,7 @@ function resolveParentDir(
   return contextNode.kind === 'folder' ? contextNode.absPath : path.dirname(contextNode.absPath);
 }
 
-// surface a warning and bail when no vault is configured
+// Check a vault is configured, warning the user when it is not
 function ensureVault(parentDir: string | undefined): parentDir is string {
   if (parentDir) {
     return true;
@@ -35,7 +36,7 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
   return false;
 }
 
-// create a note or folder, bail on a name conflict
+// Create a note or folder, stopping when the name is already taken
 async function createVaultEntry(
   parentDir: string,
   name: string,
@@ -70,6 +71,7 @@ export function registerCreateNote(
         return;
       }
 
+      // Ask for a filename
       const input = await vscode.window.showInputBox({
         title: 'New note',
         prompt: 'Filename',
@@ -81,12 +83,14 @@ export function registerCreateNote(
         return;
       }
 
+      // Create the file
       const filename = ensureNoteExt(input.trim());
       const created = await createVaultEntry(parentDir, filename, 'note');
       if (!created) {
         return;
       }
 
+      // Place the card where the canvas asked for it, then open the note
       if (position) {
         config.setPosition(created, position);
       }
@@ -107,6 +111,7 @@ export function registerCreateFolder(
         return;
       }
 
+      // Ask for a name
       const input = await vscode.window.showInputBox({
         title: 'New folder',
         prompt: 'Folder name',
@@ -116,12 +121,14 @@ export function registerCreateFolder(
         return;
       }
 
+      // Create the folder
       const folderName = input.trim();
       const created = await createVaultEntry(parentDir, folderName, 'folder');
       if (!created) {
         return;
       }
 
+      // Place the card where the canvas asked for it
       if (position) {
         config.setPosition(created, position);
       }

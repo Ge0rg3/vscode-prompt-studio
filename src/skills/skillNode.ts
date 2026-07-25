@@ -1,11 +1,10 @@
-// The row shapes the skills tree passes between the host and its webview.
+// The rows in the skills tree, a project, a skill, and the files and folders under one
 export interface SkillRef {
   name: string;
   skillFile: string;
   description?: string;
 }
 
-// one row in the skills webview tree
 export type SkillTreeNode =
   | { kind: 'project'; name: string; absPath: string; skillsDir?: string; children: SkillTreeNode[] }
   | { kind: 'skill'; name: string; absPath: string; skill: SkillRef; color?: string; children: SkillTreeNode[] }

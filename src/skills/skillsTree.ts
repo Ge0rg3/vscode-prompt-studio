@@ -1,4 +1,4 @@
-// Builds the rows the skills sidebar renders, sub-projects and the skills under them.
+// Builds the rows the skills sidebar renders, sub-projects and the skills under them
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -10,7 +10,7 @@ import { SkillTreeNode } from './skillNode';
 import { scanSkills, Skill, skillsRoot } from './skillScanner';
 import { SkillsConfigs } from './skillsConfigs';
 
-// a workspace directory that holds a nested skills root, or leads down to one
+// A workspace directory that holds a nested skills root, or leads down to one
 interface ProjectDir {
   name: string;
   absPath: string;
@@ -20,12 +20,12 @@ interface ProjectDir {
 
 // --- helpers ---
 
-// case-insensitive by display name
+// Compare two rows by display name, ignoring case
 function compareByName(first: SkillTreeNode, second: SkillTreeNode): number {
   return compareCaseInsensitive(first.name, second.name);
 }
 
-// a directory's child file and folder nodes
+// Read a directory tree into file and folder rows, folders first
 async function readEntries(dir: string, config: VaultConfig): Promise<SkillTreeNode[]> {
   let entries: [string, vscode.FileType][];
   try {
@@ -59,7 +59,7 @@ async function readEntries(dir: string, config: VaultConfig): Promise<SkillTreeN
   return [...folders, ...files];
 }
 
-// a skill row carrying its folder contents
+// Build a skill row carrying its folder contents
 async function buildSkillNode(skill: Skill, config: VaultConfig): Promise<SkillTreeNode> {
   return {
     kind: 'skill',
@@ -71,7 +71,7 @@ async function buildSkillNode(skill: Skill, config: VaultConfig): Promise<SkillT
   };
 }
 
-// nest each project under its path segments below the workspace root
+// Nest each project under its path segments below the workspace root
 function buildProjectDirTree(
   workspaceRoot: string,
   projects: ProjectSkills[]
@@ -97,7 +97,7 @@ function buildProjectDirTree(
   return rootDirs;
 }
 
-// squash a dir that holds nothing but one child into a single row, the way the explorer does
+// Squash a chain of single-child dirs into one row, the way the explorer does
 function compressDir(dir: ProjectDir): ProjectDir {
   let mergedDir = dir;
   while (!mergedDir.project && mergedDir.children.size === 1) {
@@ -107,7 +107,7 @@ function compressDir(dir: ProjectDir): ProjectDir {
   return mergedDir;
 }
 
-// child dirs sorted by name, then squashed where a dir holds a single child
+// List the child dirs by name, squashed where a dir holds a single child
 function listChildDirs(children: Map<string, ProjectDir>): ProjectDir[] {
   const sortedChildren = [...children.values()];
   sortedChildren.sort((first, second) => compareCaseInsensitive(first.name, second.name));
@@ -119,7 +119,7 @@ function listChildDirs(children: Map<string, ProjectDir>): ProjectDir[] {
   return dirs;
 }
 
-// a project row, nested project dirs first, then the dir's own skills
+// Build a project row, nested project dirs first, then the dir's own skills
 async function buildProjectNode(dir: ProjectDir, configs: SkillsConfigs): Promise<SkillTreeNode> {
   const children: SkillTreeNode[] = [];
   for (const child of listChildDirs(dir.children)) {
@@ -146,21 +146,21 @@ async function buildProjectNode(dir: ProjectDir, configs: SkillsConfigs): Promis
 
 // --- exports ---
 
-// sub-project dirs with their own skills on top, the workspace's own skills below
+// Build the tree with sub-project dirs on top and the workspace's own skills below
 export async function buildSkillsTree(configs: SkillsConfigs): Promise<SkillTreeNode[]> {
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
     return [];
   }
 
-  // Sub-project rows first
+  // Add the sub-project rows first
   const nodes: SkillTreeNode[] = [];
   const projects = await scanProjectSkills(workspace.uri.fsPath);
   for (const dir of listChildDirs(buildProjectDirTree(workspace.uri.fsPath, projects))) {
     nodes.push(await buildProjectNode(dir, configs));
   }
 
-  // Then the workspace's own skills
+  // Then add the workspace's own skills
   const root = skillsRoot();
   const config = root ? configs.configFor(root) : undefined;
   if (root && config) {

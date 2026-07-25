@@ -1,3 +1,4 @@
+// Builds the folder and note rows the vault sidebar renders
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -18,7 +19,7 @@ export interface TreeState {
 
 const NOTE_EXT = '.md';
 
-// read a directory recursively, drop dotfiles and non-markdown, folders first then alpha
+// Read a folder tree into rows, skipping dotfiles and non-markdown files, folders first then by name
 export async function readTree(config: VaultConfig, dir: string): Promise<TreeNode[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(dir));
 

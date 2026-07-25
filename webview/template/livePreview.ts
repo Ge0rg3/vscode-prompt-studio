@@ -1,8 +1,9 @@
+// Styles the markdown in the editor so it reads as rendered text while it is edited
 import { syntaxTree } from '@codemirror/language';
 import { EditorState, Extension, Range } from '@codemirror/state';
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 
-// a mark class for the styled content of each inline node
+// A mark class for the styled content of each inline node
 const CONTENT_CLASS: Record<string, string> = {
   StrongEmphasis: 'cm-strong',
   Emphasis: 'cm-em',
@@ -13,12 +14,12 @@ const CONTENT_CLASS: Record<string, string> = {
   URL: 'cm-link'
 };
 
-// the punctuation tokens dimmed but left visible
+// The punctuation tokens dimmed but left visible
 const SYNTAX_MARK = new Set(['HeaderMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'LinkMark', 'QuoteMark', 'ListMark']);
 
 // --- helpers ---
 
-// tag every line a block node spans, not just the line it starts on
+// Tag every line a block node spans, not just the line it starts on
 function lineClasses(state: EditorState, from: number, to: number, className: string): Range<Decoration>[] {
   const out: Range<Decoration>[] = [];
   const first = state.doc.lineAt(from).number;
@@ -29,7 +30,7 @@ function lineClasses(state: EditorState, from: number, to: number, className: st
   return out;
 }
 
-// style every markdown node the given ranges cover
+// Style every markdown node the given ranges cover
 function computeDecorations(state: EditorState, ranges: readonly { from: number; to: number }[]): DecorationSet {
   const decorations: Range<Decoration>[] = [];
   const tree = syntaxTree(state);
@@ -86,7 +87,7 @@ function computeDecorations(state: EditorState, ranges: readonly { from: number;
 
 // --- exports ---
 
-// style rendered markdown inline while leaving every syntax mark visible
+// Style the markdown inline while leaving every syntax mark visible
 export function livePreview(): Extension {
   return ViewPlugin.fromClass(
     class {

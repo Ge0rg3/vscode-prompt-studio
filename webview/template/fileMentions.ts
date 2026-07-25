@@ -1,3 +1,4 @@
+// Runs the @ mention popup in the template editor and tints the mentions that resolve
 import {
   autocompletion,
   Completion,
@@ -11,13 +12,13 @@ import { EditorState, Extension, Range, StateEffect, StateField } from '@codemir
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { SyntaxNode, Tree } from '@lezer/common';
 
-// a file or folder an @mention can name, relative to the workspace root or absolute
+// A file or folder an @ mention can name, relative to the workspace root or absolute
 export interface MentionEntry {
   path: string;
   isFolder: boolean;
 }
 
-// what the editor asks the extension host for, since only the host can read the disk
+// What the editor asks the extension host for, since only the host can read the disk
 export interface MentionHost {
   listDirectory(dirPath: string): Promise<MentionEntry[]>;
   cachedDirectory(dirPath: string): MentionEntry[] | undefined;
@@ -48,7 +49,7 @@ interface MentionScan {
   unverified: string[];
 }
 
-// the @ token before the cursor and the range its options replace
+// The @ token before the cursor and the range its options replace
 interface MentionToken {
   typed: string;
   query: string;
@@ -56,34 +57,34 @@ interface MentionToken {
   to: number;
 }
 
-// the @ token before the cursor, opened at a line start or after a space, a bracket, or an emphasis mark
+// The @ token before the cursor, opened at a line start or after a space, a bracket, or an emphasis mark
 const MENTION_AT_CURSOR = /(?:^|[\s([{<"'*_~])@([^\s@]*)$/;
 
-// every @ token on a line, same shape
+// Every @ token on a line, same shape
 const MENTION_SCAN = /(?:^|[\s([{<"'*_~])@([^\s@]+)/g;
 
-// the rest of a token sitting after the caret
+// The rest of a token sitting after the caret
 const TOKEN_TAIL = /^[^\s@]*/;
 
-// punctuation and emphasis marks that can trail a mention without belonging to the path
+// Punctuation and emphasis marks that can trail a mention without belonging to the path
 const TRAILING_PUNCTUATION = /[.,;:!?)\]}'"*_~`>]+$/;
 
-// nodes whose text is code, where an @ never names a file
+// Nodes whose text is code, where an @ never names a file
 const CODE_NODES = new Set(['FencedCode', 'CodeBlock', 'CodeText', 'CodeMark', 'CodeInfo', 'InlineCode']);
 
 const MAX_OPTIONS = 50;
 
-// how long the popup highlight rests on a folder before its listing is prefetched
+// How long the popup highlight rests on a folder before its listing is fetched
 const PREFETCH_SETTLE_MS = 150;
 
 const EMPTY_CATALOG: MentionCatalog = { candidates: [], paths: new Set() };
 
 const mentionMark = Decoration.mark({ class: 'cm-mention' });
 
-// the workspace paths the popup offers, pushed in by the extension host
+// The workspace paths the popup offers, pushed in by the extension host
 export const setMentionEntries = StateEffect.define<readonly MentionEntry[]>();
 
-// absolute paths the host has confirmed exist
+// Absolute paths the host has confirmed exist
 export const addVerifiedPaths = StateEffect.define<readonly MentionEntry[]>();
 
 const mentionCatalog = StateField.define<MentionCatalog>({
@@ -116,7 +117,7 @@ const verifiedPaths = StateField.define<ReadonlySet<string>>({
 
 // --- helpers ---
 
-// a folder answers to its bare path and to the same path with a trailing slash
+// Record every path, plus the trailing-slash form so a folder answers to both
 function addLookupForms(paths: Set<string>, entry: MentionEntry): void {
   paths.add(entry.path);
   if (entry.isFolder) {
@@ -124,7 +125,7 @@ function addLookupForms(paths: Set<string>, entry: MentionEntry): void {
   }
 }
 
-// precompute the lowercase forms the ranking compares against
+// Work out the lowercase forms the ranking compares against
 function toCandidate(entry: MentionEntry): MentionCandidate {
   const lowerPath = entry.path.toLowerCase();
   return {
@@ -136,7 +137,7 @@ function toCandidate(entry: MentionEntry): MentionCandidate {
   };
 }
 
-// the list the popup ranks and the set the tint checks against
+// Build the list the popup ranks and the set the tinting checks against
 function buildCatalog(entries: readonly MentionEntry[]): MentionCatalog {
   const candidates: MentionCandidate[] = [];
   const paths = new Set<string>();
@@ -149,7 +150,7 @@ function buildCatalog(entries: readonly MentionEntry[]): MentionCatalog {
   return { candidates, paths };
 }
 
-// true when the position sits inside a fenced block or a backtick span
+// Check whether the position sits inside a fenced block or a backtick span
 function insideCode(tree: Tree, pos: number): boolean {
   for (let node: SyntaxNode | null = tree.resolveInner(pos, 1); node; node = node.parent) {
     if (CODE_NODES.has(node.name)) {
@@ -159,7 +160,7 @@ function insideCode(tree: Tree, pos: number): boolean {
   return false;
 }
 
-// the query characters in order, anywhere in the path
+// Match the query's characters in order, anywhere in the path
 function isSubsequence(query: string, path: string): boolean {
   let at = 0;
   for (const char of path) {
@@ -170,13 +171,13 @@ function isSubsequence(query: string, path: string): boolean {
   return false;
 }
 
-// how well a workspace path answers the query, lower is better, -1 rejects it
+// Score a workspace path against the query, lower is better and -1 rejects it
 function scoreCandidate(candidate: MentionCandidate, query: string): number {
   if (query.length === 0) {
     return candidate.depth === 0 ? 0 : -1;
   }
 
-  // a trailing slash browses that folder, so only its direct children qualify
+  // Keep only the direct children of the folder a trailing slash browses
   if (query.endsWith('/')) {
     const childDepth = query.split('/').length - 1;
     return candidate.lowerPath.startsWith(query) && candidate.depth === childDepth ? 0 : -1;
@@ -197,7 +198,7 @@ function scoreCandidate(candidate: MentionCandidate, query: string): number {
   return isSubsequence(query, candidate.lowerPath) ? 4 : -1;
 }
 
-// how well a listed child answers what is typed after the last slash
+// Score a listed child against what is typed after the last slash
 function scoreChild(candidate: MentionCandidate, prefix: string): number {
   if (prefix.length === 0 || candidate.lowerBase.startsWith(prefix)) {
     return 0;
@@ -208,7 +209,7 @@ function scoreChild(candidate: MentionCandidate, prefix: string): number {
   return isSubsequence(prefix, candidate.lowerBase) ? 2 : -1;
 }
 
-// score first, then shallow paths, then folders, then alphabetical
+// Order by score, then by shallow paths, then folders, then alphabetically
 function compareScored(first: ScoredCandidate, second: ScoredCandidate): number {
   return (
     first.score - second.score ||
@@ -218,7 +219,7 @@ function compareScored(first: ScoredCandidate, second: ScoredCandidate): number 
   );
 }
 
-// the best candidates for a query, capped at what the popup shows
+// Pick the best candidates for a query, capped at what the popup shows
 function bestMatches(candidates: readonly MentionCandidate[], score: (candidate: MentionCandidate) => number): MentionCandidate[] {
   const scored: ScoredCandidate[] = [];
   for (const candidate of candidates) {
@@ -237,7 +238,7 @@ function bestMatches(candidates: readonly MentionCandidate[], score: (candidate:
   return matches;
 }
 
-// insert the path and leave the caret one space past it
+// Insert the path and leave the caret one space past it
 function applyFilePath(view: EditorView, completion: Completion, from: number, to: number): void {
   const nextChar = view.state.sliceDoc(to, to + 1);
   const spacer = nextChar === ' ' || nextChar === '\t' ? '' : ' ';
@@ -250,7 +251,7 @@ function applyFilePath(view: EditorView, completion: Completion, from: number, t
   });
 }
 
-// one popup row, the name up front and the folder it sits in dimmed beside it
+// Build one popup row, the name up front and the folder it sits in dimmed beside it
 function toCompletion(candidate: MentionCandidate): Completion {
   const slash = candidate.path.lastIndexOf('/');
   const name = candidate.path.slice(slash + 1);
@@ -264,7 +265,7 @@ function toCompletion(candidate: MentionCandidate): Completion {
   };
 }
 
-// the part of the row name the last query segment matched
+// Find the part of the row name the last query segment matched
 function matchRange(name: string, query: string): readonly number[] {
   const segment = query.slice(query.lastIndexOf('/') + 1);
   if (segment.length === 0) {
@@ -275,7 +276,7 @@ function matchRange(name: string, query: string): readonly number[] {
   return at < 0 ? [] : [at, at + segment.length];
 }
 
-// turn the ranked candidates into a popup result over the token
+// Turn the ranked candidates into a popup result over the token
 function toResult(matches: readonly MentionCandidate[], token: MentionToken, host: MentionHost): CompletionResult | null {
   if (matches.length === 0) {
     return null;
@@ -292,7 +293,8 @@ function toResult(matches: readonly MentionCandidate[], token: MentionToken, hos
     options,
     filter: false,
     getMatch: (completion) => matchRange(completion.displayLabel ?? completion.label, token.query),
-    // keystrokes re-rank in place, a null falls back to a fresh source query
+
+    // Re-rank in place as keys arrive, returning null asks the source for fresh options
     update: (_current, _from, _to, context) => {
       const next = mentionToken(context);
       return next ? syncOptions(context, next, host) : null;
@@ -300,7 +302,7 @@ function toResult(matches: readonly MentionCandidate[], token: MentionToken, hos
   };
 }
 
-// the @ token before the cursor, or null when there is none or it sits in code
+// Find the @ token before the cursor, null when there is none or it sits in code
 function mentionToken(context: CompletionContext): MentionToken | null {
   const line = context.state.doc.lineAt(context.pos);
   const caret = context.pos - line.from;
@@ -314,17 +316,17 @@ function mentionToken(context: CompletionContext): MentionToken | null {
     return null;
   }
 
-  // the options replace the whole token, not just the part before the caret
+  // Reach past the caret so the options replace the whole token
   const tail = TOKEN_TAIL.exec(line.text.slice(caret))?.[0].length ?? 0;
   return { typed: token[1], query: token[1].toLowerCase(), from, to: context.pos + tail };
 }
 
-// the directory named by everything up to the token's last slash
+// Take the directory the token names, everything up to its last slash
 function directoryOf(typed: string): string {
   return typed.slice(0, typed.lastIndexOf('/') + 1);
 }
 
-// rank a directory listing against what is typed after the last slash
+// Rank a directory listing against what is typed after the last slash
 function childResult(children: readonly MentionEntry[], token: MentionToken, host: MentionHost): CompletionResult | null {
   const prefix = token.query.slice(token.query.lastIndexOf('/') + 1);
   const candidates: MentionCandidate[] = [];
@@ -335,7 +337,7 @@ function childResult(children: readonly MentionEntry[], token: MentionToken, hos
   return toResult(bestMatches(candidates, (candidate) => scoreChild(candidate, prefix)), token, host);
 }
 
-// the options answerable without the host, the workspace catalog or a cached directory
+// Build the options answerable without the host, from the workspace list or a cached directory
 function syncOptions(context: CompletionContext, token: MentionToken, host: MentionHost): CompletionResult | null {
   if (token.typed.startsWith('/')) {
     const cached = host.cachedDirectory(directoryOf(token.typed));
@@ -346,7 +348,7 @@ function syncOptions(context: CompletionContext, token: MentionToken, host: Ment
   return toResult(bestMatches(catalog.candidates, (candidate) => scoreCandidate(candidate, token.query)), token, host);
 }
 
-// the file and folder options for the @ token before the cursor
+// Offer the file and folder options for the @ token before the cursor
 function mentionSource(context: CompletionContext, host: MentionHost): CompletionResult | Promise<CompletionResult | null> | null {
   const token = mentionToken(context);
   if (!token) {
@@ -361,7 +363,7 @@ function mentionSource(context: CompletionContext, host: MentionHost): Completio
   return host.listDirectory(directoryOf(token.typed)).then((children) => childResult(children, token, host));
 }
 
-// once the highlight rests on a disk folder, warm its listing so stepping in is instant
+// Fetch a disk folder's listing once the highlight rests on it, so stepping in is instant
 function prefetchHighlighted(host: MentionHost): Extension {
   let settleTimer: number | undefined;
   return EditorView.updateListener.of((update) => {
@@ -377,7 +379,7 @@ function prefetchHighlighted(host: MentionHost): Extension {
   });
 }
 
-// the path an @ token names, trailing punctuation trimmed off
+// Resolve the path an @ token names, trailing punctuation trimmed off
 function resolveMention(token: string, catalog: MentionCatalog, verified: ReadonlySet<string>): string | undefined {
   if (catalog.paths.has(token) || verified.has(token)) {
     return token;
@@ -387,7 +389,7 @@ function resolveMention(token: string, catalog: MentionCatalog, verified: Readon
   return catalog.paths.has(trimmed) || verified.has(trimmed) ? trimmed : undefined;
 }
 
-// the absolute path an @ token points at, for the host to confirm
+// Take the absolute path an @ token points at, undefined when the token names none
 function absoluteTarget(token: string): string | undefined {
   if (!token.startsWith('/')) {
     return undefined;
@@ -397,7 +399,7 @@ function absoluteTarget(token: string): string | undefined {
   return trimmed.length > 1 ? trimmed : undefined;
 }
 
-// mark every @ mention in the visible lines that names a real file or folder
+// Mark every @ mention in the visible lines that names a real file or folder
 function scanMentions(state: EditorState, ranges: readonly { from: number; to: number }[]): MentionScan {
   const catalog = state.field(mentionCatalog);
   const verified = state.field(verifiedPaths);
@@ -440,7 +442,7 @@ function scanMentions(state: EditorState, ranges: readonly { from: number; to: n
 
 // --- exports ---
 
-// complete @ against the workspace or, from a leading slash, the disk, and tint what resolves
+// Complete @ mentions from the workspace, or from disk past a leading slash, and tint what resolves
 export function fileMentions(host: MentionHost): Extension {
   return [
     mentionCatalog,
@@ -448,7 +450,8 @@ export function fileMentions(host: MentionHost): Extension {
     autocompletion({
       override: [(context) => mentionSource(context, host)],
       activateOnCompletion: (completion) => completion.type === 'folder',
-      // keystrokes are answered locally, so skip the type-ahead debounce
+
+      // Skip the type-ahead delay, every keystroke is answered locally
       activateOnTypingDelay: 0
     }),
     prefetchHighlighted(host),
@@ -464,7 +467,8 @@ export function fileMentions(host: MentionHost): Extension {
           const pathsChanged =
             update.startState.field(mentionCatalog) !== update.state.field(mentionCatalog) ||
             update.startState.field(verifiedPaths) !== update.state.field(verifiedPaths);
-          // markdown parses in the background, and skipping code blocks depends on it
+
+          // Rescan when the background markdown parse lands, since skipping code blocks needs its tree
           const treeChanged = syntaxTree(update.startState) !== syntaxTree(update.state);
 
           if (update.docChanged || update.viewportChanged || pathsChanged || treeChanged) {

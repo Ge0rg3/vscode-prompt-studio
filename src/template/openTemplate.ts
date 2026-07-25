@@ -1,3 +1,4 @@
+// Registers the command that opens a note as a template and reattaches panels after a reload
 import * as vscode from 'vscode';
 
 import { pathExists } from '../common/utils/fs';
@@ -6,6 +7,7 @@ import { VaultNode } from '../common/vaultNode';
 import { MentionIndex } from './mentionIndex';
 import { TemplatePanel } from './templatePanel';
 
+// Open a note as a template, ignoring folder rows
 export function registerOpenTemplate(extensionUri: vscode.Uri, mentionIndex: MentionIndex): vscode.Disposable {
   return vscode.commands.registerCommand(
     'promptStudio.openTemplate',
@@ -19,6 +21,7 @@ export function registerOpenTemplate(extensionUri: vscode.Uri, mentionIndex: Men
   );
 }
 
+// Reattach template panels VSCode restored after a window reload
 export function registerTemplateSerializer(extensionUri: vscode.Uri, mentionIndex: MentionIndex): vscode.Disposable {
   return vscode.window.registerWebviewPanelSerializer(TemplatePanel.viewType, {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel, state: unknown): Promise<void> {

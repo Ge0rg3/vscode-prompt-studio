@@ -1,3 +1,4 @@
+// Colors the code inside fenced blocks and names the languages the editor parses
 import { css } from '@codemirror/lang-css';
 import { html } from '@codemirror/lang-html';
 import { javascript } from '@codemirror/lang-javascript';
@@ -9,7 +10,7 @@ import { shell } from '@codemirror/legacy-modes/mode/shell';
 import { Extension } from '@codemirror/state';
 import { tags } from '@lezer/highlight';
 
-// token classes, colored in template.css so light and dark themes adapt
+// Token classes, colored in template.css so light and dark themes adapt
 const codeStyle = HighlightStyle.define([
   { tag: [tags.keyword, tags.moduleKeyword, tags.controlKeyword, tags.operatorKeyword], class: 'cmt-keyword' },
   { tag: [tags.string, tags.special(tags.string), tags.regexp], class: 'cmt-string' },
@@ -22,7 +23,7 @@ const codeStyle = HighlightStyle.define([
 
 // --- exports ---
 
-// languages parsed inside fenced code blocks, matched by the info string
+// Languages parsed inside fenced code blocks, matched on the word after the opening backticks
 export const codeLanguages: LanguageDescription[] = [
   LanguageDescription.of({ name: 'javascript', alias: ['js', 'jsx', 'ts', 'tsx', 'typescript'], support: javascript({ jsx: true, typescript: true }) }),
   LanguageDescription.of({ name: 'python', alias: ['py'], support: python() }),
@@ -37,5 +38,5 @@ export const codeLanguages: LanguageDescription[] = [
   })
 ];
 
-// color the code inside fenced blocks, the markdown around it keeps its own styling
+// Color the code inside fenced blocks, the markdown around it keeps its own styling
 export const codeHighlighting: Extension = syntaxHighlighting(codeStyle);

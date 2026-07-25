@@ -1,3 +1,4 @@
+// Moves a dragged note or folder to another spot in the vault
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -5,7 +6,7 @@ import * as vscode from 'vscode';
 import { pathExists } from '../common/utils/fs';
 import { isWithin } from '../common/utils/paths';
 
-// move sourcePath into targetDir, or bail on a no-op or a name conflict
+// Move an entry into another folder, undefined when the move is refused
 export async function moveVaultEntry(
   vaultRoot: string,
   sourcePath: string,
@@ -15,6 +16,7 @@ export async function moveVaultEntry(
   const resolvedSource = path.resolve(sourcePath);
   const resolvedTarget = path.resolve(targetDir);
 
+  // Move only inside the vault, never the root and never a folder into itself
   if (!isWithin(resolvedSource, resolvedRoot) || resolvedSource === resolvedRoot) {
     return undefined;
   }
@@ -29,6 +31,7 @@ export async function moveVaultEntry(
     return undefined;
   }
 
+  // Stop when the name is already taken in the destination folder
   const destination = path.join(resolvedTarget, path.basename(resolvedSource));
   if (await pathExists(vscode.Uri.file(destination))) {
     void vscode.window.showErrorMessage(

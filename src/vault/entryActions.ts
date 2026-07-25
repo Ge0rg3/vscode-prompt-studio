@@ -1,3 +1,4 @@
+// Registers the row commands for revealing, copying, renaming, and deleting an entry
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -12,18 +13,18 @@ import { ensureNoteExt, validateEntryName } from './entryName';
 
 // --- helpers ---
 
-// the name shown in the tree, notes drop the .md extension
+// Build the name the tree shows, notes drop the .md
 function displayName(node: VaultNode): string {
   return node.kind === 'folder' ? node.name : node.name.replace(/\.md$/i, '');
 }
 
-// pre-fill the rename box with the tree name, selecting all of it
+// Pre-fill the rename box with the name the tree shows and select all of it
 function renamePrefill(node: VaultNode): { value: string; selectionEnd: number } {
   const value = displayName(node);
   return { value, selectionEnd: value.length };
 }
 
-// rename an entry in place, or bail on a no-op or a name conflict
+// Rename an entry in place, stopping on an unchanged name or one already taken
 async function renameVaultEntry(node: VaultNode, newName: string): Promise<string | undefined> {
   const nextName = node.kind === 'note' ? ensureNoteExt(newName) : newName;
   if (nextName === node.name) {
@@ -99,7 +100,7 @@ export function registerCopyPathRelative(vaultManager: VaultManager): vscode.Dis
   );
 }
 
-// rename an entry and follow its metadata, returns false on a no-op or conflict
+// Rename an entry and carry its saved color and layout across, false on an unchanged or taken name
 export async function renameEntry(
   config: VaultConfig,
   node: VaultNode,
@@ -120,6 +121,7 @@ export function registerRenameEntry(config: VaultConfig): vscode.Disposable {
       return;
     }
 
+    // Ask for the new name
     const { value, selectionEnd } = renamePrefill(target);
     const input = await vscode.window.showInputBox({
       title: target.kind === 'folder' ? 'Rename folder' : 'Rename note',
@@ -141,6 +143,7 @@ export function registerDeleteEntry(config: VaultConfig): vscode.Disposable {
       return;
     }
 
+    // Confirm first, deleting a folder takes everything inside it
     const label = target.kind === 'folder' ? 'folder' : 'note';
     const detail =
       target.kind === 'folder' ? 'The folder and everything inside it will be deleted.' : undefined;
@@ -153,6 +156,7 @@ export function registerDeleteEntry(config: VaultConfig): vscode.Disposable {
       return;
     }
 
+    // Delete it and drop its saved color and layout
     await vscode.workspace.fs.delete(vscode.Uri.file(target.absPath), { recursive: true });
     config.remove(target.absPath);
   });

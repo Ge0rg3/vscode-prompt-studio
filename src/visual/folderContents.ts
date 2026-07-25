@@ -1,3 +1,4 @@
+// Turns a folder on disk into positioned cards and a breadcrumb trail
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -37,10 +38,10 @@ export interface VisualState {
 const NOTE_EXT = '.md';
 const HEADING = /^\s*#{1,6}\s+(.+?)\s*$/;
 
-// how many nested folder layers a folder card previews before falling back to a plain icon
+// Nest folder card previews this many layers deep
 const PREVIEW_DEPTH = 3;
 
-// default card size, also the auto-placement grid step
+// Fall back to this card size and step the auto-placement grid by it
 const CARD_W = 240;
 const CARD_H = 170;
 const GRID_MARGIN = 24;
@@ -56,7 +57,7 @@ interface CardRect {
 
 // --- helpers ---
 
-// first markdown heading in the body, else the filename stem
+// Take the title from the first markdown heading, else the filename stem
 function deriveTitle(raw: string, fallback: string): string {
   for (const line of raw.split('\n')) {
     const match = HEADING.exec(line);
@@ -67,17 +68,17 @@ function deriveTitle(raw: string, fallback: string): string {
   return fallback;
 }
 
-// the note body with the leading heading dropped
+// Drop the leading heading from the note body
 function previewOf(raw: string): string {
   return raw.replace(/^\s*#{1,6}\s+[^\n]*\n?/, '').trim();
 }
 
-// alphabetical by title, case-insensitive
+// Compare two cards by title, ignoring case
 function byTitle(first: VisualCard, second: VisualCard): number {
   return compareCaseInsensitive(first.title, second.title);
 }
 
-// a trail from the canvas root down to the folder
+// Build a trail from the canvas root down to the folder
 function buildBreadcrumbs(root: string, folder: string): Breadcrumb[] {
   const crumbs: Breadcrumb[] = [
     { path: root, name: path.basename(root) || root }
@@ -96,7 +97,7 @@ function buildBreadcrumbs(root: string, folder: string): Breadcrumb[] {
   return crumbs;
 }
 
-// two card rectangles overlap on both axes
+// Test whether two card rectangles overlap on both axes
 function overlaps(first: CardRect, second: CardRect): boolean {
   return (
     first.x < second.x + second.width &&
@@ -106,7 +107,7 @@ function overlaps(first: CardRect, second: CardRect): boolean {
   );
 }
 
-// the nth grid slot, filling left to right then top to bottom
+// Find the nth grid slot, filling left to right then top to bottom
 function gridSlot(index: number): NotePosition {
   const column = index % GRID_COLUMNS;
   const row = Math.floor(index / GRID_COLUMNS);
@@ -116,7 +117,7 @@ function gridSlot(index: number): NotePosition {
   };
 }
 
-// the first grid slot whose card rectangle clears every occupied rectangle
+// Find the first grid slot that clears every occupied rectangle
 function firstFreeSlot(occupied: CardRect[], width: number, height: number): NotePosition {
   for (let index = 0; ; index++) {
     const slot = gridSlot(index);
@@ -127,12 +128,12 @@ function firstFreeSlot(occupied: CardRect[], width: number, height: number): Not
   }
 }
 
-// a card's current rectangle
+// Take a card's current rectangle
 function rectOf(card: VisualCard): CardRect {
   return { x: card.x, y: card.y, width: card.width, height: card.height };
 }
 
-// size and stack every card, keep saved positions, flow the rest into free slots
+// Size and stack every card, then flow the ones with no saved position into free slots
 function placeCards(store: CardLayoutStore, cards: VisualCard[]): void {
   const occupied: CardRect[] = [];
   const unplaced: VisualCard[] = [];
@@ -160,10 +161,11 @@ function placeCards(store: CardLayoutStore, cards: VisualCard[]): void {
   }
 }
 
-// a folder's direct children as placed cards, folders first then notes
+// Read a folder's direct children as placed cards, folders first then notes
 async function readEntries(store: CardLayoutStore, folder: string): Promise<VisualCard[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(folder));
 
+  // Turn each folder and markdown file into a card, skipping hidden ones
   const folders: VisualCard[] = [];
   const notes: VisualCard[] = [];
   for (const [name, type] of entries) {
@@ -201,6 +203,7 @@ async function readEntries(store: CardLayoutStore, folder: string): Promise<Visu
     }
   }
 
+  // Sort each group by title and lay the cards out
   folders.sort(byTitle);
   notes.sort(byTitle);
   const cards = [...folders, ...notes];
@@ -208,7 +211,7 @@ async function readEntries(store: CardLayoutStore, folder: string): Promise<Visu
   return cards;
 }
 
-// fill each folder card's children for the mini preview, recursing `layers` folders deep
+// Fill each folder card's children for its mini preview, recursing `layers` folders deep
 async function attachPreviews(
   store: CardLayoutStore,
   cards: VisualCard[],
@@ -228,7 +231,7 @@ async function attachPreviews(
 
 // --- exports ---
 
-// a folder's cards plus a breadcrumb trail, each folder card carrying a nested mini preview of its contents
+// Read one folder's cards and breadcrumb trail, each folder card carrying a nested preview
 export async function readFolder(
   store: CardLayoutStore,
   root: string,

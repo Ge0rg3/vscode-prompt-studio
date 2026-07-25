@@ -1,3 +1,4 @@
+// Registers the Configure Vault command and the folder choices it offers
 import * as vscode from 'vscode';
 
 import { projectStorageDir } from '../common/utils/paths';
@@ -11,7 +12,7 @@ interface ModePick extends vscode.QuickPickItem {
 
 // --- helpers ---
 
-// build the three option rows, hiding "inside workspace" when no workspace is open
+// Build the option rows, dropping the in-workspace choice when no workspace is open
 function buildPicks(workspace: vscode.WorkspaceFolder | undefined, defaultRoot: string): ModePick[] {
   const picks: ModePick[] = [
     {
@@ -40,7 +41,7 @@ function buildPicks(workspace: vscode.WorkspaceFolder | undefined, defaultRoot: 
   return picks;
 }
 
-// show the folder picker, unwrap the chosen absolute path
+// Show the folder picker and return the path the user chose
 async function pickFolder(defaultUri?: vscode.Uri): Promise<string | undefined> {
   const picked = await vscode.window.showOpenDialog({
     canSelectFiles: false,
@@ -65,6 +66,7 @@ export function registerConfigureVault(
       : '';
     const current = vaultManager.getVaultRoot();
 
+    // Ask where the vault should live
     const choice = await vscode.window.showQuickPick(buildPicks(workspace, defaultRoot), {
       title: 'Configure Vault',
       placeHolder: current ? `Current: ${current}` : 'No vault configured',
@@ -74,6 +76,7 @@ export function registerConfigureVault(
       return;
     }
 
+    // Take the per-workspace default, stored as an empty path
     if (choice.id === 'default') {
       if (!workspace) {
         void vscode.window.showWarningMessage(
@@ -86,6 +89,7 @@ export function registerConfigureVault(
       return;
     }
 
+    // Pick a folder off disk, starting inside the workspace when that was the choice
     const startAt = choice.id === 'in-workspace' ? workspace?.uri : undefined;
     const picked = await pickFolder(startAt);
     if (!picked) {

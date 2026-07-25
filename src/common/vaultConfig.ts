@@ -1,3 +1,4 @@
+// Reads and writes a root's config.yml, where each entry's card layout and color are saved
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -11,11 +12,11 @@ type NoteMetadata = Record<string, unknown>;
 
 export const CONFIG_FILENAME = 'config.yml';
 const WRITE_DEBOUNCE_MS = 200;
-// grace window after a self-write to skip the watcher event it triggers
+// Ignore the file change this write just caused for this long
 const SELF_WRITE_GRACE_MS = 1000;
 const BANNER = '# Prompt Studio per-entry metadata. Safe to edit and commit.\n';
 
-// per-entry metadata stored in <root>/config.yml, keeps any keys it does not use when rewriting
+// Per-entry metadata from <root>/config.yml, an entry's unknown keys survive a rewrite
 export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly watcherSubs: vscode.Disposable[] = [];
@@ -24,7 +25,6 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   private entries = new Map<string, NoteMetadata>();
   private vaultRoot: string | undefined;
   private writeTimer: ReturnType<typeof setTimeout> | undefined;
-  // time of the last self-write, checked against SELF_WRITE_GRACE_MS
   private lastSelfWrite = 0;
 
   readonly onDidChange: vscode.Event<void> = this.emitter.event;
@@ -66,7 +66,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return key === undefined ? undefined : this.zOf(this.entries.get(key));
   }
 
-  // raise a card's stacking order so it sits in front of overlapping cards
+  // Save a card's stacking order, a higher number sits in front
   setZ(absPath: string, z: number): void {
     this.mutateVisual(absPath, (visual) => {
       visual.z = Math.round(z);
@@ -78,7 +78,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return key === undefined ? undefined : this.colorOf(this.entries.get(key));
   }
 
-  // set a palette color, or pass undefined to clear it back to the theme default
+  // Set a palette color, undefined clears it back to the theme default
   setColor(absPath: string, color: string | undefined): void {
     const applied = this.mutateVisual(absPath, (visual) => {
       if (color === undefined) {
@@ -93,7 +93,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // follow a renamed or moved entry, remapping its own key and any descendants
+  // Follow a renamed or moved entry, remapping its own key and any below it
   relocate(oldAbsPath: string, newAbsPath: string): void {
     const oldKey = this.configKeyOf(oldAbsPath);
     const newKey = this.configKeyOf(newAbsPath);
@@ -123,7 +123,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // copy an entry's metadata, and any descendants', onto a duplicated path
+  // Copy an entry's metadata, and anything below it, onto a duplicated path
   duplicate(sourceAbsPath: string, copyAbsPath: string): void {
     const sourceKey = this.configKeyOf(sourceAbsPath);
     const copyKey = this.configKeyOf(copyAbsPath);
@@ -151,7 +151,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // drop a deleted entry and any descendants from the metadata
+  // Drop a deleted entry, and anything below it, from the metadata
   remove(absPath: string): void {
     const key = this.configKeyOf(absPath);
     if (key === undefined) {
@@ -181,14 +181,14 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     this.emitter.dispose();
   }
 
-  // vault-relative config.yml key for an absolute path
+  // Turn an absolute path into its vault-relative config.yml key
   private configKeyOf(absPath: string): string | undefined {
     return this.vaultRoot === undefined
       ? undefined
       : this.toConfigKey(path.relative(this.vaultRoot, absPath));
   }
 
-  // re-point at the current root, reloading config.yml and rearming its watcher
+  // Switch to the current vault root, reading its config.yml and watching it again
   private reload(): void {
     this.teardownWatcher();
     this.entries = new Map();
@@ -198,6 +198,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
       return;
     }
 
+    // Watch config.yml so an outside edit is picked up
     const pattern = new vscode.RelativePattern(this.vaultRoot, CONFIG_FILENAME);
     this.watcher = vscode.workspace.createFileSystemWatcher(pattern);
     this.watcherSubs.push(
@@ -209,7 +210,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     void this.loadFromDisk(this.vaultRoot).then(() => this.emitter.fire());
   }
 
-  // dispose the config.yml watcher and its subscriptions
+  // Dispose the config.yml watcher and its subscriptions
   private teardownWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -219,7 +220,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     this.watcher = undefined;
   }
 
-  // read and parse config.yml into entries, skip silently when the file is absent
+  // Read config.yml into the entries map, doing nothing when there is no file
   private async loadFromDisk(root: string): Promise<void> {
     const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
     let raw: string;
@@ -238,7 +239,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // an external edit landed, drop the in-memory copy and re-read
+  // Read config.yml again when someone else edits it
   private handleExternalChange(): void {
     if (Date.now() - this.lastSelfWrite < SELF_WRITE_GRACE_MS) {
       return;
@@ -254,7 +255,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     })();
   }
 
-  // debounce a flush so a burst of edits collapses into one write
+  // Wait for a burst of edits to settle, then write once
   private scheduleWrite(): void {
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
@@ -265,14 +266,14 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }, WRITE_DEBOUNCE_MS);
   }
 
-  // write the entries map back to config.yml
+  // Write the entries map back to config.yml
   private async flush(): Promise<void> {
     const root = this.vaultRoot;
     if (!root) {
       return;
     }
 
-    // collect entries in stable order, dropping any that have no metadata left
+    // Collect the entries in a stable order, dropping any with no metadata left
     const notes: Record<string, NoteMetadata> = {};
     const keys = [...this.entries.keys()].sort(compareCaseInsensitive);
     for (const key of keys) {
@@ -282,12 +283,13 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
       }
     }
 
-    // a fresh vault with nothing to store gets no config.yml
+    // Don't create a config.yml for a vault with nothing to store
     const configUri = vscode.Uri.file(path.join(root, CONFIG_FILENAME));
     if (Object.keys(notes).length === 0 && !(await pathExists(configUri))) {
       return;
     }
 
+    // Write the file, noting the time so the watcher skips the change it fires
     const body = BANNER + stringify({ notes });
     try {
       this.lastSelfWrite = Date.now();
@@ -299,12 +301,12 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // config.yml keys are vault-relative with forward slashes on every platform
+  // Swap in forward slashes so a key reads the same on every platform
   private toConfigKey(relPath: string): string {
     return relPath.split(path.sep).join('/');
   }
 
-  // apply a change to a card's visual block and persist, false when no vault is set
+  // Change a card's visual block and save it, false when no vault is set
   private mutateVisual(absPath: string, mutate: (visual: Record<string, unknown>) => void): boolean {
     const key = this.configKeyOf(absPath);
     if (key === undefined) {
@@ -321,7 +323,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return true;
   }
 
-  // the visual block within an entry's metadata, or undefined if absent or malformed
+  // Read the visual block out of an entry's metadata, undefined when it is missing or broken
   private visualOf(meta: NoteMetadata | undefined): Record<string, unknown> | undefined {
     const visual = meta?.visual;
     if (!visual || typeof visual !== 'object' || Array.isArray(visual)) {
@@ -330,13 +332,13 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return visual as Record<string, unknown>;
   }
 
-  // a mutable copy of the visual block
+  // Copy an entry's visual block, empty when it has none
   private cloneVisual(meta: NoteMetadata): Record<string, unknown> {
     const visual = this.visualOf(meta);
     return visual ? { ...visual } : {};
   }
 
-  // the x/y position saved in an entry's metadata
+  // Read the x/y position saved in an entry's metadata
   private positionOf(meta: NoteMetadata | undefined): NotePosition | undefined {
     const visual = this.visualOf(meta);
     if (!visual) {
@@ -349,7 +351,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return undefined;
   }
 
-  // the width/height saved in an entry's metadata
+  // Read the width/height saved in an entry's metadata
   private sizeOf(meta: NoteMetadata | undefined): CardSize | undefined {
     const visual = this.visualOf(meta);
     if (!visual) {
@@ -367,19 +369,19 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     return undefined;
   }
 
-  // the palette color saved in an entry's metadata
+  // Read the palette color saved in an entry's metadata
   private colorOf(meta: NoteMetadata | undefined): string | undefined {
     const color = this.visualOf(meta)?.color;
     return typeof color === 'string' ? color : undefined;
   }
 
-  // the stacking order saved in an entry's metadata
+  // Read the stacking order saved in an entry's metadata
   private zOf(meta: NoteMetadata | undefined): number | undefined {
     const z = this.visualOf(meta)?.z;
     return typeof z === 'number' && Number.isFinite(z) ? z : undefined;
   }
 
-  // read the `notes` map out of parsed config.yml, skipping malformed entries
+  // Read the notes map out of a parsed config.yml, skipping any broken entry
   private notesFrom(parsed: unknown): Map<string, NoteMetadata> {
     const out = new Map<string, NoteMetadata>();
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {

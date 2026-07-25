@@ -1,3 +1,4 @@
+// Handles tab at the start of a list bullet, nesting it or lifting it back out
 import { syntaxTree } from '@codemirror/language';
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { Command, KeyBinding } from '@codemirror/view';
@@ -11,7 +12,7 @@ interface ListItemStart {
 
 // --- helpers ---
 
-// the list item the cursor sits at the start of, measured for indenting
+// Measure the bullet the cursor sits at the start of, null anywhere else
 function listItemStart(state: EditorState): ListItemStart | null {
   const range = state.selection.main;
   if (!range.empty) {
@@ -31,7 +32,7 @@ function listItemStart(state: EditorState): ListItemStart | null {
     return null;
   }
 
-  // the content column, past the marker and the space after it
+  // Step past the marker and the spaces after it to the content column
   let contentStart = mark.to;
   while (contentStart < line.to && line.text[contentStart - line.from] === ' ') {
     contentStart++;
@@ -43,7 +44,7 @@ function listItemStart(state: EditorState): ListItemStart | null {
   return { lineFrom: line.from, indentWidth: contentStart - mark.from, leadingSpaces };
 }
 
-// indent by the marker width, the column a nested bullet has to reach to count as nested
+// Indent by the marker and the spaces after it, the width a nested bullet has to reach
 const indentListItem: Command = (view) => {
   const item = listItemStart(view.state);
   if (!item) {
@@ -60,7 +61,7 @@ const indentListItem: Command = (view) => {
   return true;
 };
 
-// lift the bullet back out one level
+// Lift the bullet back out one level
 const outdentListItem: Command = (view) => {
   const item = listItemStart(view.state);
   if (!item || item.leadingSpaces === 0) {
@@ -80,7 +81,6 @@ const outdentListItem: Command = (view) => {
 
 // --- exports ---
 
-// at the start of a bullet, tab nests it and shift-tab lifts it back out
 export const listIndentKeymap: readonly KeyBinding[] = [
   { key: 'Tab', run: indentListItem, shift: outdentListItem }
 ];

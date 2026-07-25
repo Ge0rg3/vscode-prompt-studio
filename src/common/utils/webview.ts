@@ -1,10 +1,11 @@
+// Renders webview HTML from the bundled templates and reads restored panel state
 import * as fs from 'node:fs';
 
 import * as vscode from 'vscode';
 
 // --- helpers ---
 
-// substitute {{key}} tokens with their values
+// Substitute {{key}} tokens with their values
 function fillTemplate(template: string, values: Record<string, string>): string {
   let out = template;
   for (const [key, value] of Object.entries(values)) {
@@ -13,7 +14,7 @@ function fillTemplate(template: string, values: Record<string, string>): string 
   return out;
 }
 
-// 32-char alphanumeric nonce for the webview CSP
+// Build a 32-character nonce for the webview security policy
 function randomNonce(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let out = '';
@@ -23,7 +24,7 @@ function randomNonce(): string {
   return out;
 }
 
-// the content-security policy shared by every bundled webview
+// Build the content security policy, adding a style nonce for a webview that writes its own styles
 function buildCsp(webview: vscode.Webview, nonce: string, styleNonce: boolean): string {
   const styleSrc = styleNonce
     ? `style-src ${webview.cspSource} 'nonce-${nonce}'`
@@ -33,12 +34,12 @@ function buildCsp(webview: vscode.Webview, nonce: string, styleNonce: boolean): 
 
 // --- exports ---
 
-// a webview-safe uri for a bundled media asset
+// Turn a bundled media path into a uri the webview can load
 export function assetUri(webview: vscode.Webview, extensionUri: vscode.Uri, relativePath: string): string {
   return webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, relativePath)).toString();
 }
 
-// fill a bundled template with a fresh nonce, the CSP, and the caller's values
+// Fill a bundled template with a fresh nonce, the security policy, and the caller's values
 export function renderWebviewHtml(
   webview: vscode.Webview,
   extensionUri: vscode.Uri,
@@ -51,7 +52,7 @@ export function renderWebviewHtml(
   return fillTemplate(template, { csp: buildCsp(webview, nonce, styleNonce), nonce, ...replacements });
 }
 
-// the string at key in a restored webview-panel state
+// Read a string field out of a restored panel state
 export function readStringField(state: unknown, key: string): string | undefined {
   if (state && typeof state === 'object' && typeof (state as Record<string, unknown>)[key] === 'string') {
     return (state as Record<string, string>)[key];
@@ -59,7 +60,7 @@ export function readStringField(state: unknown, key: string): string | undefined
   return undefined;
 }
 
-// the boolean at key in a restored webview-panel state
+// Read a boolean field out of a restored panel state
 export function readBooleanField(state: unknown, key: string): boolean | undefined {
   if (state && typeof state === 'object' && typeof (state as Record<string, unknown>)[key] === 'boolean') {
     return (state as Record<string, boolean>)[key];

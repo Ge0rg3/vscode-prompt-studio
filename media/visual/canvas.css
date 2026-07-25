@@ -1,3 +1,4 @@
+/* Styles the canvas panel, its breadcrumb bar, and the note and folder cards on it */
 html,
 body {
   margin: 0;
@@ -136,7 +137,8 @@ body {
 
 .card .preview {
   flex: 1;
-  /* pull the scrollbar to the card edge, keep text inset */
+
+  /* Pull the scrollbar out to the card edge, keep the text inset */
   margin: 0 -14px 0 0;
   padding-right: 14px;
   white-space: pre-wrap;
@@ -187,7 +189,8 @@ body {
   padding: 12px 14px;
   border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   border-radius: 6px;
-  /* neutral fill and text over a colored folder */
+
+  /* Keep the fill and text neutral inside a colored folder */
   color: var(--vscode-foreground);
   background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten, 14%), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
   overflow: hidden;
@@ -256,12 +259,12 @@ body {
   background-color: var(--ps-fill);
 }
 
-/* lighten toward white */
+/* Lighten toward white, one step per nesting level */
 .mini-card.colored {
   background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten, 14%), var(--ps-fill));
 }
 
-/* dark text on the colored card's own icon and preview */
+/* Darken the icon and preview text inside a colored card */
 .card.colored > .title > .codicon,
 .card.colored > .preview,
 .mini-card.colored > .mini-title > .codicon,
@@ -269,7 +272,7 @@ body {
   color: #3a3a3a;
 }
 
-/* accent-tinted scrollbar thumb */
+/* Tint the preview scrollbar with the card's accent color */
 .card.colored > .preview {
   scrollbar-color: var(--ps-accent) transparent;
 }

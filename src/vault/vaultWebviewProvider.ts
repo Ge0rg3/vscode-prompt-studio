@@ -1,3 +1,4 @@
+// Hosts the vault sidebar webview, its watchers, and its messages
 import * as vscode from 'vscode';
 
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
@@ -87,7 +88,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     void this.view?.webview.postMessage({ type: 'collapseAll' });
   }
 
-  // track the folder shown by the active canvas, or undefined when no canvas is active
+  // Track the folder the active canvas shows, cleared when it loses focus or closes
   setActiveVisualFolder(folder: string | undefined): void {
     this.activeVisualFolder = folder;
     this.syncSelection();
@@ -103,7 +104,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     }
   }
 
-  // point the watcher at the current vault root
+  // Point the watcher at the current vault root
   private rebuildWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -124,7 +125,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     );
   }
 
-  // collapse a burst of fs events into one delayed state push
+  // Collapse a burst of file events into one refresh
   private scheduleRefresh(): void {
     if (this.refreshScheduled) {
       return;
@@ -149,7 +150,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     await this.view.webview.postMessage({ type: 'state', state });
   }
 
-  // highlight the active canvas folder, or the active editor's note when no canvas is active
+  // Highlight the folder the active canvas shows, falling back to the note in the active editor
   private syncSelection(): void {
     if (this.activeVisualFolder) {
       void this.view?.webview.postMessage({ type: 'select', path: this.activeVisualFolder });
@@ -198,7 +199,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       }
       case 'rename': {
         const root = this.vaultManager.getVaultRoot();
-        // re-validate the untrusted renderer message before touching disk
+
+        // Check the path and the name again, a webview message can say anything
         if (!root || !isWithin(msg.node.absPath, root) || validateEntryName(msg.newName)) {
           return;
         }
@@ -238,6 +240,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
   }
 }
 
+// Register the expand and collapse commands for the view title bar
 export function registerVaultViewCommands(provider: VaultWebviewProvider): vscode.Disposable {
   return vscode.Disposable.from(
     vscode.commands.registerCommand('promptStudio.expandAll', () => provider.expandAll()),

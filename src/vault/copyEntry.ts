@@ -1,3 +1,4 @@
+// Pastes a copied note or folder into the vault under a free name
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -7,7 +8,7 @@ import { VaultNode } from '../common/vaultNode';
 
 // --- helpers ---
 
-// the directory a paste lands in, dropping to a sibling when it would nest a folder inside itself
+// Pick the folder a paste lands in, a folder pasted into itself goes beside it instead
 function resolvePasteDir(sourcePath: string, contextNode: VaultNode | undefined, vaultRoot: string): string {
   let preferred = vaultRoot;
   if (contextNode) {
@@ -18,7 +19,7 @@ function resolvePasteDir(sourcePath: string, contextNode: VaultNode | undefined,
   return isWithin(preferred, sourcePath) ? path.dirname(sourcePath) : preferred;
 }
 
-// a name free in targetDir, appending " (Copy)" then " (Copy N)" on a clash
+// Find a free name in the target folder, adding " (Copy)" then " (Copy N)" on a clash
 async function uniqueCopyName(targetDir: string, name: string, kind: 'note' | 'folder'): Promise<string> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(targetDir));
   const taken = new Set<string>();
@@ -31,6 +32,7 @@ async function uniqueCopyName(targetDir: string, name: string, kind: 'note' | 'f
     return name;
   }
 
+  // Split off the extension and drop any copy suffix already there so copies never stack
   const dotIndex = kind === 'note' ? name.toLowerCase().lastIndexOf('.md') : -1;
   const ext = dotIndex >= 0 ? name.slice(dotIndex) : '';
   const stem = dotIndex >= 0 ? name.slice(0, dotIndex) : name;
@@ -51,7 +53,7 @@ async function uniqueCopyName(targetDir: string, name: string, kind: 'note' | 'f
 
 // --- exports ---
 
-// copy sourcePath into the paste directory under a unique name, or bail on a missing source
+// Copy an entry into the folder a paste lands in, undefined when the source is gone or the paste is refused
 export async function pasteVaultEntry(
   vaultRoot: string,
   sourcePath: string,
@@ -60,6 +62,7 @@ export async function pasteVaultEntry(
   const resolvedRoot = path.resolve(vaultRoot);
   const resolvedSource = path.resolve(sourcePath);
 
+  // Copy only from inside the vault, never the root itself
   if (!isWithin(resolvedSource, resolvedRoot) || resolvedSource === resolvedRoot) {
     return undefined;
   }
@@ -71,11 +74,13 @@ export async function pasteVaultEntry(
     return undefined;
   }
 
+  // Work out where the copy lands
   const targetDir = resolvePasteDir(resolvedSource, contextNode, resolvedRoot);
   if (!isWithin(targetDir, resolvedRoot)) {
     return undefined;
   }
 
+  // Work out a free name for the copy
   const kind = sourceStat.type === vscode.FileType.Directory ? 'folder' : 'note';
   const name = await uniqueCopyName(targetDir, path.basename(resolvedSource), kind);
   const destination = vscode.Uri.file(path.join(targetDir, name));

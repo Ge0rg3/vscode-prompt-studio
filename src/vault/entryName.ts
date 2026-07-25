@@ -1,8 +1,9 @@
+// Checks the names typed for new and renamed entries and keeps notes ending in .md
 export const NOTE_EXT = '.md';
 
 const INVALID_NAME = /[\\/:*?"<>|]/;
 
-// reject empties, leading dots, path separators, and OS-reserved characters
+// Reject an empty name, a leading dot, and characters a filename cannot hold
 export function validateEntryName(input: string): string | undefined {
   const trimmed = input.trim();
   if (!trimmed) {
@@ -17,7 +18,7 @@ export function validateEntryName(input: string): string | undefined {
   return undefined;
 }
 
-// append .md if the user did not type the extension
+// Add .md when the typed name does not already end with it
 export function ensureNoteExt(name: string): string {
   return name.toLowerCase().endsWith(NOTE_EXT) ? name : `${name}${NOTE_EXT}`;
 }

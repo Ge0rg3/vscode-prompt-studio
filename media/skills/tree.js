@@ -1,4 +1,4 @@
-// Renders the Claude Skills sidebar tree and posts row commands back to the host.
+// Renders the Claude Skills sidebar tree and posts row commands back to the host
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -17,16 +17,17 @@
 
   // --- helpers ---
 
-  // the node fields the host needs for a command
+  // Reduce a node to the fields a command needs
   function serialize(node) {
     return { kind: node.kind, name: node.name, absPath: node.absPath, skill: node.skill, skillsDir: node.skillsDir };
   }
 
-  // post a node command back to the host, node is null for background actions
+  // Post a node command back to the host, node is null for background actions
   function postCommand(command, node) {
     vscode.postMessage({ type: 'command', command, node: node ? serialize(node) : undefined });
   }
 
+  // Redraw every row from the current children
   function render() {
     treeEl.replaceChildren();
     for (const node of children) {
@@ -35,12 +36,12 @@
     reapplyPreview();
   }
 
-  // the expand-state key for a node
+  // Key a node's expand state by its absolute path
   function keyOf(node) {
     return node.absPath;
   }
 
-  // the leading codicon class for a node's kind and open state
+  // Pick the leading codicon for a node's kind and open state
   function iconClass(node, isOpen) {
     if (node.kind === 'project') {
       return isOpen ? 'codicon-root-folder-opened' : 'codicon-root-folder';
@@ -54,7 +55,7 @@
     return 'codicon-file';
   }
 
-  // a hover-row icon that runs a command on the node
+  // Build a hover icon that runs a command on the node
   function actionButton(icon, title, command, node) {
     const action = document.createElement('span');
     action.className = `action codicon codicon-${icon}`;
@@ -66,11 +67,12 @@
     return action;
   }
 
-  // set a row's color classes, clearing any previous tint
+  // Set a row's color classes, clearing any previous tint
   function applyRowColor(row, color) {
     applyTint(row, color, 'colored');
   }
 
+  // Draw one row, then the rows under it when it is open
   function renderNode(node, depth) {
     const expandable = node.kind !== 'file';
     const hasChildren = expandable && node.children && node.children.length > 0;
@@ -82,6 +84,7 @@
     row.dataset.path = node.absPath;
     applyRowColor(row, node.color);
 
+    // Indent the row with one guide per level of depth
     for (let level = 0; level < depth; level++) {
       const guide = document.createElement('span');
       guide.className = 'indent-guide';
@@ -92,6 +95,7 @@
     indent.className = 'indent';
     row.appendChild(indent);
 
+    // Give the row a chevron only when it has children
     const twisty = document.createElement('span');
     twisty.className = 'twisty';
     if (hasChildren) {
@@ -107,6 +111,7 @@
     }
     row.appendChild(twisty);
 
+    // Add the kind icon and the name
     const icon = document.createElement('span');
     icon.className = 'icon';
     const glyph = document.createElement('span');
@@ -119,6 +124,7 @@
     label.textContent = node.name;
     row.appendChild(label);
 
+    // Give a skill row its description tooltip and its hover actions
     if (node.kind === 'skill') {
       if (node.skill && node.skill.description) {
         row.title = node.skill.description;
@@ -131,6 +137,7 @@
       row.appendChild(actions);
     }
 
+    // Open a file on click, toggle a row that has children
     row.addEventListener('click', () => {
       if (node.kind === 'file') {
         vscode.postMessage({ type: 'openNote', path: node.absPath });
@@ -139,6 +146,7 @@
       }
     });
 
+    // Wire up the right-click menu when the node has one
     const items = menuFor(node);
     if (items) {
       row.addEventListener('contextmenu', (event) => {
@@ -150,6 +158,7 @@
 
     treeEl.appendChild(row);
 
+    // Draw the children of an open row beneath it
     if (isOpen) {
       for (const child of node.children) {
         renderNode(child, depth + 1);
@@ -157,6 +166,7 @@
     }
   }
 
+  // Flip a row open or shut and redraw
   function toggleExpand(key) {
     if (expanded.has(key)) {
       expanded.delete(key);
@@ -166,7 +176,7 @@
     render();
   }
 
-  // collect the expand key of every node that has children, recursing into them
+  // Mark every node that has children as expanded, all the way down
   function addExpandableKeys(nodes) {
     for (const node of nodes) {
       if (node.children && node.children.length > 0) {
@@ -176,7 +186,7 @@
     }
   }
 
-  // the skills-root actions shown when right-clicking empty space
+  // Build the menu for a right-click on empty space
   function backgroundMenu() {
     return [
       { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openSkillsCanvas' },
@@ -185,7 +195,7 @@
     ];
   }
 
-  // find a node anywhere in the tree by absolute path
+  // Find a node anywhere in the tree by absolute path
   function findNode(absPath, nodes) {
     for (const node of nodes) {
       if (node.absPath === absPath) {
@@ -201,13 +211,13 @@
     return undefined;
   }
 
-  // the color saved for a path in the current tree
+  // Read the color saved for a path in the current tree
   function nodeColorOf(absPath) {
     const node = findNode(absPath, children);
     return node ? node.color : undefined;
   }
 
-  // the rendered row for a path, absent when its parent is collapsed
+  // Find the drawn row for a path, absent when its parent is collapsed
   function rowFor(absPath) {
     for (const row of treeEl.querySelectorAll('.row')) {
       if (row.dataset.path === absPath) {
@@ -217,7 +227,7 @@
     return undefined;
   }
 
-  // tint the live row for a path without persisting
+  // Tint the row for a path without saving the color
   function tintRow(absPath, color) {
     const row = rowFor(absPath);
     if (row) {
@@ -225,18 +235,18 @@
     }
   }
 
-  // tint the row and tell the host so any open canvas matches
+  // Tint the row and send the color to the host
   function previewColor(absPath, color) {
     tintRow(absPath, color);
     vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
   }
 
-  // remember the live preview, drop it once it matches the saved color
+  // Remember the live preview, drop it once it matches the saved color
   function trackPreview(absPath, color) {
     activePreview = (nodeColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
   }
 
-  // re-apply the preview if it still differs from the saved color
+  // Re-apply the preview if it still differs from the saved color
   function reapplyPreview() {
     if (!activePreview) {
       return;
@@ -247,7 +257,7 @@
     }
   }
 
-  // apply the color to the live row and local state, then persist it
+  // Set the color on the node, tint its row, then save it
   function recolor(absPath, color) {
     const node = findNode(absPath, children);
     if (node) {
@@ -257,7 +267,7 @@
     vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
   }
 
-  // swatch target for a node, tints its row live
+  // Build the swatch callbacks that tint a node's row and save its color
   function colorTarget(node) {
     return {
       currentColor: () => nodeColorOf(node.absPath),
@@ -266,7 +276,7 @@
     };
   }
 
-  // the right-click menu for a node
+  // Build the right-click menu for a node's kind
   function menuFor(node) {
     if (node.kind === 'project') {
       const items = [];
@@ -318,6 +328,7 @@
 
   const menu = create(menuEl, postCommand, CARD_COLORS);
 
+  // Handle one message from the host
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (!message) {
@@ -338,7 +349,7 @@
     }
   });
 
-  // right-click empty space acts on the skills root
+  // Show the skills-root menu when a right-click misses every row
   treeEl.addEventListener('contextmenu', (event) => {
     if (event.target.closest('.row')) {
       return;

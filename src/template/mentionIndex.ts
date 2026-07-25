@@ -1,6 +1,7 @@
+// Keeps the list of workspace files and folders an @ mention can name, refreshed as files come and go
 import * as vscode from 'vscode';
 
-// a workspace file or folder an @mention can name, path relative to the workspace root
+// A file or folder an @ mention can name
 export interface MentionEntry {
   path: string;
   isFolder: boolean;
@@ -32,11 +33,11 @@ export class MentionIndex implements vscode.Disposable {
       watcher.onDidDelete(() => this.invalidate())
     );
 
-    // scan ahead of the first template panel, so the first @ has a list to show
+    // Scan now so the first @ mention has a list to show
     void this.entries();
   }
 
-  // the workspace files and folders an @mention can name
+  // Share one scan between callers, starting it on the first call
   entries(): Promise<MentionEntry[]> {
     if (!this.pending) {
       this.pending = this.build();
@@ -51,6 +52,7 @@ export class MentionIndex implements vscode.Disposable {
     }
   }
 
+  // Scan the workspace, keeping every path relative to the workspace root
   private async build(): Promise<MentionEntry[]> {
     const folder = this.folder;
     if (!folder) {
@@ -63,7 +65,7 @@ export class MentionIndex implements vscode.Disposable {
       MAX_INDEXED_FILES
     );
 
-    // a mention stops at whitespace, so a path holding any could never be written
+    // Skip paths that cannot appear in a mention, since @ starts one and a space ends it
     const root = `${folder.uri.path.replace(/\/$/, '')}/`;
     const filePaths: string[] = [];
     for (const uri of uris) {
@@ -76,14 +78,14 @@ export class MentionIndex implements vscode.Disposable {
     return this.withFolders(filePaths);
   }
 
-  // drop the scan now, announce once the burst of file events settles
+  // Drop the scan now, fire the change event once file events stop arriving
   private invalidate(): void {
     this.pending = undefined;
     clearTimeout(this.rebuildTimer);
     this.rebuildTimer = setTimeout(() => this.emitter.fire(), REBUILD_DELAY_MS);
   }
 
-  // the enabled files.exclude and search.exclude patterns as one glob
+  // Fold the enabled files.exclude and search.exclude patterns into one glob
   private excludeGlob(folder: vscode.WorkspaceFolder): string | undefined {
     const files = vscode.workspace.getConfiguration('files', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
     const search = vscode.workspace.getConfiguration('search', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
@@ -98,7 +100,7 @@ export class MentionIndex implements vscode.Disposable {
     return patterns.size > 0 ? `{${[...patterns].join(',')}}` : undefined;
   }
 
-  // each file plus every folder above it, deduped
+  // List each file plus every folder above it, without repeats
   private withFolders(filePaths: string[]): MentionEntry[] {
     const entries: MentionEntry[] = [];
     const folders = new Set<string>();

@@ -1,4 +1,4 @@
-// Finds the workspace subdirectories that own their own .claude/skills.
+// Finds the workspace subdirectories that own their own .claude/skills
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -7,7 +7,7 @@ import { compareCaseInsensitive } from '../common/utils/compare';
 import { isDirectory } from '../common/utils/fs';
 import { CLAUDE_DIR, scanSkills, Skill, skillsDirIn } from './skillScanner';
 
-// a workspace subdirectory with skills in its own .claude/skills
+// A workspace subdirectory with skills in its own .claude/skills
 export interface ProjectSkills {
   relativeSegments: string[];
   dirPath: string;
@@ -15,7 +15,7 @@ export interface ProjectSkills {
   skills: Skill[];
 }
 
-// a directory waiting to be walked, with its segments below the workspace root
+// A directory waiting to be walked, with its segments below the workspace root
 interface PendingDir {
   dirPath: string;
   segments: string[];
@@ -27,7 +27,7 @@ const SKIPPED_DIRS = new Set(['node_modules']);
 
 // --- helpers ---
 
-// subdirectory names worth walking
+// List the subdirectory names worth walking
 function listWalkableDirs(entries: [string, vscode.FileType][]): string[] {
   const dirs: string[] = [];
   for (const [name, type] of entries) {
@@ -38,7 +38,7 @@ function listWalkableDirs(entries: [string, vscode.FileType][]): string[] {
   return dirs;
 }
 
-// true when one of the entries is a .claude directory
+// Look for a .claude directory among the entries
 function hasClaudeDir(entries: [string, vscode.FileType][]): boolean {
   for (const [name, type] of entries) {
     if (name === CLAUDE_DIR && isDirectory(type)) {
@@ -50,9 +50,9 @@ function hasClaudeDir(entries: [string, vscode.FileType][]): boolean {
 
 // --- exports ---
 
-// every workspace subdirectory with its own skills, sorted by workspace-relative path
+// Find every workspace subdirectory with its own skills, sorted by workspace-relative path
 export async function scanProjectSkills(workspaceRoot: string): Promise<ProjectSkills[]> {
-  // walk breadth-first to spend the dir cap on shallow projects first
+  // Walk breadth-first so the directory limit goes to the shallow projects first
   const projects: ProjectSkills[] = [];
   const queue: PendingDir[] = [{ dirPath: workspaceRoot, segments: [] }];
   let head = 0;
@@ -68,7 +68,7 @@ export async function scanProjectSkills(workspaceRoot: string): Promise<ProjectS
       continue;
     }
 
-    // Record a sub-project, never the workspace root, whose skills go in the flat list
+    // Record a sub-project, skipping the workspace root itself
     if (segments.length > 0 && hasClaudeDir(entries)) {
       const skillsDir = skillsDirIn(dirPath);
       const skills = await scanSkills(skillsDir);

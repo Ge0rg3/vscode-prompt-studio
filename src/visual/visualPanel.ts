@@ -1,3 +1,4 @@
+// Hosts the card canvas panel, its folder watcher, and its webview messages
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -11,7 +12,7 @@ import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 import { readFolder } from './folderContents';
 
-// what one canvas is bound to
+// What one canvas is bound to
 export interface CanvasContext {
   store: CardLayoutStore;
   root: string;
@@ -32,6 +33,8 @@ type InboundMessage =
   | { type: 'command'; command: string; node: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
+
+// Run only these commands from a canvas message, a webview can send anything
 const ALLOWED_COMMANDS = new Set([
   'promptStudio.rename',
   'promptStudio.delete',
@@ -43,7 +46,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.revealInOS'
 ]);
 
-// the commands that change the folder's structure, suppressed on a read-only canvas
+// Block these commands on a read-only canvas, they change the folder's structure
 const CRUD_COMMANDS = new Set(['promptStudio.rename', 'promptStudio.delete']);
 
 export class VisualPanel {
@@ -51,7 +54,7 @@ export class VisualPanel {
 
   private static readonly panels = new Map<string, VisualPanel>();
 
-  // reveal the canvas for this root, creating it on first use, then point it at folder
+  // Reveal this root's canvas at the given folder, creating the panel on first use
   static show(extensionUri: vscode.Uri, context: CanvasContext, folder: string): void {
     const existing = VisualPanel.panels.get(context.root);
     if (existing) {
@@ -69,7 +72,7 @@ export class VisualPanel {
     VisualPanel.panels.set(context.root, new VisualPanel(panel, extensionUri, context, folder));
   }
 
-  // reattach to a canvas panel VSCode restored after a window reload
+  // Reattach to a canvas panel VSCode restored after a window reload
   static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
@@ -120,7 +123,7 @@ export class VisualPanel {
     }
   }
 
-  // point the panel at a different folder inside the canvas root
+  // Point the panel at a different folder inside the canvas root
   private navigate(folder: string): void {
     if (folder === this.folder || !isWithin(folder, this.context.root)) {
       return;
@@ -133,12 +136,12 @@ export class VisualPanel {
     this.emitActiveFolder();
   }
 
-  // fire this canvas's folder while it is the active panel, undefined otherwise
+  // Fire this canvas's folder while it is the active panel, undefined otherwise
   private emitActiveFolder(): void {
     this.context.activeFolderEmitter?.fire(this.panel.active ? this.folder : undefined);
   }
 
-  // point the watcher at the current folder's direct children
+  // Point the watcher at the current folder's direct children
   private rebuildWatcher(): void {
     for (const sub of this.watcherSubs) {
       sub.dispose();
@@ -155,7 +158,7 @@ export class VisualPanel {
     );
   }
 
-  // refresh on note add/delete/change, the layout store owns its own change events
+  // Refresh on any entry change, the layout store fires its own event for the config file
   private onFolderEvent(uri: vscode.Uri): void {
     if (path.basename(uri.fsPath) === CONFIG_FILENAME) {
       return;
@@ -163,7 +166,7 @@ export class VisualPanel {
     this.scheduleRefresh();
   }
 
-  // collapse a burst of fs events into one delayed state push
+  // Collapse a burst of file events into one delayed state push
   private scheduleRefresh(): void {
     if (this.refreshScheduled) {
       return;
@@ -175,6 +178,7 @@ export class VisualPanel {
     }, REFRESH_DEBOUNCE_MS);
   }
 
+  // Act on one message from the canvas webview
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
@@ -217,17 +221,16 @@ export class VisualPanel {
     }
   }
 
-  // block structural edits on a read-only canvas
   private isBlockedCommand(command: string): boolean {
     return !this.context.allowCrud && CRUD_COMMANDS.has(command);
   }
 
-  // copy a card's path relative to this canvas root
+  // Copy a card's path relative to this canvas root
   private async copyRelativePath(node: VaultNode): Promise<void> {
     await copyPathToClipboard(relativeToRoot(this.context.root, node.absPath), node.name);
   }
 
-  // create a note or folder in the open folder, pinned at the drop point
+  // Create a note or folder in the open folder, placed at the drop point
   private async createEntry(kind: 'note' | 'folder', position: NotePosition): Promise<void> {
     const node: VaultNode = { kind: 'folder', absPath: this.folder, name: path.basename(this.folder) };
     const command = kind === 'note' ? 'promptStudio.newNote' : 'promptStudio.newFolder';
@@ -254,12 +257,12 @@ export class VisualPanel {
     });
   }
 
-  // panel tab label for a folder
+  // Label the panel tab with the folder name
   private static titleFor(folder: string): string {
     return `Visual: ${path.basename(folder) || folder}`;
   }
 
-  // scripts on, asset loads limited to the bundled media folder
+  // Allow scripts and limit asset loads to the bundled media folder
   private static webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
     return {
       enableScripts: true,

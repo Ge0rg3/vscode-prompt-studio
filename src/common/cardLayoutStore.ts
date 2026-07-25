@@ -1,3 +1,4 @@
+// The store interface holding each card's position, size, stacking order, and color
 import * as vscode from 'vscode';
 
 export interface NotePosition {
@@ -10,7 +11,7 @@ export interface CardSize {
   height: number;
 }
 
-// one store per visual canvas
+// One store per vault or skills root
 export interface CardLayoutStore {
   readonly onDidChange: vscode.Event<void>;
   getPosition(absPath: string): NotePosition | undefined;

@@ -1,3 +1,4 @@
+// Works out which folder is the vault and fires an event when it changes
 import * as vscode from 'vscode';
 
 import { ensureDir } from './utils/fs';
@@ -29,7 +30,7 @@ export class VaultManager implements vscode.Disposable {
     return this.current;
   }
 
-  // save the per-project choice, empty string reverts to the per-workspace default
+  // Save the chosen vault folder, an empty string goes back to the default one
   async setVaultPath(value: string): Promise<void> {
     await this.workspaceState.update(STATE_KEY, value);
     this.recompute();
@@ -42,7 +43,7 @@ export class VaultManager implements vscode.Disposable {
     }
   }
 
-  // re-resolve the root, fire only when it actually changed
+  // Work out the root again, fire only when it changed
   private recompute(): void {
     const next = this.resolveVaultRoot();
     if (next === this.current) {
@@ -53,12 +54,12 @@ export class VaultManager implements vscode.Disposable {
     this.emitter.fire(next);
   }
 
-  // set promptStudio.hasVault so the vault view appears only when a vault exists
+  // Set promptStudio.hasVault so the title-bar buttons and palette commands need a vault
   private publishContext(): void {
     void vscode.commands.executeCommand('setContext', HAS_VAULT_CONTEXT, this.current !== undefined);
   }
 
-  // read the project's saved path or fall back to a per-workspace storage dir
+  // Read the saved path, falling back to a folder kept for this workspace
   private resolveVaultRoot(): string | undefined {
     const configured = this.workspaceState.get<string>(STATE_KEY)?.trim();
     if (configured) {

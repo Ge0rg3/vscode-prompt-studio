@@ -1,3 +1,4 @@
+// Hosts the template panel for one note, its webview messages, and the lookups behind an @ mention
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -21,7 +22,7 @@ export class TemplatePanel {
 
   private static readonly openPanels = new Map<string, TemplatePanel>();
 
-  // reveal the note's template panel, creating it on first use
+  // Reveal the note's template panel, creating it on first use
   static show(
     extensionUri: vscode.Uri,
     mentionIndex: MentionIndex,
@@ -47,7 +48,7 @@ export class TemplatePanel {
     new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);
   }
 
-  // reattach to a template panel VSCode restored after a window reload
+  // Reattach to a template panel VSCode restored after a window reload
   static restore(
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
@@ -85,6 +86,7 @@ export class TemplatePanel {
     }
   }
 
+  // Act on one message from the template webview
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready': {
@@ -131,7 +133,7 @@ export class TemplatePanel {
     await this.panel.webview.postMessage({ type: 'mentions', entries: await this.mentionIndex.entries() });
   }
 
-  // suffix the tab title with a white circle while the editor differs from what is on disk
+  // Suffix the tab title with a white circle while the editor differs from what is on disk
   private markDirty(dirty: boolean): void {
     this.panel.title = TemplatePanel.titleFor(this.notePath) + (dirty ? ' \u26AA' : '');
   }
@@ -151,12 +153,12 @@ export class TemplatePanel {
     );
   }
 
-  // panel tab label for a note opened as a template
+  // Build the tab label for a note opened as a template
   private static titleFor(notePath: string): string {
     return `${path.basename(notePath).replace(/\.md$/i, '')} (template)`;
   }
 
-  // scripts on, asset loads limited to the bundled media folder
+  // Allow scripts and limit asset loads to the bundled media folder
   private static webviewOptions(extensionUri: vscode.Uri): vscode.WebviewOptions {
     return {
       enableScripts: true,

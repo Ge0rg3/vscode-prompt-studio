@@ -1,3 +1,4 @@
+// Renders the vault sidebar tree with its selection, inline rename, drag moves, and menus
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -17,7 +18,7 @@
 
   // --- focus tracking ---
 
-  // toggle the body class so .selected rows render as active vs inactive
+  // Toggle the body class so the selected row uses the active highlight
   function setFocused(isFocused) {
     document.body.classList.toggle('focused', isFocused);
   }
@@ -28,7 +29,7 @@
 
   // --- keyboard ---
 
-  // rename the selected entry on F2
+  // Rename the selected entry on F2
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'F2' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
       return;
@@ -43,7 +44,7 @@
     }
   });
 
-  // delete the selected entry on Delete
+  // Delete the selected entry on Delete
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Delete' || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) {
       return;
@@ -58,7 +59,7 @@
     }
   });
 
-  // copy the selected entry on ctrl/cmd C, paste a duplicate on V
+  // Copy the selected entry on ctrl/cmd C, paste a duplicate on V
   document.addEventListener('keydown', (event) => {
     if (activeRename || event.altKey || event.shiftKey || !(event.ctrlKey || event.metaKey)) {
       return;
@@ -84,7 +85,7 @@
 
   // --- inline rename ---
 
-  // why the name is invalid for this node
+  // Explain why a name is invalid for this node, null when the name is fine
   function renameError(candidateName, node) {
     const name = candidateName.trim();
     if (!name) {
@@ -102,12 +103,12 @@
     return null;
   }
 
-  // the path with its last segment stripped
+  // Strip the last segment off a path
   function parentDir(absPath) {
     return absPath.replace(/[\/\\][^\/\\]+$/, '');
   }
 
-  // the entries sharing a folder with the given path
+  // List everything in the folder that holds the given path
   function siblingsOf(absPath) {
     const parentPath = parentDir(absPath);
     if (parentPath === state.root) {
@@ -117,7 +118,7 @@
     return parent && parent.children ? parent.children : [];
   }
 
-  // whether a sibling other than the node already carries the target name
+  // Check whether another entry in the same folder already uses the name
   function hasSiblingNamed(node, name) {
     const target = (node.kind === 'note' ? ensureMdExt(name) : name).toLowerCase();
     for (const sibling of siblingsOf(node.absPath)) {
@@ -128,7 +129,7 @@
     return false;
   }
 
-  // flag the input while its value is invalid
+  // Flag the input while its value is invalid
   function validateRename() {
     if (!activeRename) {
       return;
@@ -138,7 +139,7 @@
     activeRename.input.title = error || '';
   }
 
-  // swap the editing input back for a label carrying the given text
+  // Swap the editing input back for a label carrying the given text
   function endRename(text) {
     const rename = activeRename;
     activeRename = null;
@@ -151,18 +152,20 @@
     }
   }
 
+  // Put the original name back and end the edit
   function cancelRename() {
     if (!activeRename) {
       return;
     }
     endRename(activeRename.original);
-    // apply any state update that arrived mid-edit
+
+    // Apply any state update that arrived mid-edit
     if (deferredRender) {
       render();
     }
   }
 
-  // send a valid, changed name to the host, staying open while it is invalid
+  // Send a valid, changed name to the host, staying open while it is invalid
   function commitRename() {
     if (!activeRename) {
       return;
@@ -183,7 +186,7 @@
     vscode.postMessage({ type: 'rename', node: serialize(node), newName: value });
   }
 
-  // turn a row's label into an editable name field
+  // Turn a row's label into an editable name field
   function beginRename(node) {
     if (activeRename) {
       return;
@@ -195,6 +198,7 @@
       return;
     }
 
+    // Swap the label for an input holding the current name
     const original = label.textContent;
     const input = document.createElement('input');
     input.type = 'text';
@@ -205,6 +209,7 @@
     label.replaceWith(input);
     activeRename = { node, row, input, label, original };
 
+    // Finish on Enter, Escape, or blur, and keep clicks and drags off the row
     input.addEventListener('keydown', (event) => {
       event.stopPropagation();
       if (event.key === 'Enter') {
@@ -266,6 +271,7 @@
 
   // --- rendering ---
 
+  // Rebuild every row from the current state, dropping any edit in progress
   function render() {
     activeRename = null;
     deferredRender = false;
@@ -284,6 +290,7 @@
     reapplyPreview();
   }
 
+  // Show the configure-vault panel when no vault is set
   function renderWelcome() {
     const wrap = document.createElement('div');
     wrap.id = 'welcome';
@@ -309,12 +316,12 @@
     treeEl.appendChild(hint);
   }
 
-  // set a row's color classes, clearing any previous tint
+  // Set a row's color classes, clearing any previous tint
   function applyRowColor(row, color) {
     applyTint(row, color, 'colored');
   }
 
-  // a hover-row icon that runs onClick without selecting the row
+  // Build a row icon that runs its action without selecting the row
   function actionButton(icon, title, onClick) {
     const action = document.createElement('span');
     action.className = `action codicon codicon-${icon}`;
@@ -326,10 +333,12 @@
     return action;
   }
 
+  // Draw one row, then the rows under it when the folder is open
   function renderNode(node, depth) {
     const isFolder = node.kind === 'folder';
     const isOpen = isFolder && expanded.has(node.absPath);
 
+    // Build the row and tint it
     const row = document.createElement('div');
     row.className = 'row';
     row.dataset.path = node.absPath;
@@ -339,6 +348,7 @@
     }
     applyRowColor(row, node.color);
 
+    // Draw one indent guide per ancestor level
     for (let level = 0; level < depth; level++) {
       const guide = document.createElement('span');
       guide.className = 'indent-guide';
@@ -349,6 +359,7 @@
     indent.className = 'indent';
     row.appendChild(indent);
 
+    // Add a chevron on a folder row, an empty slot on a note row
     const twisty = document.createElement('span');
     twisty.className = 'twisty';
     if (isFolder) {
@@ -377,6 +388,7 @@
     label.textContent = isFolder ? node.name : stripMdExt(node.name);
     row.appendChild(label);
 
+    // Add the icons that show when the row is hovered
     const actions = document.createElement('span');
     actions.className = 'actions';
 
@@ -387,6 +399,7 @@
     actions.appendChild(actionButton('layout', 'Open Visual Canvas', () => postCommand('promptStudio.openVisual', node)));
     row.appendChild(actions);
 
+    // Toggle a folder on click, open a note in the template editor
     row.addEventListener('click', (event) => {
       event.stopPropagation();
       select(node.absPath);
@@ -404,6 +417,7 @@
       menu.show(event.clientX, event.clientY, menuFor(node), node);
     });
 
+    // Start a drag carrying the row's path
     row.draggable = true;
     row.addEventListener('dragstart', (event) => {
       dragSource = node.absPath;
@@ -411,6 +425,7 @@
       event.dataTransfer.effectAllowed = 'move';
     });
 
+    // Take a drop on a folder and move the dragged entry into it
     if (isFolder) {
       row.addEventListener('dragover', (event) => {
         if (!canDrop(dragSource, node.absPath)) return;
@@ -432,6 +447,7 @@
 
     treeEl.appendChild(row);
 
+    // Draw the children of an open folder
     if (isFolder && isOpen && node.children) {
       for (const child of node.children) {
         renderNode(child, depth + 1);
@@ -462,6 +478,7 @@
     render();
   }
 
+  // Mark every folder under these nodes as expanded, all the way down
   function addFolderPaths(nodes) {
     for (const node of nodes) {
       if (node.kind === 'folder') {
@@ -473,6 +490,7 @@
     }
   }
 
+  // Select the row for a path, clearing the selection when the path is null
   function select(path) {
     selectedPath = path;
     for (const row of treeEl.querySelectorAll('.row.selected')) {
@@ -487,7 +505,7 @@
     }
   }
 
-  // expand every ancestor folder of a path so its row renders, then select it
+  // Expand every ancestor folder of a path so its row renders, then select it
   function reveal(path) {
     if (!state) {
       return;
@@ -507,7 +525,7 @@
     select(path);
   }
 
-  // reject self-into-self moves and same-parent no-ops
+  // Refuse a drop onto the entry itself, into its own subfolder, or where it already sits
   function canDrop(src, destDir) {
     if (!src || !destDir) return false;
     if (src === destDir) return false;
@@ -553,21 +571,21 @@
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
 
-  // post a node command back to the host
+  // Post a node command back to the host
   function postCommand(command, node) {
     vscode.postMessage({ type: 'command', command, node: node ? serialize(node) : undefined });
   }
 
   const menu = create(menuEl, postCommand, CARD_COLORS);
 
-  // expand the folder first, then create a note or folder inside it
+  // Expand the folder first, then create a note or folder inside it
   function newInFolder(command, node) {
     expanded.add(node.absPath);
     render();
     postCommand(command, node);
   }
 
-  // find a node anywhere in the tree by absolute path
+  // Find a node anywhere in the tree by absolute path
   function findNode(absPath, nodes) {
     for (const node of nodes) {
       if (node.absPath === absPath) {
@@ -583,13 +601,13 @@
     return undefined;
   }
 
-  // the color saved for a path in the current tree
+  // Read the color saved for a path in the current tree
   function nodeColorOf(absPath) {
     const node = state ? findNode(absPath, state.children) : undefined;
     return node ? node.color : undefined;
   }
 
-  // the rendered row for a path, absent when its parent is collapsed
+  // Find the rendered row for a path, absent when its parent is collapsed
   function rowFor(absPath) {
     for (const row of treeEl.querySelectorAll('.row')) {
       if (row.dataset.path === absPath) {
@@ -599,7 +617,7 @@
     return undefined;
   }
 
-  // tint the live row for a path without persisting
+  // Tint the row for a path without saving the color
   function tintRow(absPath, color) {
     const row = rowFor(absPath);
     if (row) {
@@ -607,18 +625,18 @@
     }
   }
 
-  // tint the row and tell the host so any open canvas matches
+  // Tint the row and send the color to the host
   function previewColor(absPath, color) {
     tintRow(absPath, color);
     vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
   }
 
-  // remember the live preview, drop it once it matches the saved color
+  // Remember the live preview, drop it once it matches the saved color
   function trackPreview(absPath, color) {
     activePreview = (nodeColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
   }
 
-  // re-apply the preview if it still differs from the saved color
+  // Re-apply the preview if it still differs from the saved color
   function reapplyPreview() {
     if (!activePreview) {
       return;
@@ -629,7 +647,7 @@
     }
   }
 
-  // apply the color to the live row and local state, then persist it
+  // Set the color on the node, tint its row, then save it
   function recolor(absPath, color) {
     const node = state ? findNode(absPath, state.children) : undefined;
     if (node) {
@@ -639,7 +657,7 @@
     vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
   }
 
-  // swatch target for a node, tints its row live
+  // Wire the menu's color swatches to a node, tinting its row on hover
   function colorTarget(node) {
     return {
       currentColor: () => nodeColorOf(node.absPath),
@@ -648,6 +666,7 @@
     };
   }
 
+  // Build the right-click menu for a node's kind
   function menuFor(node) {
     if (node.kind === 'note') {
       return [

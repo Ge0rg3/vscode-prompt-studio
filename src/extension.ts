@@ -1,4 +1,4 @@
-// Wires up every service, provider, and command when the extension activates.
+// Wires up every service, provider, and command when the extension activates
 import * as vscode from 'vscode';
 
 import { ColorPreview } from './common/cardColors';
@@ -24,12 +24,14 @@ import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWe
 import { VisualCommands } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Find the vault and read the metadata saved inside it
   const vaultManager = new VaultManager(context.globalStorageUri.fsPath, context.workspaceState);
   context.subscriptions.push(vaultManager);
 
   const config = new VaultConfig(() => vaultManager.getVaultRoot(), vaultManager.onDidChangeVault);
   context.subscriptions.push(config);
 
+  // Build the shared emitters, the views, and the command services
   const activeFolderEmitter = new vscode.EventEmitter<string | undefined>();
   context.subscriptions.push(activeFolderEmitter);
 
@@ -51,6 +53,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfigs, colorPreviewEmitter, mentionIndex);
   const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter, colorPreviewEmitter);
 
+  // Register every view, command, and listener
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(VaultWebviewProvider.viewType, provider, {
       webviewOptions: { retainContextWhenHidden: true }

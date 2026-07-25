@@ -1,4 +1,4 @@
-// Registers the commands that open a card canvas and reattaches panels after a reload.
+// Registers the commands that open a card canvas and reattaches panels after a reload
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -22,7 +22,7 @@ export class VisualCommands {
     private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
   ) {}
 
-  // open the vault canvas at the context node's folder, or the root when nothing is selected
+  // Open the vault canvas at the context node's folder, or the root when nothing is selected
   registerOpenCommand(): vscode.Disposable {
     return vscode.commands.registerCommand('promptStudio.openVisual', (contextNode?: VaultNode) => {
       const root = this.vaultManager.getVaultRoot();
@@ -35,13 +35,13 @@ export class VisualCommands {
     });
   }
 
-  // reattach canvas panels VSCode restored after a window reload
+  // Reattach canvas panels VSCode restored after a window reload
   registerSerializer(resolveSkillStore: (root: string) => CardLayoutStore | undefined): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(VisualPanel.viewType, {
       deserializeWebviewPanel: async (panel: vscode.WebviewPanel, state: unknown): Promise<void> => {
         const root = readStringField(state, 'root');
 
-        // restore a read-only skill canvas, dropping the panel when its folder is gone
+        // Restore a read-only skill canvas, dropping the panel when its folder is gone
         if (readBooleanField(state, 'allowCrud') === false) {
           if (!root || !(await pathExists(vscode.Uri.file(root)))) {
             panel.dispose();
@@ -58,7 +58,7 @@ export class VisualCommands {
           return;
         }
 
-        // the vault canvas, also the fallback for any state not marked read-only
+        // Fall back to the vault canvas for any state not marked read-only
         const vaultRoot = this.vaultManager.getVaultRoot();
         if (!vaultRoot) {
           panel.dispose();
@@ -69,7 +69,7 @@ export class VisualCommands {
     });
   }
 
-  // the editable vault canvas context
+  // Build the editable context for the vault canvas
   private vaultContext(root: string): CanvasContext {
     return {
       store: this.config,
@@ -80,7 +80,7 @@ export class VisualCommands {
     };
   }
 
-  // the folder to open as a canvas, a note uses its parent folder
+  // Pick the folder to open as a canvas, using the parent folder for a note
   private canvasFolder(contextNode: VaultNode | undefined, vaultRoot: string): string {
     if (contextNode?.kind === 'folder') {
       return contextNode.absPath;
@@ -91,12 +91,12 @@ export class VisualCommands {
     return vaultRoot;
   }
 
-  // a read-only canvas context over a skill folder
+  // Build a read-only context over a skill folder
   private skillContext(store: CardLayoutStore, root: string): CanvasContext {
     return { store, root, allowCrud: false, colorPreviewEmitter: this.colorPreviewEmitter };
   }
 
-  // the folder to restore the canvas to, falling back to the root when the saved one is gone
+  // Restore the saved folder when it still exists inside the root, else the root itself
   private async restoreFolder(state: unknown, root: string): Promise<string> {
     const folder = readStringField(state, 'folder');
     if (folder && isWithin(folder, root) && (await pathExists(vscode.Uri.file(folder)))) {

@@ -1,3 +1,4 @@
+/* Styles the template editor, its rendered markdown, the mention popup, and the bottom bar */
 html,
 body {
   margin: 0;
@@ -87,7 +88,7 @@ body.vscode-high-contrast-light .cm-editor ::selection {
   color: var(--vscode-descriptionForeground);
 }
 
-/* dim the marks with an alpha color, opacity would group the span and composite the selection down with it */
+/* Dim the marks with color-mix, not opacity, or the selection highlight notches at every mark */
 .cm-syntax {
   color: color-mix(in srgb, currentColor 50%, transparent);
 }

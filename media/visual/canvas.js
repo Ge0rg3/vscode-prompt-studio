@@ -1,3 +1,4 @@
+// Renders the card canvas and posts moves, colors, and commands back to the host
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -24,12 +25,12 @@
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
   const { applyTint } = window.PromptStudioPalette;
 
-  // one context-menu controller, commands post back to the host
+  // Build the context menu shared by the cards and the background
   const menu = create(menuEl, (command, node) => vscode.postMessage({ type: 'command', command, node: serialize(node) }), CARD_COLORS);
 
   // --- helpers ---
 
-  // grow the surface to hold every card plus room to drag into
+  // Grow the surface to hold every card plus room to drag into
   function resizeSurface() {
     let maxX = 0;
     let maxY = 0;
@@ -41,17 +42,17 @@
     surfaceEl.style.height = maxY + SURFACE_MARGIN + 'px';
   }
 
-  // tint the canvas backdrop with the open folder's color, clearing any previous tint
+  // Tint the canvas background with the open folder's color
   function applyFolderTint(color) {
     applyTint(canvasEl, color, 'surface-tinted');
   }
 
-  // set a card element's color classes, clearing any previous tint
+  // Set the color classes on a card element
   function applyCardColor(el, color) {
     applyTint(el, color, 'colored');
   }
 
-  // raise a card above every other so the most recently dragged one stays on top
+  // Raise a card above every other so the most recently dragged one stays on top
   function bringToFront(card, el) {
     let topZ = 0;
     for (const other of cards) {
@@ -63,13 +64,13 @@
     el.style.zIndex = String(card.z);
   }
 
-  // pointerdown landed on the target's scrollbar, not its content
+  // Check whether a pointerdown landed on the element's scrollbar
   function isScrollbarPress(event) {
     const target = event.target;
     return event.offsetX > target.clientWidth || event.offsetY > target.clientHeight;
   }
 
-  // drag to reposition, or run onClick when the pointer barely moved
+  // Drag a card to a new spot, or run onClick when the pointer barely moved
   function attachDrag(el, card, onClick) {
     el.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) {
@@ -87,6 +88,7 @@
       let dragging = false;
       el.setPointerCapture(event.pointerId);
 
+      // Follow the pointer once it has moved past the drag threshold
       const onMove = (move) => {
         const dx = move.clientX - startX;
         const dy = move.clientY - startY;
@@ -103,6 +105,7 @@
         }
       };
 
+      // Save the new position on release, or run onClick when nothing moved
       const onUp = () => {
         el.releasePointerCapture(event.pointerId);
         el.removeEventListener('pointermove', onMove);
@@ -123,7 +126,7 @@
     });
   }
 
-  // drag the corner handle to resize the card
+  // Drag the corner handle to resize the card
   function attachResize(el, card) {
     const handle = document.createElement('div');
     handle.className = 'resize-handle';
@@ -141,6 +144,7 @@
       const originHeight = card.height;
       handle.setPointerCapture(event.pointerId);
 
+      // Resize the card as the pointer moves
       const onMove = (move) => {
         card.width = Math.max(MIN_CARD_WIDTH, Math.round(originWidth + move.clientX - startX));
         card.height = Math.max(MIN_CARD_HEIGHT, Math.round(originHeight + move.clientY - startY));
@@ -148,6 +152,7 @@
         el.style.height = card.height + 'px';
       };
 
+      // Save the new size on release
       const onUp = () => {
         handle.releasePointerCapture(event.pointerId);
         handle.removeEventListener('pointermove', onMove);
@@ -165,7 +170,7 @@
 
   // --- card builders ---
 
-  // shared card shell with an icon + title row, placed and sized at the card's saved spot
+  // Build the card shell shared by notes and folders, placed at its saved spot
   function baseCard(card, iconName) {
     const el = document.createElement('div');
     el.className = 'card';
@@ -198,7 +203,7 @@
     return el;
   }
 
-  // a note card showing the note body, opens the note when clicked
+  // Build a note card that shows the note body and opens the note when clicked
   function noteCard(card) {
     const el = baseCard(card, 'codicon-note');
     applyCardColor(el, card.color);
@@ -216,7 +221,7 @@
     return el;
   }
 
-  // a scaled-down, non-interactive copy of one child card for a folder preview
+  // Build a copy of one child card for a folder preview, with no dragging or menus
   function miniCard(child) {
     const el = document.createElement('div');
     el.className = 'mini-card';
@@ -248,7 +253,7 @@
     return el;
   }
 
-  // render the children at their real canvas positions, scaled down for the preview
+  // Draw the children at their real canvas positions, scaled down for the preview
   function folderPreview(children, containerWidth, containerHeight) {
     const previewBox = document.createElement('div');
     previewBox.className = 'folder-preview';
@@ -260,7 +265,7 @@
       return previewBox;
     }
 
-    // the canvas extent measured from its (0, 0) origin
+    // Measure how far the children reach from the (0, 0) origin
     let canvasWidth = 0;
     let canvasHeight = 0;
     for (const child of children) {
@@ -277,7 +282,7 @@
     }
     previewBox.appendChild(miniSurface);
 
-    // scale against the box at the container's default size
+    // Scale against the default card size, so a bigger card reveals more of the preview
     const observer = new ResizeObserver(() => {
       if (previewBox.clientWidth === 0 || previewBox.clientHeight === 0) {
         return;
@@ -292,7 +297,7 @@
     return previewBox;
   }
 
-  // a folder card showing a mini preview of its contents, drills in when clicked
+  // Build a folder card with a small preview of its contents, opening the folder when clicked
   function folderCard(card) {
     const el = baseCard(card, 'codicon-folder');
     applyCardColor(el, card.color);
@@ -307,7 +312,7 @@
 
   // --- rendering ---
 
-  // the crumb trail, every crumb but the current folder navigates on click
+  // Draw the breadcrumb trail, every crumb but the last one navigates on click
   function renderBreadcrumbs(crumbs) {
     breadcrumbsEl.replaceChildren();
     for (const [index, crumb] of crumbs.entries()) {
@@ -332,7 +337,7 @@
     }
   }
 
-  // redraw everything from the new state
+  // Redraw the whole canvas from a new state
   function render(next) {
     state = next;
     cards = state.cards;
@@ -352,19 +357,19 @@
 
   // --- context menu ---
 
-  // the open folder as a node, taken from the last breadcrumb
+  // Build a node for the open folder out of the last breadcrumb
   function currentFolderNode() {
     const crumb = state.breadcrumbs[state.breadcrumbs.length - 1];
     return { kind: 'folder', absPath: crumb.path, name: crumb.name };
   }
 
-  // the color currently saved for a card path
+  // Find the saved color for a card path
   function cardColorOf(absPath) {
     const card = cards.find((entry) => entry.absPath === absPath);
     return card ? card.color : undefined;
   }
 
-  // tint the live card element for a path, without persisting
+  // Tint the card element at a path without saving the color
   function tintCard(absPath, color) {
     const el = cardEls.get(absPath);
     if (el) {
@@ -372,7 +377,7 @@
     }
   }
 
-  // tint the matching card, or the backdrop when the path is the open folder
+  // Tint the matching card, or the canvas background when the path is the open folder
   function applyIncomingPreview(absPath, color) {
     if (state && absPath === currentFolderNode().absPath) {
       applyFolderTint(color || undefined);
@@ -381,13 +386,13 @@
     }
   }
 
-  // tint locally, then tell the host so the sidebar and other canvases match
+  // Tint this canvas, then have the host mirror it in the sidebar and other canvases
   function previewColor(absPath, color) {
     applyIncomingPreview(absPath, color);
     vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
   }
 
-  // the saved color for a path, the folder color when it is the open folder
+  // Look up the saved color for a path, the folder's own color when it is the open folder
   function savedColorOf(absPath) {
     if (state && absPath === currentFolderNode().absPath) {
       return state.folderColor;
@@ -395,12 +400,12 @@
     return cardColorOf(absPath);
   }
 
-  // remember the live preview, drop it once it matches the saved color
+  // Remember the live preview, drop it once it matches the saved color
   function trackPreview(absPath, color) {
     activePreview = (savedColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
   }
 
-  // re-apply the preview if it still differs from the saved color
+  // Re-apply the preview if it still differs from the saved color
   function reapplyPreview() {
     if (!activePreview) {
       return;
@@ -411,7 +416,7 @@
     }
   }
 
-  // apply the color to the live card, then persist it
+  // Set the color on the card, then save it
   function recolor(absPath, color) {
     const card = cards.find((entry) => entry.absPath === absPath);
     if (card) {
@@ -421,14 +426,14 @@
     vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
   }
 
-  // apply the color to the canvas backdrop, then persist it on the open folder
+  // Set the color on the canvas background, then save it on the open folder
   function recolorFolder(absPath, color) {
     state.folderColor = color || undefined;
     applyFolderTint(state.folderColor);
     vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
   }
 
-  // swatch target for a card, tints the card element live
+  // Build the swatch target that recolors a card
   function cardColorTarget(card) {
     return {
       currentColor: () => cardColorOf(card.absPath),
@@ -437,7 +442,7 @@
     };
   }
 
-  // swatch target for the open folder, tints the canvas backdrop live
+  // Build the swatch target that recolors the open folder and its canvas background
   function folderColorTarget() {
     const folder = currentFolderNode();
     return {
@@ -447,7 +452,7 @@
     };
   }
 
-  // drop empty entries, then leading, trailing, and doubled separators
+  // Drop empty entries, then leading, trailing, and doubled separators
   function compactMenu(items) {
     const out = [];
     for (const entry of items) {
@@ -465,7 +470,7 @@
     return out;
   }
 
-  // card right-click menu, swatches then the kind's actions, edits dropped on a read-only canvas
+  // Build the right-click menu for a card, without Rename and Delete on a read-only canvas
   function menuFor(card) {
     if (card.kind === 'note') {
       return compactMenu([
@@ -497,7 +502,7 @@
     ]);
   }
 
-  // surface coordinates that center a default card on the click point
+  // Work out the surface point that centers a new card on the click
   function dropPoint(event) {
     const rect = surfaceEl.getBoundingClientRect();
     return {
@@ -506,7 +511,7 @@
     };
   }
 
-  // empty-area right-click menu, acts on the open folder
+  // Build the right-click menu for empty canvas space, acting on the open folder
   function backgroundMenu(dropPos) {
     return compactMenu([
       { kind: 'swatches', target: folderColorTarget() },
@@ -519,12 +524,12 @@
     ]);
   }
 
-  // the node fields the host needs for a command
+  // Cut a node down to the fields sent with a command
   function serialize(node) {
     return { kind: node.kind, absPath: node.absPath, name: node.name };
   }
 
-  // right-click empty canvas space acts on the open folder
+  // Open the background menu on a right-click in empty canvas space
   canvasEl.addEventListener('contextmenu', (event) => {
     if (!state) {
       return;
@@ -540,7 +545,8 @@
     const message = event.data;
     if (message && message.type === 'state') {
       render(message.state);
-      // stash what VSCode needs to restore the canvas after a reload
+
+      // Save what VSCode needs to restore the canvas after a reload
       vscode.setState({ folder: currentFolderNode().absPath, root: state.breadcrumbs[0].path, allowCrud: ALLOW_CRUD });
     } else if (message && message.type === 'previewColor') {
       applyIncomingPreview(message.path, message.color);
