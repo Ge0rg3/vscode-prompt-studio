@@ -1,10 +1,11 @@
+// Wires up every service, provider, and command when the extension activates.
 import * as vscode from 'vscode';
 
 import { ColorPreview } from './common/cardColors';
 import { VaultConfig } from './common/vaultConfig';
 import { VaultManager } from './common/vaultManager';
 import { SkillCommands } from './skills/skillCommands';
-import { skillsRoot } from './skills/skillScanner';
+import { SkillsConfigs } from './skills/skillsConfigs';
 import { SkillsWebviewProvider } from './skills/skillsWebviewProvider';
 import { MentionIndex } from './template/mentionIndex';
 import { registerOpenTemplate, registerTemplateSerializer } from './template/openTemplate';
@@ -38,16 +39,16 @@ export function activate(context: vscode.ExtensionContext): void {
   const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri, colorPreviewEmitter);
   context.subscriptions.push(provider);
 
-  const skillsConfig = new VaultConfig(() => skillsRoot(), vscode.workspace.onDidChangeWorkspaceFolders);
-  context.subscriptions.push(skillsConfig);
+  const skillsConfigs = new SkillsConfigs();
+  context.subscriptions.push(skillsConfigs);
 
-  const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfig, colorPreviewEmitter);
+  const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfigs, colorPreviewEmitter);
   context.subscriptions.push(skillsProvider);
 
   const mentionIndex = new MentionIndex();
   context.subscriptions.push(mentionIndex);
 
-  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfig, colorPreviewEmitter, mentionIndex);
+  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfigs, colorPreviewEmitter, mentionIndex);
   const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter, colorPreviewEmitter);
 
   context.subscriptions.push(
@@ -63,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
     registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
     registerVaultViewCommands(provider),
     visualCommands.registerOpenCommand(),
-    visualCommands.registerSerializer(skillsConfig),
+    visualCommands.registerSerializer((root) => skillsConfigs.configFor(root)),
     registerCreateNote(vaultManager, config),
     registerCreateFolder(vaultManager, config),
     registerRenameEntry(config),

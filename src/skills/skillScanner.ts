@@ -1,9 +1,11 @@
+// Reads .claude/skills off disk and pulls the name and description out of each SKILL.md.
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 import { parse } from 'yaml';
 
 import { compareCaseInsensitive } from '../common/utils/compare';
+import { isDirectory } from '../common/utils/fs';
 
 export interface Skill {
   name: string;
@@ -13,6 +15,8 @@ export interface Skill {
 }
 
 export const SKILL_FILE = 'SKILL.md';
+export const CLAUDE_DIR = '.claude';
+const SKILLS_DIR = 'skills';
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 
 // --- helpers ---
@@ -62,19 +66,34 @@ async function readSkill(dirPath: string, dirName: string): Promise<Skill | unde
 
 // --- exports ---
 
+// the .claude/skills directory belonging to a project directory
+export function skillsDirIn(dirPath: string): string {
+  return path.join(dirPath, CLAUDE_DIR, SKILLS_DIR);
+}
+
 // the workspace's .claude/skills directory, or undefined when no folder is open
 export function skillsRoot(): string | undefined {
   const workspace = vscode.workspace.workspaceFolders?.[0];
-  return workspace ? path.join(workspace.uri.fsPath, '.claude', 'skills') : undefined;
+  return workspace ? skillsDirIn(workspace.uri.fsPath) : undefined;
 }
 
-// every skill directly under the workspace .claude/skills, sorted by display name
-export async function scanSkills(): Promise<Skill[]> {
-  const root = skillsRoot();
-  if (!root) {
-    return [];
+// walk up from a path to the .claude/skills folder it lives in
+export function owningSkillsDir(absPath: string): string | undefined {
+  let dir = absPath;
+  while (true) {
+    if (path.basename(dir) === SKILLS_DIR && path.basename(path.dirname(dir)) === CLAUDE_DIR) {
+      return dir;
+    }
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
   }
+}
 
+// every skill directly under a .claude/skills root, sorted by display name
+export async function scanSkills(root: string): Promise<Skill[]> {
   let entries: [string, vscode.FileType][];
   try {
     entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(root));
@@ -84,7 +103,7 @@ export async function scanSkills(): Promise<Skill[]> {
 
   const skills: Skill[] = [];
   for (const [dirName, type] of entries) {
-    if (type !== vscode.FileType.Directory || dirName.startsWith('.')) {
+    if (!isDirectory(type) || dirName.startsWith('.')) {
       continue;
     }
     const skill = await readSkill(path.join(root, dirName), dirName);

@@ -12,6 +12,11 @@ export async function pathExists(uri: vscode.Uri): Promise<boolean> {
   }
 }
 
+// a symlinked folder reports as both a symlink and a directory
+export function isDirectory(type: vscode.FileType): boolean {
+  return (type & vscode.FileType.Directory) !== 0;
+}
+
 // read a file as utf-8 text
 export async function readTextFile(absPath: string): Promise<string> {
   const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(absPath));

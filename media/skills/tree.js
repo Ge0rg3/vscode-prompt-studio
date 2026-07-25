@@ -1,3 +1,4 @@
+// Renders the Claude Skills sidebar tree and posts row commands back to the host.
 (function () {
   const vscode = acquireVsCodeApi();
 
@@ -5,6 +6,8 @@
   const menuEl = document.getElementById('context-menu');
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
+  const NEW_SKILL_ITEM = { label: 'New Skill', icon: 'add', cmd: 'promptStudio.newSkill' };
+  const REVEAL_ITEM = { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' };
   const { applyTint } = window.PromptStudioPalette;
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
 
@@ -16,7 +19,7 @@
 
   // the node fields the host needs for a command
   function serialize(node) {
-    return { kind: node.kind, name: node.name, absPath: node.absPath, skill: node.skill };
+    return { kind: node.kind, name: node.name, absPath: node.absPath, skill: node.skill, skillsDir: node.skillsDir };
   }
 
   // post a node command back to the host, node is null for background actions
@@ -39,6 +42,9 @@
 
   // the leading codicon class for a node's kind and open state
   function iconClass(node, isOpen) {
+    if (node.kind === 'project') {
+      return isOpen ? 'codicon-root-folder-opened' : 'codicon-root-folder';
+    }
     if (node.kind === 'skill') {
       return 'codicon-sparkle';
     }
@@ -175,7 +181,7 @@
     return [
       { label: 'Open as Canvas', icon: 'layout', cmd: 'promptStudio.openSkillsCanvas' },
       'sep',
-      { label: 'New Skill', icon: 'add', cmd: 'promptStudio.newSkill' }
+      NEW_SKILL_ITEM
     ];
   }
 
@@ -262,6 +268,17 @@
 
   // the right-click menu for a node
   function menuFor(node) {
+    if (node.kind === 'project') {
+      const items = [];
+      if (node.skillsDir) {
+        items.push(NEW_SKILL_ITEM, 'sep');
+      }
+      items.push(
+        REVEAL_ITEM,
+        COPY_PATH_ITEM
+      );
+      return items;
+    }
     if (node.kind === 'skill') {
       return [
         { kind: 'swatches', target: colorTarget(node) },
@@ -272,7 +289,7 @@
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendSkillToClaude' },
         'sep',
-        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        REVEAL_ITEM,
         COPY_PATH_ITEM
       ];
     }
@@ -282,7 +299,7 @@
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
         'sep',
-        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        REVEAL_ITEM,
         COPY_PATH_ITEM
       ];
     }
@@ -290,7 +307,7 @@
       return [
         { kind: 'swatches', target: colorTarget(node) },
         'sep',
-        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        REVEAL_ITEM,
         COPY_PATH_ITEM
       ];
     }

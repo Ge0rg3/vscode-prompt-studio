@@ -1,11 +1,22 @@
+// Builds the rows the skills sidebar renders, sub-projects and the skills under them.
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
 import { compareCaseInsensitive } from '../common/utils/compare';
 import { VaultConfig } from '../common/vaultConfig';
+import { ProjectSkills, scanProjectSkills } from './projectScanner';
 import { SkillTreeNode } from './skillNode';
-import { scanSkills } from './skillScanner';
+import { scanSkills, Skill, skillsRoot } from './skillScanner';
+import { SkillsConfigs } from './skillsConfigs';
+
+// a workspace directory that holds a nested skills root, or leads down to one
+interface ProjectDir {
+  name: string;
+  absPath: string;
+  project?: ProjectSkills;
+  children: Map<string, ProjectDir>;
+}
 
 // --- helpers ---
 
@@ -48,22 +59,115 @@ async function readEntries(dir: string, config: VaultConfig): Promise<SkillTreeN
   return [...folders, ...files];
 }
 
+// a skill row carrying its folder contents
+async function buildSkillNode(skill: Skill, config: VaultConfig): Promise<SkillTreeNode> {
+  return {
+    kind: 'skill',
+    name: skill.name,
+    absPath: skill.dirPath,
+    skill: { name: skill.name, skillFile: skill.skillFile, description: skill.description },
+    color: config.getColor(skill.dirPath),
+    children: await readEntries(skill.dirPath, config)
+  };
+}
+
+// nest each project under its path segments below the workspace root
+function buildProjectDirTree(
+  workspaceRoot: string,
+  projects: ProjectSkills[]
+): Map<string, ProjectDir> {
+  const rootDirs = new Map<string, ProjectDir>();
+  for (const project of projects) {
+    let siblings = rootDirs;
+    let dirPath = workspaceRoot;
+    let dir: ProjectDir | undefined;
+    for (const segment of project.relativeSegments) {
+      dirPath = path.join(dirPath, segment);
+      dir = siblings.get(segment);
+      if (!dir) {
+        dir = { name: segment, absPath: dirPath, children: new Map() };
+        siblings.set(segment, dir);
+      }
+      siblings = dir.children;
+    }
+    if (dir) {
+      dir.project = project;
+    }
+  }
+  return rootDirs;
+}
+
+// squash a dir that holds nothing but one child into a single row, the way the explorer does
+function compressDir(dir: ProjectDir): ProjectDir {
+  let mergedDir = dir;
+  while (!mergedDir.project && mergedDir.children.size === 1) {
+    const child = [...mergedDir.children.values()][0];
+    mergedDir = { ...child, name: `${mergedDir.name}/${child.name}` };
+  }
+  return mergedDir;
+}
+
+// child dirs sorted by name, then squashed where a dir holds a single child
+function listChildDirs(children: Map<string, ProjectDir>): ProjectDir[] {
+  const sortedChildren = [...children.values()];
+  sortedChildren.sort((first, second) => compareCaseInsensitive(first.name, second.name));
+
+  const dirs: ProjectDir[] = [];
+  for (const child of sortedChildren) {
+    dirs.push(compressDir(child));
+  }
+  return dirs;
+}
+
+// a project row, nested project dirs first, then the dir's own skills
+async function buildProjectNode(dir: ProjectDir, configs: SkillsConfigs): Promise<SkillTreeNode> {
+  const children: SkillTreeNode[] = [];
+  for (const child of listChildDirs(dir.children)) {
+    children.push(await buildProjectNode(child, configs));
+  }
+
+  if (dir.project) {
+    const config = configs.configFor(dir.project.skillsDir);
+    if (config) {
+      for (const skill of dir.project.skills) {
+        children.push(await buildSkillNode(skill, config));
+      }
+    }
+  }
+
+  return {
+    kind: 'project',
+    name: dir.name,
+    absPath: dir.absPath,
+    skillsDir: dir.project?.skillsDir,
+    children
+  };
+}
+
 // --- exports ---
 
-// the skill rows for the webview, each carrying its folder contents
-export async function buildSkillsTree(config: VaultConfig): Promise<SkillTreeNode[]> {
-  const skills = await scanSkills();
-
-  const nodes: SkillTreeNode[] = [];
-  for (const skill of skills) {
-    nodes.push({
-      kind: 'skill',
-      name: skill.name,
-      absPath: skill.dirPath,
-      skill: { name: skill.name, skillFile: skill.skillFile, description: skill.description },
-      color: config.getColor(skill.dirPath),
-      children: await readEntries(skill.dirPath, config)
-    });
+// sub-project dirs with their own skills on top, the workspace's own skills below
+export async function buildSkillsTree(configs: SkillsConfigs): Promise<SkillTreeNode[]> {
+  const workspace = vscode.workspace.workspaceFolders?.[0];
+  if (!workspace) {
+    return [];
   }
+
+  // Sub-project rows first
+  const nodes: SkillTreeNode[] = [];
+  const projects = await scanProjectSkills(workspace.uri.fsPath);
+  for (const dir of listChildDirs(buildProjectDirTree(workspace.uri.fsPath, projects))) {
+    nodes.push(await buildProjectNode(dir, configs));
+  }
+
+  // Then the workspace's own skills
+  const root = skillsRoot();
+  const config = root ? configs.configFor(root) : undefined;
+  if (root && config) {
+    for (const skill of await scanSkills(root)) {
+      nodes.push(await buildSkillNode(skill, config));
+    }
+  }
+
   return nodes;
 }

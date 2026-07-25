@@ -1,3 +1,4 @@
+// Registers the commands that open a card canvas and reattaches panels after a reload.
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -35,14 +36,25 @@ export class VisualCommands {
   }
 
   // reattach canvas panels VSCode restored after a window reload
-  registerSerializer(skillStore: CardLayoutStore): vscode.Disposable {
+  registerSerializer(resolveSkillStore: (root: string) => CardLayoutStore | undefined): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(VisualPanel.viewType, {
       deserializeWebviewPanel: async (panel: vscode.WebviewPanel, state: unknown): Promise<void> => {
         const root = readStringField(state, 'root');
 
-        // a skill canvas, marked read-only in its saved state, restored if its folder still exists
-        if (readBooleanField(state, 'allowCrud') === false && root && (await pathExists(vscode.Uri.file(root)))) {
-          VisualPanel.restore(panel, this.extensionUri, this.skillContext(skillStore, root), await this.restoreFolder(state, root));
+        // restore a read-only skill canvas, dropping the panel when its folder is gone
+        if (readBooleanField(state, 'allowCrud') === false) {
+          if (!root || !(await pathExists(vscode.Uri.file(root)))) {
+            panel.dispose();
+            return;
+          }
+
+          const store = resolveSkillStore(root);
+          if (!store) {
+            panel.dispose();
+            return;
+          }
+
+          VisualPanel.restore(panel, this.extensionUri, this.skillContext(store, root), await this.restoreFolder(state, root));
           return;
         }
 

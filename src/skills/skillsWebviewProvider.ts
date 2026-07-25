@@ -1,3 +1,4 @@
+// Hosts the Claude Skills sidebar webview, its watchers, and its messages.
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -6,9 +7,10 @@ import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
-import { CONFIG_FILENAME, VaultConfig } from '../common/vaultConfig';
+import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { SkillTreeNode } from './skillNode';
-import { skillsRoot } from './skillScanner';
+import { owningSkillsDir } from './skillScanner';
+import { SkillsConfigs } from './skillsConfigs';
 import { buildSkillsTree } from './skillsTree';
 
 type InboundMessage =
@@ -32,8 +34,8 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.copyPathRelative'
 ]);
 
-// watch the skills folder itself and edits inside it
-const WATCH_PATTERNS = ['.claude/skills', '.claude/skills/**'];
+// watch every .claude/skills in the workspace, the bare .claude catches a new sub-project appearing
+const WATCH_PATTERNS = ['**/.claude', '**/.claude/skills', '**/.claude/skills/**'] as const;
 
 export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewType = 'promptStudio.skills';
@@ -47,7 +49,7 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly config: VaultConfig,
+    private readonly skillsConfigs: SkillsConfigs,
     private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
   ) {
     this.rebuildWatchers();
@@ -56,7 +58,7 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
         this.rebuildWatchers();
         this.scheduleRefresh();
       }),
-      config.onDidChange(() => this.scheduleRefresh()),
+      skillsConfigs.onDidChange(() => this.scheduleRefresh()),
       colorPreviewEmitter.event((preview) => postColorPreview(this.view?.webview, preview))
     );
     void this.refresh();
@@ -85,7 +87,7 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
 
   // re-scan and repaint the tree
   async refresh(): Promise<void> {
-    this.children = await buildSkillsTree(this.config);
+    this.children = await buildSkillsTree(this.skillsConfigs);
     await vscode.commands.executeCommand(
       'setContext',
       HAS_SKILLS_CONTEXT,
@@ -116,12 +118,21 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
       case 'openNote':
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
         return;
-      case 'setColor':
-        applyColorMessage(this.config, msg);
+      case 'setColor': {
+        const target = this.rowPath(msg.path);
+        const config = target ? this.skillsConfigs.configFor(target) : undefined;
+        if (target && config) {
+          applyColorMessage(config, { ...msg, path: target });
+        }
         return;
-      case 'previewColor':
-        this.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
+      }
+      case 'previewColor': {
+        const target = this.rowPath(msg.path);
+        if (target) {
+          this.colorPreviewEmitter.fire({ path: target, color: msg.color });
+        }
         return;
+      }
       case 'command':
         if (!ALLOWED_COMMANDS.has(msg.command)) {
           return;
@@ -135,17 +146,29 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
     }
   }
 
-  // copy a node's path relative to the skills root
+  // a webview path, resolved and confined to the skills root that owns it
+  private rowPath(rawPath: string): string | undefined {
+    const target = path.resolve(rawPath);
+    const skillsDir = owningSkillsDir(target);
+    return skillsDir && isWithin(target, skillsDir) ? target : undefined;
+  }
+
+  // copy a node's path relative to its skills root, project rows relative to the workspace
   private async copyRelativePath(node: SkillTreeNode | undefined): Promise<void> {
-    const root = skillsRoot();
-    if (!node || !root || !isWithin(node.absPath, root)) {
+    if (!node) {
+      return;
+    }
+
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    const root = owningSkillsDir(node.absPath) ?? workspace?.uri.fsPath;
+    if (!root || !isWithin(node.absPath, root)) {
       return;
     }
 
     await copyPathToClipboard(relativeToRoot(root, node.absPath), node.name);
   }
 
-  // watch the workspace .claude/skills for added, edited, or removed skills
+  // one watcher per pattern, rebuilt whenever the workspace folders change
   private rebuildWatchers(): void {
     this.teardownWatchers();
 
