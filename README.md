@@ -9,7 +9,7 @@ Storage stays plain markdown on disk, so a vault is portable, git-friendly, and 
 npm install                 # one-time
 npm run watch               # rebuild on change, leave running during F5 debug
 npx tsc --noEmit            # typecheck the extension host (esbuild does not check types)
-npm run vsix                # build a .vsix for sideloading
+./install.sh                # package a .vsix and install it into VSCode
 ```
 
 Press **F5** in VSCode to launch an Extension Development Host with the extension loaded. **Ctrl+R** in that window reloads it after a rebuild.
@@ -30,6 +30,7 @@ vscode-prompt-studio/
 +-- AGENTS.md               # Code map, conventions, code style
 +-- package.json            # Manifest: commands, views, menus. Contributes no settings
 +-- esbuild.js              # Two bundles (host, template webview) + copies codicons into media/
++-- install.sh              # Package a .vsix and install it into VSCode
 +-- tsconfig.json           # Extension host: ES2022 target, Node16 modules, no DOM
 +-- .vscode/                # launch.json for the F5 debug flow, plus the npm: watch build task
 |
@@ -40,18 +41,21 @@ vscode-prompt-studio/
 |   |   +-- vaultManager.ts     # Which folder is the vault, remembered per workspace
 |   |   +-- cardLayoutStore.ts  # The interface a canvas needs from a metadata store
 |   |   +-- cardColors.ts       # The seven-color palette and its shared messages
-|   |   +-- sendToClaude.ts     # Paste text into the Claude Code chat input
+|   |   +-- noteAttachments.ts  # The files stored beside a note, and dropping the unused ones
+|   |   +-- sendToClaude.ts     # Paste a prompt and its attached files into the Claude Code chat input
 |   |   +-- vaultNode.ts        # The node shape passed between host, webviews, and commands
-|   |   +-- utils/              # Purpose-named stateless helpers: paths, fs, webview, clipboard, compare
+|   |   +-- utils/              # Purpose-named stateless helpers: paths, fs, webview, clipboard,
+|   |                           # imageClipboard, compare
 |   +-- vault/              # Vault sidebar host, create/rename/delete, move/copy, vault location
-|   +-- template/           # Template panel host, workspace mention index, on-disk path browsing
+|   +-- template/           # Template panel host, mention index, on-disk path browsing, attachment storage
 |   +-- visual/             # Canvas panel host and the folder-to-cards reader
 |   +-- skills/             # Skills sidebar host, skill and sub-project scanners, per-root config
 |                           # stores, skill commands
 |
 +-- webview/                # Browser source bundled into media/ (own tsconfig: DOM, no node types)
 |   +-- template/           # main.ts, livePreview.ts, codeHighlight.ts, listIndent.ts,
-|                           # fileMentions.ts, directoryCache.ts
+|                           # fileMentions.ts, directoryCache.ts, attachments.ts,
+|                           # attachmentStrip.ts
 |
 +-- media/                  # Everything a webview loads at runtime. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
@@ -65,7 +69,7 @@ vscode-prompt-studio/
 +-- dist/                   # Built extension bundle
 ```
 
-`dist/`, `media/codicons/`, and `media/template/template.js` are build output and gitignored, but they still ship in the `.vsix`. The `.vsix` excludes `src/`, `webview/`, source maps, the build config, and `AGENTS.md`.
+`dist/`, `media/codicons/`, and `media/template/template.js` are build output and gitignored, but they still ship in the `.vsix`. The `.vsix` excludes `src/`, `webview/`, source maps, the build config, `install.sh`, and `AGENTS.md`.
 
 </details>
 
@@ -92,6 +96,7 @@ vscode-prompt-studio/
 - Node 18+ and npm
 - VSCode 1.85 or newer
 - The Claude Code extension, for the **Send to Claude** actions. Without it those actions fall back to the clipboard.
+- On Linux, `wl-copy` or `xclip`, so a note's images can be attached to what you send. Without one an image goes over as a path, the way every other file does.
 
 </details>
 
@@ -104,7 +109,7 @@ npm run build      # one-shot build
 npm run watch      # rebuild on change, leave running during F5 debug
 ```
 
-`npm run build` produces two bundles: the extension host into `dist/extension.js`, and the template webview into `media/template/template.js`. Both builds first copy the codicon font out of `node_modules` into `media/codicons/`, because a webview can only load resources from under `media/`.
+`npm run build` produces two bundles: the extension host into `dist/extension.js`, and the template webview into `media/template/template.js`. Both builds first copy the codicon font out of `node_modules` into `media/codicons/`, since `media/` is the resource root every webview is given.
 
 </details>
 
@@ -134,14 +139,15 @@ There is no test suite, no test runner, no linter, no formatter, and no CI. Veri
 <details>
 <summary><b>Packaging and publishing</b></summary>
 
-Build a `.vsix` and install it into your everyday VSCode:
+Install the extension into your everyday VSCode:
 
 ```bash
-yes | npm run vsix                                  # writes prompt-studio-<version>.vsix
-code --install-extension prompt-studio-0.0.1.vsix
+./install.sh
 ```
 
-Reload VSCode and the Prompt Studio icon appears in the activity bar.
+That packages a `.vsix` and installs it over any previous copy of the same version. Reload VSCode and the Prompt Studio icon appears in the activity bar.
+
+The script calls `code`, so set `CODE_CLI=code-insiders` when your VSCode CLI goes by another name.
 
 The extension publishes to the [VSCode Marketplace](https://marketplace.visualstudio.com/vscode) via `vsce`. Before the first publish:
 
@@ -159,6 +165,8 @@ Cut a release with `npm version patch` (or `minor` / `major`) then `npm run publ
 <summary><b>The vault and <code>config.yml</code></b></summary>
 
 A vault is a folder of `.md` files. Note bodies are pure markdown with no frontmatter, so a note can be pasted straight into an LLM without leaking metadata.
+
+A file attached to a note is stored in a hidden `.attachments` folder beside it, and taking it off the note deletes the file unless another note there uses it too.
 
 Per-entry metadata lives in a single `config.yml` at the vault root. Notes and folders both get an entry, keyed by vault-relative path:
 
@@ -229,23 +237,26 @@ Clicking a note opens it in the template view: an editable tab of its own, title
 
 **Open as File** opens the raw markdown in a plain text editor instead.
 
-The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Save, Copy, and Send hand off exactly what you wrote, `{{variables}}` and all.
+The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Save and Copy hand off exactly what you wrote, `{{variables}}` and all.
 
 - **Inline styling.** Headings, emphasis, strikethrough, inline and fenced code, links, quotes, lists, and rules. Tables and images stay as plain markdown.
+- **Attachments.** Paste or drop a file to attach it. Each one shows as a chip above the bottom bar, with an x to take it off again. Source mode shows the markdown that names it.
 - **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
 - **Workspace mentions.** Type `@` to search the workspace by path, the way you would in Claude Code. Picking a file inserts its path, picking a folder browses into it.
 - **Matching.** Search matches the file name, the folder path, or the typed letters in order anywhere in the path, so `@tmplpanel` and `@template/temp` both find `src/template/templatePanel.ts`. An `@` inside code, mid-word, or naming a path that does not exist is left alone.
 - **Absolute paths.** Start the path with a slash to browse the disk itself: `@/` lists the filesystem root, `@/home/` lists what is in `/home`. Each directory is read as you reach it, so anything on disk can be mentioned. Case does not have to match, and picking from the popup inserts the path as it is spelled on disk.
 - **Mention highlight.** A mention naming a real file or folder is tinted, in both Rendered and Source mode, so you can see what Claude Code will resolve before you send.
+- **Open a mention.** Ctrl+click a tinted mention, or Cmd+click on macOS, to open the file in an editor. A folder opens in the file manager.
 - **Limits.** A path with a space in it cannot be mentioned, and search covers the first workspace folder, since that is the folder Claude Code runs in.
 - **Keyboard.** While the `@` popup is open, **Up** and **Down** move the selection, **Enter** or **Tab** accepts, and **Escape** closes it. Otherwise **Tab** at the start of a bullet nests it under the one above and **Shift+Tab** lifts it out. Anywhere else **Tab** inserts a tab or indents a selection, and **Shift+Tab** outdents. Press **Escape** first to move focus out of the editor instead.
 
 A bar along the bottom offers:
 
 - **Rendered / Source.** Names the mode you are looking at. Click it to read the note as plain markdown, and again to bring the inline styling back.
+- **Attach.** Pick files off disk to attach to the note.
 - **Save.** Write the current text back over the note. **Ctrl+S** anywhere in the tab does the same.
 - **Copy.** Put the current text on the clipboard.
-- **Send to Claude.** Drop the current text into the Claude Code chat input.
+- **Send to Claude.** Replace the Claude Code chat input with the current text. Images go over attached, other files as their path.
 
 </details>
 

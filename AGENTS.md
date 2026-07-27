@@ -261,7 +261,7 @@ Type-checking proves the code compiles. It says nothing about whether the featur
 
 Press **F5** to launch an Extension Development Host and exercise the change by hand. Most of this extension is interface, so if you cannot visually verify a change, say so rather than claiming it works.
 
-Skills discovery needs a workspace with sub-projects that own their own `.claude/skills`. Create one to test against.
+Skills discovery needs a workspace with sub-projects that own their own `.claude/skills`. Create one under `test-projects/`, which `.vscodeignore` keeps out of the package.
 
 ### Typechecking
 
@@ -283,9 +283,14 @@ If a test suite is added later, document the runner here and in [README.md](READ
 ```bash
 npm run build        # one-shot build of both bundles
 npm run watch        # rebuild on change, leave running during F5 debug
-npm run vsix         # produce a local .vsix for sideloading
+yes | npm run vsix   # produce a local .vsix, the yes answers the missing-LICENSE prompt
+./install.sh         # package a .vsix and install it into VSCode
 npm run publish      # publish to the marketplace via vsce
 ```
+
+`install.sh` runs `code`, or whatever `CODE_CLI` names.
+
+Anything added at the repo root that a user should not receive needs a line in `.vscodeignore`, since `vsce` packages from disk rather than from git.
 
 </details>
 
@@ -309,6 +314,8 @@ The template editor is the one bundled webview. `webview/template/` holds:
 - `listIndent.ts` - tab and shift-tab on bullets
 - `fileMentions.ts` - the `@` path popup and the tint on a resolved mention
 - `directoryCache.ts` - the cached listings behind the absolute-path popup
+- `attachments.ts` - the pasted, dropped, and picked files coming in, and the hidden markdown that names them
+- `attachmentStrip.ts` - the chips listing what the note carries
 
 esbuild bundles it to `media/template/template.js`, gitignored and rebuilt like `dist/`.
 
@@ -395,9 +402,41 @@ The webview caches the last 100 listings it receives and answers keystrokes thro
 
 A relative mention is tinted straight from the pushed index. An absolute one is tinted only after a debounced existence check of a path actually written in the note, never from a popup listing. Only the host touches the filesystem, and the webview holds what it has been told.
 
+Ctrl+click, or Cmd+click on macOS, reads the path out of the tint decoration under the pointer, so only a mention that resolved is clickable. [src/template/openMention.ts](src/template/openMention.ts) resolves it again before opening, a relative one against the first workspace folder, and warns when the path has gone since it was tinted.
+
+The underline and the hand cursor come up on a plain hover rather than while ctrl is down. A webview only gets a key press while it holds focus, so gate them on the key and a mention looks dead until the pointer moves.
+
 Browsing ignores case everywhere: the workspace popup ranks against lowercased paths, and a failed absolute read retries with each segment matched to its on-disk casing, so `@/HOME/` still lists `/home` on a case-sensitive disk. A picked completion always inserts the on-disk spelling. The tint stays exact-case on purpose, because Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
 
 The popup is CodeMirror's, restyled in `media/template/template.css` to match the VSCode suggest widget. Every rule there is prefixed with `.cm-editor` to reach the specificity of CodeMirror's own base theme, and the selected-row rule carries both `.cm-tooltip` and `.cm-tooltip-autocomplete` to outrank its light and dark variants. Drop a class from those selectors and the popup reverts to CodeMirror's colors.
+
+</details>
+
+<details>
+<summary><b>Note attachments</b></summary>
+
+Any file pasted, dropped, or picked with **Attach** in the template editor lands in a `.attachments` folder beside the note, and the note points at it with a plain relative path. Both sidebar trees and the canvas skip dotfiles, so the folder never shows up. A vault stays portable because a path never leaves the note's own folder.
+
+An image is written as `![stem](.attachments/name)` and every other file as `[name](.attachments/name)`. The chip strip above the toolbar draws a thumbnail for the first and a codicon for the rest, going on the extension since the bytes are never read.
+
+[src/common/noteAttachments.ts](src/common/noteAttachments.ts) owns the lifecycle, and every code path that moves a note has to call it:
+
+- **Save** prunes the note's folder, dropping anything in `.attachments` that no note there names. A file counts as named when its filename appears anywhere in a note, so an `<img>` tag or a reference-style link keeps it just as `![](...)` does.
+- **Taking a file off in the editor** deletes it there and then, unless another note in the folder names it. The prune on save is the backstop for whatever is orphaned some other way.
+- **Delete** drops the files only that note names. It runs before the note goes, since it reads the note to find them.
+- **Move and paste** carry the files across. A file still named by a note in the old folder is copied, the rest are moved, and the note is repointed when the destination already held that name. A folder needs nothing, since its `.attachments` travels inside it.
+
+A prune only ever reads notes on disk, so it waits until every panel on that folder has written its edits and finished storing its files. Without that, saving one note would delete a screenshot just pasted into another.
+
+A repoint rewrites the path inside a reference and nothing else, since a stored file can be called `main.ts` and the prose around it says that name too.
+
+Only a reference resolving to a file inside the note's own `.attachments` counts as an attachment, in the editor and on the way to Claude alike. That is what leaves an ordinary `[the spec](spec.md)` in the text where the writer put it. It is the whole of the containment boundary, so a delete or a move can never reach a note's `../elsewhere.png`.
+
+A paste or a drop carries the bytes through the webview, so the editor skips anything over 20 MB and tells the host to say so. **Attach** hands over the picks instead and the host copies them on disk, so no bytes cross a message and no cap applies.
+
+A stored file is named at the end of the note rather than at the cursor, since the strip is what the writer works with and the markdown itself is covered up. Covering it is a decoration in the rendered mode's compartment, so Source mode brings it back.
+
+The strip draws each image from a uri the host hands back. So the template panel's `localResourceRoots` carries the note's `.attachments` folder beside `media/`, and the shared policy in [src/common/utils/webview.ts](src/common/utils/webview.ts) allows `img-src`.
 
 </details>
 
@@ -436,11 +475,23 @@ A canvas opened from a skill cannot create, rename, or delete an entry, though c
 <details>
 <summary><b>Send to Claude</b></summary>
 
-Sending pastes into the existing Claude Code chat input: copy to the clipboard, focus the Claude view, then run the paste command. A deep link or an editor-open call opens a new Claude window instead.
+Sending pastes into the existing Claude Code chat input: focus the Claude view, copy to the clipboard, then run the paste command. A deep link or an editor-open call opens a new Claude window instead.
 
 If Claude Code is missing, the action falls back to leaving the text on the clipboard and saying so.
 
-The sending code lives in `src/common/sendToClaude.ts` and takes plain text. What gets sent differs by caller: a vault note sends its contents, a skill sends its `/name` slash command, and the template panel sends the slash command when it was opened from a skill and the edited text otherwise.
+The sending code lives in `src/common/sendToClaude.ts` and takes the text plus the files to attach. What gets sent differs by caller: a vault note sends its contents, a skill sends its `/name` slash command, and the template panel sends the slash command when it was opened from a skill and the edited text otherwise.
+
+A note's files come out of the text before it goes. An image goes over as a real attachment. A platform tool puts it on the system clipboard and it pastes the way the text does, since the VSCode clipboard api carries text alone and Claude Code offers no command an extension can hand a file to.
+
+[src/common/utils/imageClipboard.ts](src/common/utils/imageClipboard.ts) holds the commands: `Set-Clipboard` through `powershell.exe` on Windows and WSL, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Images paste before the text, so the chat is left holding the prompt and the caret.
+
+Every other file goes over as its absolute path, under an `--- attachments <agent MUST read> ---` heading at the end of the prompt. An image goes the same way whenever the clipboard step reports back that it took nothing: a machine with none of those tools, a format none of them names such as an svg, or a remote workspace other than WSL. The heading is what stops a bare list of paths reading as part of the prompt.
+
+The prompt is pasted over whatever the input already held, since a second send would otherwise pile onto the first.
+
+A select-all runs on its own before anything is pasted, and that is how the send checks it is aimed at the chat. An open file left wholly selected means the chat never took focus. The cursor goes back where it was and the send stops, since the paste behind it would have replaced that file.
+
+Images already pasted into the input stay there, because nothing the Claude Code extension exposes can take an attachment back off it: no command, no message it listens for, and no keystroke a webview can be sent. Claude Code only empties its attachments once a message has gone.
 
 </details>
 
@@ -455,7 +506,7 @@ Three rules in `media/template/template.css` hold it up, and the selection break
 - `.cm-content` sets `caret-color`, since the caret is the browser's now and CodeMirror's base theme would otherwise force it black on a dark theme.
 - `.cm-syntax` dims the markdown marks with a `color-mix` alpha. An `opacity` below 1 groups the span and composites its own selection background down with the glyphs, which notches the highlight at every `#`, `-`, `**`, and backtick.
 
-The toolbar cancels its `mousedown` for the same reason: a click on Copy or Send would otherwise pull focus out of the editor, and the native highlight only stays lit while the editor holds focus.
+The toolbar and the attachment strip cancel their `mousedown` for the same reason: a click on Copy, Send, or a chip's x would otherwise pull focus out of the editor, and the native highlight only stays lit while the editor holds focus.
 
 </details>
 
@@ -486,6 +537,7 @@ The accent is the only thing carrying a color into the tree, so no accent is a n
 
 - Activation and the service graph -> [src/extension.ts](src/extension.ts)
 - Vault metadata, moves, and copies -> [src/common/vaultConfig.ts](src/common/vaultConfig.ts)
+- Files stored beside a note -> [src/common/noteAttachments.ts](src/common/noteAttachments.ts)
 - Which folder is the vault -> [src/common/vaultManager.ts](src/common/vaultManager.ts), [src/vault/configureVault.ts](src/vault/configureVault.ts)
 - Sidebar host, watchers, and the message allowlist -> [src/vault/vaultWebviewProvider.ts](src/vault/vaultWebviewProvider.ts), [src/skills/skillsWebviewProvider.ts](src/skills/skillsWebviewProvider.ts)
 - Skills and sub-project discovery -> [src/skills/skillScanner.ts](src/skills/skillScanner.ts), [src/skills/projectScanner.ts](src/skills/projectScanner.ts), [src/skills/skillsConfigs.ts](src/skills/skillsConfigs.ts)

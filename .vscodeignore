@@ -13,4 +13,6 @@ esbuild.js
 .gitignore
 .vscodeignore
 AGENTS.md
+install.sh
+test-projects/**
 *.vsix

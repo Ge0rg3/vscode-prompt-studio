@@ -29,7 +29,13 @@ function buildCsp(webview: vscode.Webview, nonce: string, styleNonce: boolean): 
   const styleSrc = styleNonce
     ? `style-src ${webview.cspSource} 'nonce-${nonce}'`
     : `style-src ${webview.cspSource}`;
-  return [`default-src 'none'`, styleSrc, `font-src ${webview.cspSource}`, `script-src 'nonce-${nonce}'`].join('; ');
+  return [
+    `default-src 'none'`,
+    styleSrc,
+    `font-src ${webview.cspSource}`,
+    `img-src ${webview.cspSource}`,
+    `script-src 'nonce-${nonce}'`
+  ].join('; ');
 }
 
 // --- exports ---

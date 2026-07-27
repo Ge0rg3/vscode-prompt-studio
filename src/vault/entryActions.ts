@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { dropNoteAttachments } from '../common/noteAttachments';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { pathExists } from '../common/utils/fs';
 import { relativeToRoot } from '../common/utils/paths';
@@ -154,6 +155,11 @@ export function registerDeleteEntry(config: VaultConfig): vscode.Disposable {
     );
     if (choice !== 'Delete') {
       return;
+    }
+
+    // Drop the files only this note named, while it is still there to read
+    if (target.kind === 'note') {
+      await dropNoteAttachments(target.absPath);
     }
 
     // Delete it and drop its saved color and layout

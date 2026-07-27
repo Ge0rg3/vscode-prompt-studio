@@ -6,6 +6,18 @@ import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, tooltips } from '@codemirror/view';
 import { GFM } from '@lezer/markdown';
 
+import { createAttachmentStrip } from './attachmentStrip';
+import {
+  addResolvedAttachments,
+  appendAttachment,
+  Attachment,
+  AttachmentHost,
+  dropResolvedAttachment,
+  hideAttachmentMarkdown,
+  noteAttachments,
+  removeAttachment,
+  ResolvedAttachment
+} from './attachments';
 import { codeHighlighting, codeLanguages } from './codeHighlight';
 import { DirectoryCache } from './directoryCache';
 import { addVerifiedPaths, fileMentions, MentionEntry, setMentionEntries } from './fileMentions';
@@ -46,7 +58,31 @@ interface SavedMessage {
   text: string;
 }
 
-type InboundMessage = ContentMessage | MentionsMessage | DirEntriesMessage | VerifiedPathsMessage | SavedMessage;
+interface AttachedMessage {
+  type: 'attached';
+  id: number;
+  reference?: string;
+}
+
+interface AttachedFromDiskMessage {
+  type: 'attachedFromDisk';
+  references: string[];
+}
+
+interface ResolvedAttachmentsMessage {
+  type: 'resolvedAttachments';
+  entries: ResolvedAttachment[];
+}
+
+type InboundMessage =
+  | ContentMessage
+  | MentionsMessage
+  | DirEntriesMessage
+  | VerifiedPathsMessage
+  | SavedMessage
+  | AttachedMessage
+  | AttachedFromDiskMessage
+  | ResolvedAttachmentsMessage;
 
 // The webview state kept across a window reload, with any unsaved text
 interface PersistedState {
@@ -72,6 +108,8 @@ const pendingDirectories = new Map<number, PendingDirectory>();
 const directoryCache = new DirectoryCache(fetchDirectory);
 const checkingPaths = new Set<string>();
 const queuedVerifies = new Set<string>();
+const pendingAttachments = new Map<number, (reference: string | undefined) => void>();
+const requestedAttachments = new Set<string>();
 let nextRequestId = 1;
 let verifyTimer: number | undefined;
 
@@ -83,10 +121,26 @@ const toggleLabel = document.getElementById('toggle-label') as HTMLElement;
 const save = document.getElementById('save') as HTMLElement;
 const copy = document.getElementById('copy') as HTMLElement;
 const send = document.getElementById('send') as HTMLElement;
+const attach = document.getElementById('attach') as HTMLElement;
+const attachmentStrip = document.getElementById('attachments') as HTMLElement;
 
 const persisted = vscode.getState() as PersistedState | undefined;
 
 const live = new Compartment();
+const drawAttachments = createAttachmentStrip(attachmentStrip, (attachment: Attachment) =>
+  removeAttachment(view, attachment)
+);
+const attachmentHost: AttachmentHost = {
+  storeAttachment,
+  reportTooLarge,
+  resolveAttachments: requestAttachments,
+  showAttachments
+};
+
+// What the rendered mode adds on top of the plain source
+const renderedMarkdown = [livePreview(), hideAttachmentMarkdown()];
+
+let attachedReferences = new Set<string>();
 let sourceMode = false;
 let loading = false;
 let notePath = '';
@@ -121,14 +175,16 @@ const view = new EditorView({
         listDirectory: (dirPath) => directoryCache.list(dirPath),
         cachedDirectory: (dirPath) => directoryCache.cached(dirPath),
         prefetchDirectory: (dirPath) => directoryCache.prefetch(dirPath),
-        verifyPaths
+        verifyPaths,
+        openMention: (mentionPath) => vscode.postMessage({ type: 'openMention', path: mentionPath })
       }),
+      noteAttachments(attachmentHost),
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !loading) {
           onDocChanged();
         }
       }),
-      live.of(livePreview())
+      live.of(renderedMarkdown)
     ]
   })
 });
@@ -179,6 +235,61 @@ function verifyPaths(paths: string[]): void {
   }, VERIFY_DEBOUNCE_MS);
 }
 
+// Ask the host to store a file beside the note, undefined when it could not be written
+function storeAttachment(name: string, mime: string, base64: string): Promise<string | undefined> {
+  const id = nextRequestId++;
+  vscode.postMessage({ type: 'attachFile', id, name, mime, base64 });
+  return new Promise((resolve) => pendingAttachments.set(id, resolve));
+}
+
+// Report a file the editor skipped for its size
+function reportTooLarge(name: string): void {
+  vscode.postMessage({ type: 'attachmentTooLarge', name });
+}
+
+// Ask the host where a file sits, once per reference so a broken one is not asked about again
+function requestAttachments(references: string[]): void {
+  const unrequested: string[] = [];
+  for (const reference of references) {
+    if (!requestedAttachments.has(reference)) {
+      requestedAttachments.add(reference);
+      unrequested.push(reference);
+    }
+  }
+
+  if (unrequested.length > 0) {
+    vscode.postMessage({ type: 'resolveAttachments', references: unrequested });
+  }
+}
+
+// Forget where a file sat, so putting its reference back asks the host about it again
+function forgetAttachment(reference: string): void {
+  requestedAttachments.delete(reference);
+
+  // The strip is drawn mid-update, so the effect waits for that update to finish
+  setTimeout(() => view.dispatch({ effects: dropResolvedAttachment.of(reference) }), 0);
+}
+
+// Draw the strip, and tell the host to bin whatever the note has stopped naming
+function showAttachments(attached: readonly Attachment[]): void {
+  const references = new Set(attached.map((attachment) => attachment.reference));
+
+  // Only an edit takes a file off, a fresh load just brings the note in
+  if (!loading) {
+    for (const removed of attachedReferences) {
+      if (references.has(removed)) {
+        continue;
+      }
+
+      vscode.postMessage({ type: 'dropAttachment', reference: removed });
+      forgetAttachment(removed);
+    }
+  }
+
+  attachedReferences = references;
+  drawAttachments(attached);
+}
+
 // Swap the note's text into the editor, kept out of the undo history and the modified check
 function setContent(text: string): void {
   loading = true;
@@ -224,7 +335,7 @@ function persist(): void {
 // Switch between the rendered markdown and the raw source, the button names the mode on screen
 function setSourceMode(on: boolean): void {
   sourceMode = on;
-  view.dispatch({ effects: live.reconfigure(on ? [] : livePreview()) });
+  view.dispatch({ effects: live.reconfigure(on ? [] : renderedMarkdown) });
   toggleIcon.className = on ? 'codicon codicon-code' : 'codicon codicon-eye';
   toggleLabel.textContent = on ? 'Source' : 'Rendered';
   view.focus();
@@ -232,8 +343,8 @@ function setSourceMode(on: boolean): void {
 
 // --- inbound messages ---
 
-window.addEventListener('message', (event) => {
-  const msg = event.data as InboundMessage | undefined;
+// Act on one message from the extension host
+function handleHostMessage(msg: InboundMessage | undefined): void {
   if (msg?.type === 'content') {
     notePath = msg.notePath;
     claudeCommand = msg.claudeCommand;
@@ -274,15 +385,42 @@ window.addEventListener('message', (event) => {
   if (msg?.type === 'verifiedPaths') {
     checkingPaths.clear();
     view.dispatch({ effects: addVerifiedPaths.of(msg.entries) });
+    return;
   }
-});
+
+  if (msg?.type === 'attached') {
+    pendingAttachments.get(msg.id)?.(msg.reference);
+    pendingAttachments.delete(msg.id);
+    return;
+  }
+
+  // A picked file is named the way a pasted one is, so it goes on the end the same way
+  if (msg?.type === 'attachedFromDisk') {
+    for (const reference of msg.references) {
+      appendAttachment(view, reference);
+    }
+
+    // The dialog took focus off the editor, and the caret only shows while it holds it
+    view.focus();
+    return;
+  }
+
+  // An answer with nothing in it changes no decoration, and dispatching it would ask again
+  if (msg?.type === 'resolvedAttachments' && msg.entries.length > 0) {
+    view.dispatch({ effects: addResolvedAttachments.of(msg.entries) });
+  }
+}
+
+window.addEventListener('message', (event) => handleHostMessage(event.data as InboundMessage | undefined));
 
 // --- toolbar ---
 
 // Hold focus in the editor, the selection only stays lit while the editor has it
 toolbar.addEventListener('mousedown', (event) => event.preventDefault());
+attachmentStrip.addEventListener('mousedown', (event) => event.preventDefault());
 
 toggle.addEventListener('click', () => setSourceMode(!sourceMode));
+attach.addEventListener('click', () => vscode.postMessage({ type: 'attachFromDisk' }));
 save.addEventListener('click', saveNote);
 copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));
 send.addEventListener('click', () => vscode.postMessage({ type: 'sendToClaude', text: view.state.doc.toString() }));

@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { stringify } from 'yaml';
 
 import { ColorPreview } from '../common/cardColors';
-import { sendTextToClaude } from '../common/sendToClaude';
+import { sendToClaude } from '../common/sendToClaude';
 import { pathExists } from '../common/utils/fs';
 import { MentionIndex } from '../template/mentionIndex';
 import { TemplatePanel } from '../template/templatePanel';
@@ -60,7 +60,7 @@ export class SkillCommands {
           return;
         }
 
-        await sendTextToClaude(this.slashCommand(target));
+        await sendToClaude(this.slashCommand(target));
       }),
 
       vscode.commands.registerCommand('promptStudio.newSkill', (target?: SkillTreeNode) =>

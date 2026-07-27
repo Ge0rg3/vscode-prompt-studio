@@ -4,6 +4,9 @@ import * as path from 'node:path';
 
 const HASH_LENGTH = 8;
 
+// A path that already points elsewhere, like a url, a data uri, or a windows drive
+const URL_SCHEME = /^[a-z][a-z0-9+.-]*:/i;
+
 // --- helpers ---
 
 // Hash the input to a short hex string
@@ -11,12 +14,12 @@ function shortHash(input: string): string {
   return createHash('sha256').update(input).digest('hex').slice(0, HASH_LENGTH);
 }
 
-// Swap characters that are unsafe in a folder name for underscores
-function sanitizeBasename(name: string): string {
+// --- exports ---
+
+// Swap characters that are unsafe in a file or folder name for underscores
+export function sanitizeBasename(name: string): string {
   return name.replace(/[^A-Za-z0-9._-]/g, '_');
 }
-
-// --- exports ---
 
 // Test whether target is the directory itself or sits beneath it
 export function isWithin(target: string, dir: string): boolean {
@@ -25,6 +28,15 @@ export function isWithin(target: string, dir: string): boolean {
   }
   const rel = path.relative(dir, target);
   return rel.length > 0 && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+// Resolve a path written inside a file against the folder it sits in, undefined when it points elsewhere
+export function resolveRelativePath(dir: string, reference: string): string | undefined {
+  if (URL_SCHEME.test(reference) || path.isAbsolute(reference)) {
+    return undefined;
+  }
+
+  return path.resolve(dir, reference);
 }
 
 // Make target relative to root, '.' for root itself

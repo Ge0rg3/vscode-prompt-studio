@@ -18,12 +18,13 @@ export interface MentionEntry {
   isFolder: boolean;
 }
 
-// What the editor asks the extension host for, since only the host can read the disk
+// What the editor asks the extension host for, since only the host can reach the disk
 export interface MentionHost {
   listDirectory(dirPath: string): Promise<MentionEntry[]>;
   cachedDirectory(dirPath: string): MentionEntry[] | undefined;
   prefetchDirectory(dirPath: string): void;
   verifyPaths(paths: string[]): void;
+  openMention(mentionPath: string): void;
 }
 
 interface MentionCandidate {
@@ -399,6 +400,25 @@ function absoluteTarget(token: string): string | undefined {
   return trimmed.length > 1 ? trimmed : undefined;
 }
 
+// Test a click for the open gesture: ctrl on Windows and Linux, cmd on macOS
+function isOpenClick(event: MouseEvent): boolean {
+  return event.button === 0 && (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
+}
+
+// Take the path of the tinted mention covering a position, the mark spans the @ and the path
+function mentionPathAt(marks: DecorationSet, state: EditorState, pos: number): string | undefined {
+  let mentionPath: string | undefined;
+
+  marks.between(pos, pos, (from, to) => {
+    if (pos < to) {
+      mentionPath = state.sliceDoc(from + 1, to);
+      return false;
+    }
+  });
+
+  return mentionPath;
+}
+
 // Mark every @ mention in the visible lines that names a real file or folder
 function scanMentions(state: EditorState, ranges: readonly { from: number; to: number }[]): MentionScan {
   const catalog = state.field(mentionCatalog);
@@ -476,6 +496,22 @@ export function fileMentions(host: MentionHost): Extension {
           }
         }
 
+        // Send the mention under a ctrl+click to the host
+        openClickedMention(event: MouseEvent, view: EditorView): boolean {
+          if (!isOpenClick(event)) {
+            return false;
+          }
+
+          const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+          const mentionPath = pos === null ? undefined : mentionPathAt(this.decorations, view.state, pos);
+          if (mentionPath === undefined) {
+            return false;
+          }
+
+          host.openMention(mentionPath);
+          return true;
+        }
+
         private scan(state: EditorState, ranges: readonly { from: number; to: number }[]): DecorationSet {
           const { marks, unverified } = scanMentions(state, ranges);
           if (unverified.length > 0) {
@@ -484,7 +520,14 @@ export function fileMentions(host: MentionHost): Extension {
           return marks;
         }
       },
-      { decorations: (plugin) => plugin.decorations }
+      {
+        decorations: (plugin) => plugin.decorations,
+        eventHandlers: {
+          mousedown(event, view) {
+            return this.openClickedMention(event, view);
+          }
+        }
+      }
     )
   ];
 }

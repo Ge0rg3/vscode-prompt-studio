@@ -1,4 +1,4 @@
-/* Styles the template editor, its rendered markdown, the mention popup, and the bottom bar */
+/* Styles the template editor, its rendered markdown, the mention popup, the attachment chips, and the bottom bar */
 html,
 body {
   margin: 0;
@@ -295,10 +295,90 @@ body.vscode-high-contrast-light .cmt-name {
   -webkit-box-decoration-break: clone;
 }
 
+.cm-mention:hover {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 body.vscode-high-contrast .cm-mention,
 body.vscode-high-contrast-light .cm-mention {
   background: transparent;
   outline: 1px solid var(--vscode-contrastBorder);
+}
+
+/* --- attached files --- */
+
+#attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  max-height: 25vh;
+  overflow-y: auto;
+  padding: 8px 10px;
+}
+
+#attachments:empty {
+  display: none;
+}
+
+.attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 16rem;
+  padding: 3px 5px;
+  border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  border-radius: 6px;
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+.attachment-thumbnail {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  object-fit: cover;
+  background: var(--vscode-editor-background);
+}
+
+/* Stands where a thumbnail would, so a chip with an icon lines up with one holding a picture */
+.attachment-icon {
+  flex: none;
+  width: 20px;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+
+.attachment-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.attachment-size {
+  flex: none;
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+}
+
+.attachment-remove {
+  display: inline-flex;
+  flex: none;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  opacity: 0.6;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+}
+
+.attachment-remove .codicon {
+  font-size: 13px;
+}
+
+.attachment-remove:hover {
+  opacity: 1;
 }
 
 /* --- bottom bar --- */

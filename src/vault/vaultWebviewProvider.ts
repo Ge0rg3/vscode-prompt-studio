@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
+import { carryNoteAttachments } from '../common/noteAttachments';
 import { isWithin } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
@@ -183,6 +184,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         const destination = await moveVaultEntry(root, msg.source, msg.destDir);
         if (destination) {
           this.config.relocate(msg.source, destination);
+          await carryNoteAttachments(msg.source, destination);
         }
         return;
       }
@@ -193,6 +195,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         if (!destination) return;
 
         this.config.duplicate(msg.source, destination);
+        await carryNoteAttachments(msg.source, destination);
         await this.postState();
         await this.view?.webview.postMessage({ type: 'reveal', path: destination });
         return;

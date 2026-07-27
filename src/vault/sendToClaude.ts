@@ -1,7 +1,9 @@
 // Registers the command that drops a note's text into the Claude Code chat input
 import * as vscode from 'vscode';
 
-import { sendTextToClaude } from '../common/sendToClaude';
+import { splitOutAttachments } from '../common/noteAttachments';
+import { sendToClaude } from '../common/sendToClaude';
+import { readTextFile } from '../common/utils/fs';
 import { VaultNode } from '../common/vaultNode';
 
 export function registerSendToClaude(): vscode.Disposable {
@@ -10,7 +12,7 @@ export function registerSendToClaude(): vscode.Disposable {
       return;
     }
 
-    const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(target.absPath));
-    await sendTextToClaude(new TextDecoder('utf-8').decode(bytes));
+    const note = await splitOutAttachments(target.absPath, await readTextFile(target.absPath));
+    await sendToClaude(note.text, note.attachments);
   });
 }

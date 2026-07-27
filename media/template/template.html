@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- The template editor, an empty editor pane above its toolbar buttons -->
+<!-- The template editor, an empty editor pane above its attachment chips and toolbar buttons -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -10,12 +10,17 @@
 </head>
 <body data-nonce="{{nonce}}">
   <div id="editor"></div>
+  <div id="attachments"></div>
   <div id="toolbar">
     <button id="toggle" class="bar-button" type="button">
       <span id="toggle-icon" class="codicon codicon-eye"></span>
       <span id="toggle-label">Rendered</span>
     </button>
     <span class="spacer"></span>
+    <button id="attach" class="bar-button" type="button">
+      <span class="codicon codicon-attach"></span>
+      <span>Attach</span>
+    </button>
     <button id="save" class="bar-button" type="button">
       <span class="codicon codicon-save"></span>
       <span>Save</span>
