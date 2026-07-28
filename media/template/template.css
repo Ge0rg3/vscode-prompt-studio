@@ -1,4 +1,4 @@
-/* Styles the template editor, its rendered markdown, the mention popup, the attachment chips, and the bottom bar */
+/* Styles the template editor, its rendered markdown, the mention popup, the find widget, the attachment chips, and the bottom bar */
 html,
 body {
   margin: 0;
@@ -304,6 +304,156 @@ body.vscode-high-contrast .cm-mention,
 body.vscode-high-contrast-light .cm-mention {
   background: transparent;
   outline: 1px solid var(--vscode-contrastBorder);
+}
+
+/* --- find and replace --- */
+
+/* Float the widget over the text, the way the VSCode find box sits above the editor */
+.cm-editor .cm-panels.cm-panels-top {
+  position: absolute;
+  left: auto;
+  right: 12px;
+  border-bottom: none;
+  background: none;
+}
+
+.find-widget {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  max-width: calc(100vw - 24px);
+  margin-top: 6px;
+  padding: 4px 4px 4px 0;
+  border: 1px solid var(--vscode-editorWidget-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+  border-radius: 4px;
+  color: var(--vscode-editorWidget-foreground, var(--vscode-foreground));
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.36));
+}
+
+.find-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.find-row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.find-replace-row {
+  display: none;
+}
+
+.find-widget.find-expanded .find-replace-row {
+  display: flex;
+}
+
+.find-box {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  width: 16rem;
+  min-width: 0;
+  padding: 0 2px 0 4px;
+  border: 1px solid var(--vscode-input-border, transparent);
+  background: var(--vscode-input-background);
+}
+
+.find-box:focus-within {
+  border-color: var(--vscode-focusBorder);
+}
+
+.find-box.find-invalid {
+  border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+  background: var(--vscode-inputValidation-errorBackground, var(--vscode-input-background));
+}
+
+.find-field {
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: none;
+  outline: none;
+  font: inherit;
+  color: var(--vscode-input-foreground);
+  background: transparent;
+}
+
+.find-field::placeholder {
+  color: var(--vscode-input-placeholderForeground);
+}
+
+.find-count {
+  flex: none;
+  min-width: 6.5rem;
+  padding: 0 4px;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
+
+.find-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  background: none;
+}
+
+.find-button:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+
+.find-button .codicon {
+  font-size: 16px;
+}
+
+/* Stretch the chevron across both rows, past the size the buttons share */
+.find-button.find-expand {
+  width: 16px;
+  height: auto;
+}
+
+.find-toggle[aria-pressed='true'] {
+  border-color: var(--vscode-inputOption-activeBorder, transparent);
+  color: var(--vscode-inputOption-activeForeground, inherit);
+  background: var(--vscode-inputOption-activeBackground, rgba(128, 128, 128, 0.3));
+}
+
+.find-toggle[aria-pressed='true']:hover {
+  background: var(--vscode-inputOption-hoverBackground, var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2)));
+}
+
+.cm-editor .cm-searchMatch {
+  background: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
+
+.cm-editor .cm-searchMatch-selected {
+  background: var(--vscode-editor-findMatchBackground, rgba(234, 92, 0, 0.55));
+}
+
+/* A high-contrast theme leaves both match colors unset, so the outline has to carry them */
+body.vscode-high-contrast .cm-editor .cm-searchMatch,
+body.vscode-high-contrast-light .cm-editor .cm-searchMatch {
+  background: transparent;
+  outline: 1px dotted var(--vscode-editor-findMatchHighlightBorder, var(--vscode-contrastActiveBorder));
+}
+
+body.vscode-high-contrast .cm-editor .cm-searchMatch-selected,
+body.vscode-high-contrast-light .cm-editor .cm-searchMatch-selected {
+  background: transparent;
+  outline: 1px solid var(--vscode-editor-findMatchBorder, var(--vscode-contrastActiveBorder));
 }
 
 /* --- attached files --- */

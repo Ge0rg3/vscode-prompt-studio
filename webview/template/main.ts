@@ -1,7 +1,8 @@
 // Builds the template editor's CodeMirror view and wires it to the host and the toolbar
-import { acceptCompletion } from '@codemirror/autocomplete';
+import { acceptCompletion, completionStatus } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentLess, insertTab } from '@codemirror/commands';
 import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
+import { closeSearchPanel } from '@codemirror/search';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, tooltips } from '@codemirror/view';
 import { GFM } from '@lezer/markdown';
@@ -21,6 +22,7 @@ import {
 import { codeHighlighting, codeLanguages } from './codeHighlight';
 import { DirectoryCache } from './directoryCache';
 import { addVerifiedPaths, fileMentions, MentionEntry, setMentionEntries } from './fileMentions';
+import { findReplace, stepFindMatch, toggleFindWidget } from './findReplace';
 import { listIndentKeymap } from './listIndent';
 import { livePreview } from './livePreview';
 
@@ -99,6 +101,9 @@ interface PendingDirectory {
 
 const LIST_TIMEOUT_MS = 8000;
 const VERIFY_DEBOUNCE_MS = 200;
+
+// macOS uses cmd for shortcuts, and keeps ctrl+f and ctrl+h for moving and deleting a character
+const isMac = navigator.userAgent.includes('Mac');
 
 // --- setup ---
 
@@ -179,6 +184,7 @@ const view = new EditorView({
         openMention: (mentionPath) => vscode.postMessage({ type: 'openMention', path: mentionPath })
       }),
       noteAttachments(attachmentHost),
+      findReplace(),
       EditorView.updateListener.of((update) => {
         if (update.docChanged && !loading) {
           onDocChanged();
@@ -305,10 +311,44 @@ function saveNote(): void {
   vscode.postMessage({ type: 'save', text: view.state.doc.toString() });
 }
 
-// Match ctrl+s or cmd+s on key and on code, so any keyboard layout saves
-function isSaveShortcut(event: KeyboardEvent): boolean {
-  const held = (event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey;
-  return held && (event.key.toLowerCase() === 's' || event.code === 'KeyS');
+// Match a ctrl or cmd shortcut on key and on code, so any keyboard layout reaches it
+function isCtrlOrCmdShortcut(event: KeyboardEvent, letter: string): boolean {
+  const held = (isMac ? event.metaKey : event.ctrlKey) && !event.altKey && !event.shiftKey;
+  return held && (event.key.toLowerCase() === letter || event.code === `Key${letter.toUpperCase()}`);
+}
+
+// Match the replace shortcut, cmd+alt+f on macOS and ctrl+h everywhere else
+function isReplaceShortcut(event: KeyboardEvent): boolean {
+  if (!isMac) {
+    return isCtrlOrCmdShortcut(event, 'h');
+  }
+
+  // Alt rewrites the key on macOS, so only the physical key says which one was pressed
+  return event.metaKey && event.altKey && !event.shiftKey && event.code === 'KeyF';
+}
+
+// Run the find shortcut the event names, false when it names none
+function runFindShortcut(event: KeyboardEvent): boolean {
+  if (isCtrlOrCmdShortcut(event, 'f')) {
+    return toggleFindWidget(view, false);
+  }
+
+  if (isReplaceShortcut(event)) {
+    return toggleFindWidget(view, true);
+  }
+
+  // Take the key even with nothing to step to, or it carries on out of the webview
+  if (event.key === 'F3') {
+    stepFindMatch(view, !event.shiftKey);
+    return true;
+  }
+
+  // The mention popup is the innermost thing open, so escape closes that one first
+  if (event.key === 'Escape') {
+    return completionStatus(view.state) === null && closeSearchPanel(view);
+  }
+
+  return false;
 }
 
 // Refresh the modified marker and store the text after each edit
@@ -425,12 +465,23 @@ save.addEventListener('click', saveNote);
 copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));
 send.addEventListener('click', () => vscode.postMessage({ type: 'sendToClaude', text: view.state.doc.toString() }));
 
-// Listen on the window, the editor only holds focus once the note has been clicked
-window.addEventListener('keydown', (event) => {
-  if (isSaveShortcut(event)) {
-    event.preventDefault();
-    saveNote();
-  }
-});
+// Catch keys on the way down, the editor only holds focus once the note has been clicked
+window.addEventListener(
+  'keydown',
+  (event) => {
+    if (isCtrlOrCmdShortcut(event, 's')) {
+      event.preventDefault();
+      saveNote();
+      return;
+    }
+
+    // Stop the key here, VSCode's own find shortcuts pick it up otherwise
+    if (runFindShortcut(event)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true
+);
 
 vscode.postMessage({ type: 'ready' });

@@ -314,6 +314,7 @@ The template editor is the one bundled webview. `webview/template/` holds:
 - `listIndent.ts` - tab and shift-tab on bullets
 - `fileMentions.ts` - the `@` path popup and the tint on a resolved mention
 - `directoryCache.ts` - the cached listings behind the absolute-path popup
+- `findReplace.ts` - the find and replace widget and the matches it tints
 - `attachments.ts` - the pasted, dropped, and picked files coming in, and the hidden markdown that names them
 - `attachmentStrip.ts` - the chips listing what the note carries
 
@@ -409,6 +410,21 @@ The underline and the hand cursor come up on a plain hover rather than while ctr
 Browsing ignores case everywhere: the workspace popup ranks against lowercased paths, and a failed absolute read retries with each segment matched to its on-disk casing, so `@/HOME/` still lists `/home` on a case-sensitive disk. A picked completion always inserts the on-disk spelling. The tint stays exact-case on purpose, because Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
 
 The popup is CodeMirror's, restyled in `media/template/template.css` to match the VSCode suggest widget. Every rule there is prefixed with `.cm-editor` to reach the specificity of CodeMirror's own base theme, and the selected-row rule carries both `.cm-tooltip` and `.cm-tooltip-autocomplete` to outrank its light and dark variants. Drop a class from those selectors and the popup reverts to CodeMirror's colors.
+
+</details>
+
+<details>
+<summary><b>Find and replace</b></summary>
+
+The widget is a CodeMirror search panel with a hand-built body, floated over the text by CSS rather than pushing the editor down. Two things hang off the panel: the matches are only tinted while it is open, and closing it hands focus back to the editor.
+
+Ctrl+F and Ctrl+H are caught on the window while the event travels down, and stopped there. A webview key left alone reaches VSCode's own shortcuts, and a keymap inside the editor would miss the key entirely until the note has been clicked. macOS reads cmd in place of ctrl, and takes Cmd+Alt+F for replace, since Cmd+H hides the window before anything sees it. Escape only closes the widget once the mention popup is down, since that one sits innermost.
+
+Stepping to a match selects the whole find field, so the caret is put back after each step. Typing in the field searches again from the caret rather than from the last match, or a query growing a letter at a time would walk down the note.
+
+The query carries a filter that skips the markdown naming a stored file. Rendered mode covers that markdown up, and a replace reaching it would rewrite the path and take the file off disk with it. The filter has to stay one shared function, since a query compares its filter by identity.
+
+Ctrl+F seeds a query from the selected text, carrying neither that filter nor the typed replacement. The widget pushes its own query back once that update has finished.
 
 </details>
 

@@ -54,8 +54,8 @@ vscode-prompt-studio/
 |
 +-- webview/                # Browser source bundled into media/ (own tsconfig: DOM, no node types)
 |   +-- template/           # main.ts, livePreview.ts, codeHighlight.ts, listIndent.ts,
-|                           # fileMentions.ts, directoryCache.ts, attachments.ts,
-|                           # attachmentStrip.ts
+|                           # fileMentions.ts, directoryCache.ts, findReplace.ts,
+|                           # attachments.ts, attachmentStrip.ts
 |
 +-- media/                  # Everything a webview loads at runtime. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
@@ -81,7 +81,7 @@ vscode-prompt-studio/
 | Extension host | TypeScript 5.5, targeting Node 18, VSCode API `^1.85` |
 | Bundler | esbuild 0.24 - `cjs` for the host, `iife` for the template webview |
 | Sidebar and canvas views | Webviews rendering hand-written plain JS, no framework |
-| Template editor | CodeMirror 6: markdown + GFM, autocomplete, seven fenced-code languages |
+| Template editor | CodeMirror 6: markdown + GFM, autocomplete, search, seven fenced-code languages |
 | Per-entry metadata | YAML (`yaml` 2.9), one `config.yml` per root |
 | Icons | `@vscode/codicons` font, copied into `media/` at build |
 | Packaging | `@vscode/vsce` |
@@ -242,6 +242,7 @@ The editor styles markdown inline as you type. The marks themselves (`#`, `**`, 
 - **Inline styling.** Headings, emphasis, strikethrough, inline and fenced code, links, quotes, lists, and rules. Tables and images stay as plain markdown.
 - **Attachments.** Paste or drop a file to attach it. Each one shows as a chip above the bottom bar, with an x to take it off again. Source mode shows the markdown that names it.
 - **Fenced code.** Syntax-highlighted for JavaScript and TypeScript, Python, JSON, HTML, CSS, YAML, and shell.
+- **Find and replace.** **Ctrl+F** opens a find box over the text, and **Ctrl+H** opens it with the replace row, or **Cmd+F** and **Cmd+Alt+F** on macOS.
 - **Workspace mentions.** Type `@` to search the workspace by path, the way you would in Claude Code. Picking a file inserts its path, picking a folder browses into it.
 - **Matching.** Search matches the file name, the folder path, or the typed letters in order anywhere in the path, so `@tmplpanel` and `@template/temp` both find `src/template/templatePanel.ts`. An `@` inside code, mid-word, or naming a path that does not exist is left alone.
 - **Absolute paths.** Start the path with a slash to browse the disk itself: `@/` lists the filesystem root, `@/home/` lists what is in `/home`. Each directory is read as you reach it, so anything on disk can be mentioned. Case does not have to match, and picking from the popup inserts the path as it is spelled on disk.
@@ -254,7 +255,7 @@ A bar along the bottom offers:
 
 - **Rendered / Source.** Names the mode you are looking at. Click it to read the note as plain markdown, and again to bring the inline styling back.
 - **Attach.** Pick files off disk to attach to the note.
-- **Save.** Write the current text back over the note. **Ctrl+S** anywhere in the tab does the same.
+- **Save.** Write the current text back over the note. **Ctrl+S**, or **Cmd+S** on macOS, anywhere in the tab does the same.
 - **Copy.** Put the current text on the clipboard.
 - **Send to Claude.** Replace the Claude Code chat input with the current text. Images go over attached, other files as their path.
 

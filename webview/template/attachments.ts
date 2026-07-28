@@ -20,6 +20,12 @@ export interface ResolvedAttachment {
   size: number;
 }
 
+// One span of the note where a stored file is named
+export interface AttachmentRange {
+  from: number;
+  to: number;
+}
+
 // What the editor asks the extension host for, since only the host can reach the disk
 export interface AttachmentHost {
   storeAttachment(name: string, mime: string, base64: string): Promise<string | undefined>;
@@ -291,6 +297,16 @@ export function appendAttachment(view: EditorView, reference: string): void {
 // Hold what the host resolves, take pasted files in, and keep the strip in step with the note
 export function noteAttachments(host: AttachmentHost): Extension {
   return [resolvedAttachments, attachmentDropHandlers(host), attachmentPublisher(host)];
+}
+
+// Take the spans where the note names each stored file
+export function attachmentRanges(state: EditorState): readonly AttachmentRange[] {
+  const ranges: AttachmentRange[] = [];
+  for (const attachment of collectAttachments(state).attached) {
+    ranges.push({ from: attachment.from, to: attachment.to });
+  }
+
+  return ranges;
 }
 
 // Cover the markdown naming each stored file, so the note reads as the text around it
