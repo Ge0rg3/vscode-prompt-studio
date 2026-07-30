@@ -15,4 +15,5 @@ esbuild.js
 AGENTS.md
 install.sh
 test-projects/**
+icon-candidates/**
 *.vsix
