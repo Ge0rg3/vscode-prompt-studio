@@ -1,0 +1,189 @@
+# Prompt Studio per-entry metadata. Safe to edit and commit.
+notes:
+  Architecture:
+    visual:
+      x: 40
+      y: 250
+      width: 300
+      height: 230
+      color: orange
+  Architecture/Design a New Service.md:
+    type: prompt
+    tags:
+      - design
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: orange
+  Architecture/Plan a Migration.md:
+    type: prompt
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+  Architecture/Write an ADR.md:
+    type: prompt
+    tags:
+      - writing
+    visual:
+      x: 24
+      y: 214
+      width: 240
+      height: 170
+      color: yellow
+  Code Review:
+    visual:
+      x: 360
+      y: 250
+      width: 300
+      height: 230
+      color: green
+  Code Review/Find Security Issues.md:
+    type: prompt
+    tags:
+      - security
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+      color: red
+  Code Review/Languages:
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: blue
+  Code Review/Languages/CSS Review.md:
+    type: prompt
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: green
+  Code Review/Languages/JavaScript Review.md:
+    type: prompt
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+      color: blue
+  Code Review/Review a Diff.md:
+    type: prompt
+    tags:
+      - review
+    visual:
+      x: 24
+      y: 214
+      width: 240
+      height: 170
+      color: green
+  Debugging:
+    visual:
+      x: 680
+      y: 250
+      width: 300
+      height: 230
+      color: red
+  Debugging/Explain a Stack Trace.md:
+    type: prompt
+    tags:
+      - triage
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: red
+  Debugging/Reproduce a Flaky Test.md:
+    type: prompt
+    tags:
+      - tests
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+      color: yellow
+  Debugging/Trace a Performance Regression.md:
+    type: prompt
+    visual:
+      x: 24
+      y: 214
+      width: 240
+      height: 170
+  Main.md:
+    type: prompt
+    tags:
+      - index
+    visual:
+      x: 40
+      y: 40
+      width: 718
+      height: 187
+      color: blue
+  Refactoring:
+    visual:
+      x: 40
+      y: 500
+      width: 300
+      height: 230
+      color: purple
+  Refactoring/Extract a Function.md:
+    type: prompt
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: purple
+  Refactoring/Untangle a Large Class.md:
+    type: prompt
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+  Review Past Prompts.md:
+    type: prompt
+    tags:
+      - upkeep
+    visual:
+      x: 680
+      y: 500
+      width: 300
+      height: 230
+      color: gray
+  Writing:
+    visual:
+      x: 360
+      y: 500
+      width: 300
+      height: 230
+      color: yellow
+  Writing/Draft a PR Description.md:
+    type: prompt
+    tags:
+      - writing
+    visual:
+      x: 24
+      y: 24
+      width: 240
+      height: 170
+      color: yellow
+  Writing/Write Release Notes.md:
+    type: prompt
+    tags:
+      - writing
+    visual:
+      x: 284
+      y: 24
+      width: 240
+      height: 170
+      color: green

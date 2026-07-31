@@ -1,16 +1,49 @@
-# Prompt Studio
+<h1 align="center">VSCode Prompt Studio</h1>
 
-Prompt Studio turns a folder of markdown files into an Obsidian-like vault inside VSCode. It gives you a sidebar tree, a live-preview template editor, a draggable card canvas, and a second sidebar section listing the Claude skills across your workspace and its sub-projects.
+<p align="center">
+  An Obsidian-like vault of markdown notes and reusable prompts, inside VSCode.
+</p>
 
-Storage stays plain markdown on disk, so a vault is portable, git-friendly, and readable without the extension.
+<p align="center">
+  <img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License: GPL-3.0">
+  <img src="https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg" alt="VSCode 1.85 or newer">
+  <img src="https://img.shields.io/badge/storage-plain%20markdown-blue.svg" alt="Stores plain markdown">
+</p>
 
-## What you get
+<p align="center">
+  <img src="docs/canvas.png" alt="A folder of prompts open as a canvas of colored cards, with Claude Code alongside">
+</p>
 
-- **A vault.** Any folder of `.md` files, with a tree in the activity bar. One is created for you the first time you open it.
-- **A template editor.** Markdown styles itself as you type while the marks stay visible, so what you copy is exactly what you wrote.
-- **A visual canvas.** Open any folder as a pinboard of cards, drag them where you want, and the layout is saved.
-- **Colors and attachments.** Tint any note or folder from a swatch row, and paste or drop files straight onto a note.
-- **Send to Claude.** One click puts a note, a prompt, or a skill into the Claude Code chat, with its images attached.
+<p align="center">
+  <i>Any folder, opened as a pinboard. Drag the cards where you want them.</i>
+</p>
+
+---
+
+Your prompts and notes are plain `.md` files in a folder you choose. Nothing is locked in a database, so the same vault reads fine from a text editor, a terminal, or `git log`.
+
+## Why you might want it
+
+- **A vault, with no setup.** Point it at any folder of `.md` files. Open a workspace and one is created for you.
+- **A canvas, not just a tree.** Open any folder as a pinboard of cards. Drag, resize, and tint them, and the layout is saved beside your notes.
+- **An editor that leaves your text alone.** Markdown styles itself as you type while the marks stay visible, so `{{variables}}` reach the clipboard exactly as you wrote them.
+- **One click into Claude Code.** Send a note, a prompt, or a skill straight to the chat input, images attached.
+- **Your Claude skills, listed.** Every `.claude/skills` folder in the workspace and its sub-projects, in one sidebar section.
+- **`@` mentions that resolve.** Type `@` to search the workspace the way you would in Claude Code. A mention naming a real path is tinted, and Ctrl+click opens it.
+- **Nothing to configure.** No settings. The vault location lives in workspace state, so different projects can point at different vaults.
+
+<details>
+<summary><b>See the sidebar and the template editor</b></summary>
+
+<p align="center">
+  <img src="docs/template-editor.png" alt="The vault tree and Claude Skills in the sidebar, with a prompt open in the template editor">
+</p>
+
+<p align="center">
+  <i>Both sidebar sections on the left, a prompt open in the template editor, and Send to Claude in the bar along the bottom.</i>
+</p>
+
+</details>
 
 ## Requirements
 
@@ -18,7 +51,7 @@ Storage stays plain markdown on disk, so a vault is portable, git-friendly, and 
 - The [Claude Code extension](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code), for the **Send to Claude** actions. Without it those actions fall back to the clipboard.
 - On Linux, `wl-copy` or `xclip`, so a note's images can be attached to what you send. Without one an image goes over as a path, the way every other file does.
 
-## Features
+## The details
 
 <details>
 <summary><b>The vault and <code>config.yml</code></b></summary>

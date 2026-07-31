@@ -14,7 +14,10 @@ esbuild.js
 .vscodeignore
 AGENTS.md
 CONTRIBUTING.md
+README_*.md
 install.sh
 test-projects/**
+demo/**
+docs/**
 icon-candidates/**
 *.vsix

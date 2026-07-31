@@ -1,0 +1,11 @@
+# Prompt Studio per-entry metadata. Safe to edit and commit.
+notes:
+  check-a11y:
+    visual:
+      color: orange
+  commit-message:
+    visual:
+      color: green
+  release-checklist:
+    visual:
+      color: purple

@@ -35,6 +35,8 @@ vscode-prompt-studio/
 +-- .vscodeignore           # What stays out of the packaged .vsix
 +-- tsconfig.json           # Extension host: ES2022 target, Node16 modules, no DOM
 +-- .vscode/                # launch.json for the F5 debug flow, plus the npm: watch build task
++-- docs/                   # Screenshots the README points at. Served from GitHub, not packaged
++-- demo/                   # The demo project the screenshots are shot against
 |
 +-- src/                    # Extension host source (node)
 |   +-- extension.ts        # activate(): builds the shared services, registers every provider and command
