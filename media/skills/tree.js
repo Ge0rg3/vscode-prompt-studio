@@ -7,7 +7,7 @@
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
   const NEW_SKILL_ITEM = { label: 'New Skill', icon: 'add', cmd: 'promptStudio.newSkill' };
-  const REVEAL_ITEM = { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' };
+  const REVEAL_ITEM = { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' };
   const { applyTint } = window.PromptStudioPalette;
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
 

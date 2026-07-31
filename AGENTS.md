@@ -1,7 +1,8 @@
 # Prompt Studio - Agents Guide
 
 This file is the canonical map of the codebase for LLM agents.
-* For a human-facing overview, the repository layout, the tech stack, setup, and what each surface does, read [README.md](README.md).
+* For a human-facing overview and what each surface does, read [README.md](README.md).
+* For the repository layout, the tech stack, setup, and packaging, read [CONTRIBUTING.md](CONTRIBUTING.md).
 * For the manifest itself (commands, views, menus), read [package.json](package.json).
 
 Prompt Studio is one VSCode extension. The extension host, the webview sources, and the assets a webview loads at runtime live in three roots of the same repository and ship as one `.vsix`. This file documents how those roots fit together, the conventions that apply to all of them, and the constraints behind each surface that the code cannot state for itself.
@@ -12,10 +13,11 @@ Prompt Studio is one VSCode extension. The extension host, the webview sources, 
 <details>
 <summary><b>Documentation policy</b></summary>
 
-Treat every `*.md` file as part of the codebase. After any feature, refactor, bug fix, or structural change, update the affected docs in the same commit. The two that matter:
+Treat every `*.md` file as part of the codebase. After any feature, refactor, bug fix, or structural change, update the affected docs in the same commit. The three that matter:
 
 - [AGENTS.md](AGENTS.md) - this file. Code map, conventions, project context.
-- [README.md](README.md) - human-facing overview, setup, feature reference.
+- [README.md](README.md) - human-facing overview and feature reference. The marketplace renders it as the listing page, so keep it aimed at someone installing the extension.
+- [CONTRIBUTING.md](CONTRIBUTING.md) - repository layout, tech stack, setup, and packaging.
 
 ### Docs are a knowledge base
 
@@ -42,7 +44,7 @@ Treat every `*.md` file as part of the codebase. After any feature, refactor, bu
 
 Prose drifts from these rules even when you just read them. After writing or reworking markdown or comments, re-read the diff and grep it for non-ASCII characters (the command is in AI2), semicolons in comments, `Label:` prefixes, and "X, not Y" mirroring.
 
-Before closing out any non-trivial change, re-read this file and [README.md](README.md) end to end and fix anything now wrong, redundant, or misleading.
+Before closing out any non-trivial change, re-read this file, [README.md](README.md), and [CONTRIBUTING.md](CONTRIBUTING.md) end to end and fix anything now wrong, redundant, or misleading.
 
 </details>
 
@@ -276,19 +278,19 @@ esbuild strips types without checking them, so the build never fails on a type e
 
 There is no test suite, no test runner, no linter, no formatter, and no CI. Don't claim a change is verified by tests.
 
-If a test suite is added later, document the runner here and in [README.md](README.md).
+If a test suite is added later, document the runner here and in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ### Building
 
 ```bash
 npm run build        # one-shot build of both bundles
 npm run watch        # rebuild on change, leave running during F5 debug
-yes | npm run vsix   # produce a local .vsix, the yes answers the missing-LICENSE prompt
+npm run vsix         # produce a local .vsix
 ./install.sh         # package a .vsix and install it into VSCode
 npm run publish      # publish to the marketplace via vsce
 ```
 
-`install.sh` runs `code`, or whatever `CODE_CLI` names.
+`install.sh` runs `code`, or whatever `CODE_CLI` names. It pipes `yes` into `npm run vsix` to answer any confirmation `vsce` puts up.
 
 Anything added at the repo root that a user should not receive needs a line in `.vscodeignore`, since `vsce` packages from disk rather than from git.
 
@@ -376,7 +378,7 @@ The watchers cover three patterns: `**/.claude`, `**/.claude/skills`, and `**/.c
 Two smaller constraints:
 
 - **`skillsDir` has to survive serialization.** The skills renderer puts it on every node it sends, and **New Skill** reads it to pick which skills root to create in. Remove the field and New Skill on a sub-project row quietly creates the skill in the workspace `.claude/skills`.
-- **A compressed row keeps the deepest segment's path.** A run of folders that each hold only one child renders as one `a/b/c` row carrying the last directory's path, so expand state and **Reveal in Explorer** both key off the deepest directory.
+- **A compressed row keeps the deepest segment's path.** A run of folders that each hold only one child renders as one `a/b/c` row carrying the last directory's path, so expand state and **Reveal in File Manager** both key off the deepest directory.
 
 The skills host intercepts **Copy as Path > Relative** before it reaches the registered command, because the shared menu emits the vault's command id and that handler resolves against the vault root. The interception measures the path from the skills directory that owns the row, or from the workspace folder for a sub-project row. Remove it and the entry copies a wrong `../`-prefixed path and still reports success.
 
@@ -560,6 +562,7 @@ The accent is the only thing carrying a color into the tree, so no accent is a n
 - Template editor internals -> [webview/template/](webview/template/), [src/template/templatePanel.ts](src/template/templatePanel.ts)
 - Canvas cards and folder previews -> [src/visual/folderContents.ts](src/visual/folderContents.ts), [media/visual/canvas.js](media/visual/canvas.js)
 - Shared menu, swatches, and webview HTML -> [media/common/](media/common/), [src/common/utils/webview.ts](src/common/utils/webview.ts)
-- Repository layout, tech stack, setup, packaging, and the feature reference -> [README.md](README.md)
+- The feature reference -> [README.md](README.md)
+- Repository layout, tech stack, setup, and packaging -> [CONTRIBUTING.md](CONTRIBUTING.md)
 
 </details>

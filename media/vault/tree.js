@@ -681,7 +681,7 @@
         { label: 'Duplicate File', icon: 'files', action: () => vscode.postMessage({ type: 'paste', source: node.absPath, contextNode: serialize(node) }) },
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
-        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
         COPY_PATH_ITEM,
         'sep',
         { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }
@@ -698,7 +698,7 @@
       { label: 'Rename', icon: 'edit', action: () => beginRename(node) },
       { label: 'Duplicate Folder', icon: 'files', action: () => vscode.postMessage({ type: 'paste', source: node.absPath, contextNode: serialize(node) }) },
       'sep',
-      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM,
       'sep',
       { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' }

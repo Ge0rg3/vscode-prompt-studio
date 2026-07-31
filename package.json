@@ -4,6 +4,18 @@
   "description": "Obsidian-like vault of markdown notes and reusable prompts inside VSCode.",
   "version": "0.0.2",
   "publisher": "prompt-studio-dev",
+  "license": "GPL-3.0-only",
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "notes",
+    "vault",
+    "prompts",
+    "canvas"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -11,6 +23,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/Ge0rg3/vscode-prompt-studio.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Ge0rg3/vscode-prompt-studio/issues"
   },
   "activationEvents": [
     "onStartupFinished",
@@ -87,7 +102,7 @@
       },
       {
         "command": "promptStudio.revealInOS",
-        "title": "Reveal in Explorer",
+        "title": "Reveal in File Manager",
         "category": "Prompt Studio"
       },
       {

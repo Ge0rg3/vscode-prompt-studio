@@ -484,7 +484,7 @@
         ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
         { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
         'sep',
-        { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+        { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
         COPY_PATH_ITEM,
         'sep',
         ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
@@ -495,7 +495,7 @@
       'sep',
       ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
       'sep',
-      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM,
       'sep',
       ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
@@ -519,7 +519,7 @@
       ALLOW_CRUD ? { label: 'New Note', icon: 'new-file', action: () => vscode.postMessage({ type: 'newEntry', kind: 'note', x: dropPos.x, y: dropPos.y }) } : null,
       ALLOW_CRUD ? { label: 'New Folder', icon: 'new-folder', action: () => vscode.postMessage({ type: 'newEntry', kind: 'folder', x: dropPos.x, y: dropPos.y }) } : null,
       'sep',
-      { label: 'Reveal in Explorer', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
+      { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
       COPY_PATH_ITEM
     ]);
   }

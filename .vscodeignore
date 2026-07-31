@@ -13,6 +13,7 @@ esbuild.js
 .gitignore
 .vscodeignore
 AGENTS.md
+CONTRIBUTING.md
 install.sh
 test-projects/**
 icon-candidates/**
