@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://marketplace.visualstudio.com/items?itemName=Ge0rg3.prompt-studio"><img src="https://img.shields.io/visual-studio-marketplace/v/Ge0rg3.prompt-studio?label=marketplace" alt="VSCode Marketplace version"></a>
+  <a href="https://marketplace.visualstudio.com/items?itemName=Ge0rg3.prompt-studio"><img src="https://vsmarketplacebadges.dev/version-short/Ge0rg3.prompt-studio.svg?style=flat&label=marketplace&color=blue" alt="VSCode Marketplace version"></a>
   <img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License: GPL-3.0">
   <img src="https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg" alt="VSCode 1.85 or newer">
   <img src="https://img.shields.io/badge/storage-plain%20markdown-blue.svg" alt="Stores plain markdown">
