@@ -1,6 +1,6 @@
 # Contributing to Prompt Studio
 
-Build, run, and packaging instructions for working on the extension itself.
+Build, run, packaging, and release instructions for working on the extension itself.
 
 * For what the extension does, read [README.md](README.md).
 * For the code map and the conventions, read [AGENTS.md](AGENTS.md).
@@ -26,7 +26,8 @@ Press **F5** in VSCode to launch an Extension Development Host with the extensio
 ```
 vscode-prompt-studio/
 +-- README.md               # Human-facing overview and feature reference
-+-- CONTRIBUTING.md         # This file. Setup, build, packaging
++-- CHANGELOG.md            # What changed in each released version. The marketplace renders it
++-- CONTRIBUTING.md         # This file. Setup, build, packaging, releases
 +-- AGENTS.md               # Code map, conventions, code style
 +-- LICENSE                 # GPL-3.0
 +-- package.json            # Manifest: commands, views, menus. Contributes no settings
@@ -35,7 +36,8 @@ vscode-prompt-studio/
 +-- .vscodeignore           # What stays out of the packaged .vsix
 +-- tsconfig.json           # Extension host: ES2022 target, Node16 modules, no DOM
 +-- .vscode/                # launch.json for the F5 debug flow, plus the npm: watch build task
-+-- docs/                   # Screenshots the README points at. Served from GitHub, not packaged
++-- .github/workflows/      # publish.yml, the release workflow for a push to main
++-- docs/                   # README screenshots served from GitHub, plus the marketplace icon art. Not packaged
 +-- demo/                   # The demo project the screenshots are shot against
 |
 +-- src/                    # Extension host source (node)
@@ -61,8 +63,9 @@ vscode-prompt-studio/
 |                           # fileMentions.ts, directoryCache.ts, findReplace.ts,
 |                           # attachments.ts, attachmentStrip.ts
 |
-+-- media/                  # Everything a webview loads at runtime. All of it ships
++-- media/                  # Everything a webview loads at runtime, plus the icons the manifest names. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
+|   +-- marketplaceIcon.png # 128x128 marketplace icon, exported from docs/marketplace-icon.svg
 |   +-- common/             # contextMenu + palette, shared by both trees and the canvas
 |   +-- vault/              # tree.html/.css/.js. tree.css also styles the skills view
 |   +-- skills/             # tree.html/.js for the Claude Skills sidebar
@@ -114,9 +117,9 @@ npx tsc --noEmit -p webview/tsconfig.json   # webview source
 
 esbuild strips types without checking them, so nothing in the build catches a type error. Run these before committing.
 
-There is no test suite, no test runner, no linter, no formatter, and no CI. Verify changes by running the extension.
+There is no test suite, no test runner, no linter, and no formatter. Verify changes by running the extension. CI runs both typechecks, but only on a commit that publishes.
 
-## Packaging and publishing
+## Packaging
 
 Install the extension into your everyday VSCode:
 
@@ -128,14 +131,11 @@ That packages a `.vsix` and installs it over any previous copy of the same versi
 
 The script calls `code`, so set `CODE_CLI=code-insiders` when your VSCode CLI goes by another name.
 
-The extension publishes to the [VSCode Marketplace](https://marketplace.visualstudio.com/vscode) via `vsce`. Before the first publish:
+## Releases
 
-1. Register a publisher at https://marketplace.visualstudio.com/manage and replace `publisher` in [package.json](package.json) with that publisher id. It holds the placeholder `prompt-studio-dev`.
-2. Create an Azure DevOps personal access token with **Marketplace > Manage** scope. See the [vsce docs](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token).
-3. Authenticate vsce once with `npx vsce login <publisher>`.
-4. Add a 128x128 `media/icon.png` and set `"icon": "media/icon.png"` in [package.json](package.json). The marketplace listing requires a PNG.
+Only the maintainer can cut a release, since it goes out under their personal marketplace account.
 
-Cut a release with `npm version patch` (or `minor` / `major`) then `npm run publish`. `vsce publish` runs the production build through `vscode:prepublish` automatically.
+[.github/workflows/publish.yml](.github/workflows/publish.yml) publishes on a push to `main` when the version in [package.json](package.json) has no `v<version>` release yet. So leave the version and the [CHANGELOG.md](CHANGELOG.md) entry alone in a pull request.
 
 ## Not built yet
 

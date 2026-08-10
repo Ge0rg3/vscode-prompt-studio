@@ -2,7 +2,7 @@
 
 This file is the canonical map of the codebase for LLM agents.
 * For a human-facing overview and what each surface does, read [README.md](README.md).
-* For the repository layout, the tech stack, setup, and packaging, read [CONTRIBUTING.md](CONTRIBUTING.md).
+* For the repository layout, the tech stack, setup, packaging, and releases, read [CONTRIBUTING.md](CONTRIBUTING.md).
 * For the manifest itself (commands, views, menus), read [package.json](package.json).
 
 Prompt Studio is one VSCode extension. The extension host, the webview sources, and the assets a webview loads at runtime live in three roots of the same repository and ship as one `.vsix`. This file documents how those roots fit together, the conventions that apply to all of them, and the constraints behind each surface that the code cannot state for itself.
@@ -17,7 +17,9 @@ Treat every `*.md` file as part of the codebase. After any feature, refactor, bu
 
 - [AGENTS.md](AGENTS.md) - this file. Code map, conventions, project context.
 - [README.md](README.md) - human-facing overview and feature reference. The marketplace renders it as the listing page, so keep it aimed at someone installing the extension.
-- [CONTRIBUTING.md](CONTRIBUTING.md) - repository layout, tech stack, setup, and packaging.
+- [CONTRIBUTING.md](CONTRIBUTING.md) - repository layout, tech stack, setup, packaging, and releases.
+
+[CHANGELOG.md](CHANGELOG.md) is the exception to the knowledge-base rules below. It records what changed, one entry per released version.
 
 ### Docs are a knowledge base
 
@@ -139,7 +141,7 @@ const parent = resolvePasteDir(source, target);
 ### Files and modules (FM)
 
 - **FM1** One concern per file. Treat ~200 lines as a prompt to check whether a file has grown to cover two, rather than a hard cap. Split by concern, since a single cohesive file may run well past it.
-- **FM2** Three roots, split by build target. `src/` is extension-host source (node), `webview/` is browser source with its own `tsconfig.json`, and `media/` is only what a webview loads at runtime.
+- **FM2** Three roots, split by build target. `src/` is extension-host source (node), `webview/` is browser source with its own `tsconfig.json`, and `media/` is what a webview loads at runtime, plus the icons the manifest names.
 - **FM3** One folder per feature surface, in `src/<feature>/`. Its commands, its providers, and its services live together.
 - **FM4** Keep build inputs out of `media/`. It is the extension's `localResourceRoots` and everything in it ships.
 - **FM5** Generic, stateless, domain-agnostic helpers go in `src/common/utils/`. Placement is by nature, not usage count: a helper with no domain meaning belongs there even when one feature uses it today.
@@ -276,7 +278,7 @@ esbuild strips types without checking them, so the build never fails on a type e
 
 ### Tests and linting
 
-There is no test suite, no test runner, no linter, no formatter, and no CI. Don't claim a change is verified by tests.
+There is no test suite, no test runner, no linter, and no formatter. Don't claim a change is verified by tests. CI runs both typechecks, but only on a commit that publishes.
 
 If a test suite is added later, document the runner here and in [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -287,12 +289,29 @@ npm run build        # one-shot build of both bundles
 npm run watch        # rebuild on change, leave running during F5 debug
 npm run vsix         # produce a local .vsix
 ./install.sh         # package a .vsix and install it into VSCode
-npm run publish      # publish to the marketplace via vsce
+npm run publish      # publish to the marketplace by hand
 ```
 
 `install.sh` runs `code`, or whatever `CODE_CLI` names. It pipes `yes` into `npm run vsix` to answer any confirmation `vsce` puts up.
 
 Anything added at the repo root that a user should not receive needs a line in `.vscodeignore`, since `vsce` packages from disk rather than from git.
+
+### Releasing
+
+[.github/workflows/publish.yml](.github/workflows/publish.yml) publishes on a push to `main` when the version in [package.json](package.json) has no `v<version>` release yet, then cuts that release with the `.vsix` attached. So a release is a version bump:
+
+```bash
+npm version patch -m "chore: release %s"  # or minor / major
+git push
+```
+
+Commit the version's [CHANGELOG.md](CHANGELOG.md) entry first, since `npm version` refuses a dirty tree.
+
+The marketplace credentials are the maintainer's alone. The workflow publishes with the `VSCE_PAT` repository secret, an [Azure DevOps token](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token) with **Marketplace > Manage** scope.
+
+A token lasts a year at most. A publish step failing with a `401` means it is time for a new one.
+
+Publishing by hand needs `npx vsce login` first.
 
 </details>
 
@@ -304,7 +323,7 @@ Three roots, split by build target:
 
 - **`src/`** is extension-host source, running on node. `src/extension.ts` holds `activate`, and each feature surface owns a folder: `vault`, `template`, `visual`, `skills`. `src/common/` holds shared state and domain types, `src/common/utils/` holds stateless helpers.
 - **`webview/`** is browser source with its own `tsconfig.json` (DOM types, no node types), bundled by esbuild.
-- **`media/`** is what a webview loads at runtime: HTML, CSS, icons, fonts, and built bundles.
+- **`media/`** is what a webview loads at runtime: HTML, CSS, fonts, and built bundles, plus the icons the manifest names.
 
 A webview has up to three parts: the host in `src/<feature>/` that opens it and passes its messages, the markup and styles in `media/<feature>/`, and a bundled script from `webview/<feature>/` when it needs one.
 
@@ -563,6 +582,6 @@ The accent is the only thing carrying a color into the tree, so no accent is a n
 - Canvas cards and folder previews -> [src/visual/folderContents.ts](src/visual/folderContents.ts), [media/visual/canvas.js](media/visual/canvas.js)
 - Shared menu, swatches, and webview HTML -> [media/common/](media/common/), [src/common/utils/webview.ts](src/common/utils/webview.ts)
 - The feature reference -> [README.md](README.md)
-- Repository layout, tech stack, setup, and packaging -> [CONTRIBUTING.md](CONTRIBUTING.md)
+- Repository layout, tech stack, setup, packaging, and releases -> [CONTRIBUTING.md](CONTRIBUTING.md)
 
 </details>

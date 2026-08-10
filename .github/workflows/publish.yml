@@ -1,0 +1,71 @@
+# Publishes a new version to the marketplace and cuts its GitHub release
+name: Publish
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  checkRelease:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolveRelease.outputs.version }}
+      vsixPath: ${{ steps.resolveRelease.outputs.vsixPath }}
+      isReleased: ${{ steps.resolveRelease.outputs.isReleased }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip the publish when this version already has a release
+      - id: resolveRelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          packageName="$(node -p "require('./package.json').name")"
+          version="$(node -p "require('./package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "vsixPath=$packageName-$version.vsix" >> "$GITHUB_OUTPUT"
+          if gh release view "v$version" > /dev/null 2>&1; then
+            echo "isReleased=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "isReleased=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  publish:
+    needs: checkRelease
+    if: needs.checkRelease.outputs.isReleased == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.checkRelease.outputs.version }}
+      VSIX_PATH: ${{ needs.checkRelease.outputs.vsixPath }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Stop a type error reaching the marketplace, since esbuild strips types without checking them
+      - name: Typecheck
+        run: |
+          npx tsc --noEmit
+          npx tsc --noEmit -p webview/tsconfig.json
+
+      # Leave the build to the vscode:prepublish hook
+      - name: Package
+        run: npm run vsix -- --out "$VSIX_PATH"
+
+      - name: Publish to the marketplace
+        run: npm run publish -- --packagePath "$VSIX_PATH"
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      # Tag the commit that was published, since another push can move main during the run
+      - name: Tag and attach the vsix
+        run: gh release create "v$VERSION" "$VSIX_PATH" --target "$GITHUB_SHA" --title "v$VERSION" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

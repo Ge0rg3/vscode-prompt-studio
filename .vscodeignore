@@ -2,6 +2,7 @@
 .vscode/**
 .vscode-test/**
 .claude/**
+.github/**
 src/**
 webview/**
 poc/**
@@ -19,5 +20,4 @@ install.sh
 test-projects/**
 demo/**
 docs/**
-icon-candidates/**
 *.vsix

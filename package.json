@@ -2,9 +2,14 @@
   "name": "prompt-studio",
   "displayName": "Prompt Studio",
   "description": "Obsidian-like vault of markdown notes and reusable prompts inside VSCode.",
-  "version": "0.0.2",
-  "publisher": "prompt-studio-dev",
+  "version": "0.1.0",
+  "publisher": "Ge0rg3",
   "license": "GPL-3.0-only",
+  "icon": "media/marketplaceIcon.png",
+  "galleryBanner": {
+    "color": "#1c2333",
+    "theme": "dark"
+  },
   "categories": [
     "AI",
     "Other"
