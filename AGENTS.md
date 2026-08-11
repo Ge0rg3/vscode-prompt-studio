@@ -220,14 +220,14 @@ These patterns make code look obviously machine-generated. Don't do any of these
 
 ### VSCode extension (VS)
 
-- **VS1** All command, view, and menu declarations live in `package.json` under `contributes`. Adding a feature means editing the manifest and the source in the same commit.
+- **VS1** All command, view, menu, and setting declarations live in `package.json` under `contributes`. Adding a feature means editing the manifest and the source in the same commit.
 - **VS2** Register commands, providers, and disposables inside `activate(context)` and push every disposable onto `context.subscriptions`. Never instantiate a VSCode-API consumer at module load time.
 - **VS3** Command handlers are thin: parse the trigger context, call a service in `src/<feature>/`, dispatch the result back through the VSCode API. Business logic stays out of them.
 - **VS4** A feature's commands become a service class when they share a dependency set (`SkillCommands`, `VisualCommands`). Independent registrations stay free functions (`entryActions.ts`, `createEntries.ts`).
 - **VS5** Webview message handling follows the same split: the host validates the incoming message shape, calls a service, and posts back a typed reply. The renderer in `media/` only renders and emits intent.
 - **VS6** Treat every field of a webview message as untrusted. Re-resolve a node from its path and re-run the same containment and name checks the host would run for a command.
 - **VS7** Filesystem operations go through `vscode.workspace.fs` rather than raw `node:fs`, unless the operation is specifically about the extension's own storage on the local disk.
-- **VS8** The extension contributes no settings, and the vault location lives in workspace state. If a setting is added, read it through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down.
+- **VS8** Read a setting through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down. The vault location lives in workspace state rather than a setting.
 - **VS9** Icons come from the product codicon font. No custom glyphs.
 
 ### Webview JavaScript (JS)
@@ -321,7 +321,7 @@ Publishing by hand needs `npx vsce login` first.
 
 Three roots, split by build target:
 
-- **`src/`** is extension-host source, running on node. `src/extension.ts` holds `activate`, and each feature surface owns a folder: `vault`, `template`, `visual`, `skills`. `src/common/` holds shared state and domain types, `src/common/utils/` holds stateless helpers.
+- **`src/`** is extension-host source, running on node. `src/extension.ts` holds `activate`, and each feature surface owns a folder: `vault`, `template`, `visual`, `skills`, `settings`. `src/common/` holds shared state and domain types, `src/common/utils/` holds stateless helpers.
 - **`webview/`** is browser source with its own `tsconfig.json` (DOM types, no node types), bundled by esbuild.
 - **`media/`** is what a webview loads at runtime: HTML, CSS, fonts, and built bundles, plus the icons the manifest names.
 
@@ -341,7 +341,7 @@ The template editor is the one bundled webview. `webview/template/` holds:
 
 esbuild bundles it to `media/template/template.js`, gitignored and rebuilt like `dist/`.
 
-The trees and the canvas stay plain committed JS in `media/`, because none of them needs a dependency.
+The trees, the canvas, and the settings page stay plain committed JS in `media/`, because none of them needs a dependency.
 
 ### Activation
 
@@ -488,7 +488,7 @@ They do share a stylesheet: the skills host is served [media/vault/tree.css](med
 
 ### Sidebar note click
 
-A single click on a note opens its template view with `preserveFocus`, so the sidebar webview keeps focus and F2 can rename the row just clicked. The menu's explicit **Open** omits the flag and moves focus to the editor. The note's **Open as File** hover button opens the raw file rather than the template.
+A single click on a note opens it with `preserveFocus`, so the sidebar webview keeps focus and F2 can rename the row just clicked. The menu's explicit **Open** omits the flag and moves focus to the editor.
 
 ### Sidebar copy and paste
 
@@ -506,6 +506,34 @@ Paste resolves its target the way `createEntries.ts` places a new note, dropping
 The canvas the sidebar highlights flows through a shared emitter, so the active canvas folder wins over the active editor when the two disagree.
 
 A canvas opened from a skill cannot create, rename, or delete an entry, though colors and card layout still write. The renderer strips those entries from both menus when the host says so. That is what lets the same canvas code serve the vault and the skills view.
+
+</details>
+
+<details>
+<summary><b>The settings page</b></summary>
+
+The gear in the Vault title bar opens the settings page ([src/settings/settingsPanel.ts](src/settings/settingsPanel.ts)), one webview panel at a time. It carries the vault location as well as the note-view setting, because the location lives in workspace state and VSCode's own settings UI has nothing to show for it.
+
+[src/vault/vaultLocation.ts](src/vault/vaultLocation.ts) holds the three location modes and is the only way the vault moves. The page is the only surface offering them, so there is no second copy to keep in step.
+
+The page never moves a control on its own. Every choice goes to the host and comes back as a state push, so a cancelled folder dialog leaves the mark on the saved mode. The host pushes again after each write, since a folder resolving to the current root fires no vault change and a workspace entry can outrank the note-view write.
+
+The location rows are buttons rather than radios. Two of the three open a folder dialog, and a radio already on the chosen mode fires nothing, so clicking the row you are on to pick a different folder would do nothing at all.
+
+</details>
+
+<details>
+<summary><b>Which view a note opens in</b></summary>
+
+`promptStudio.defaultNoteView` picks the template panel or the raw file, and [src/common/noteView.ts](src/common/noteView.ts) is the only place that reads it.
+
+A plain click is not the webview's call. The sidebar and the canvas both post one `openNote` message and the host opens whichever view the setting names, so a plain click means the same thing on either surface.
+
+The view is pushed back as a `noteView` message, on `ready` and again whenever the setting changes. The vault tree labels its hover button from it, and the tree and the canvas both label the menu entry offering the other view. [media/common/noteOpen.js](media/common/noteOpen.js) builds that entry.
+
+A skill file is exempt, in the skills sidebar and on a skills canvas alike. It always opens as the real file so edits save to disk, and **Open as Template** stays on the skill row and on a canvas card.
+
+`media/visual/canvas.js` serves both roots, so `VisualPanel` is what draws that line. A read-only canvas is told its view is `file`, and it opens cards that way whatever the setting says.
 
 </details>
 
@@ -575,7 +603,9 @@ The accent is the only thing carrying a color into the tree, so no accent is a n
 - Activation and the service graph -> [src/extension.ts](src/extension.ts)
 - Vault metadata, moves, and copies -> [src/common/vaultConfig.ts](src/common/vaultConfig.ts)
 - Files stored beside a note -> [src/common/noteAttachments.ts](src/common/noteAttachments.ts)
-- Which folder is the vault -> [src/common/vaultManager.ts](src/common/vaultManager.ts), [src/vault/configureVault.ts](src/vault/configureVault.ts)
+- Which folder is the vault -> [src/common/vaultManager.ts](src/common/vaultManager.ts), [src/vault/vaultLocation.ts](src/vault/vaultLocation.ts)
+- The settings page -> [src/settings/settingsPanel.ts](src/settings/settingsPanel.ts), [media/settings/](media/settings/)
+- Which view a note opens in -> [src/common/noteView.ts](src/common/noteView.ts)
 - Sidebar host, watchers, and the message allowlist -> [src/vault/vaultWebviewProvider.ts](src/vault/vaultWebviewProvider.ts), [src/skills/skillsWebviewProvider.ts](src/skills/skillsWebviewProvider.ts)
 - Skills and sub-project discovery -> [src/skills/skillScanner.ts](src/skills/skillScanner.ts), [src/skills/projectScanner.ts](src/skills/projectScanner.ts), [src/skills/skillsConfigs.ts](src/skills/skillsConfigs.ts)
 - Template editor internals -> [webview/template/](webview/template/), [src/template/templatePanel.ts](src/template/templatePanel.ts)

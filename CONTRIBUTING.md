@@ -30,7 +30,7 @@ vscode-prompt-studio/
 +-- CONTRIBUTING.md         # This file. Setup, build, packaging, releases
 +-- AGENTS.md               # Code map, conventions, code style
 +-- LICENSE                 # GPL-3.0
-+-- package.json            # Manifest: commands, views, menus. Contributes no settings
++-- package.json            # Manifest: commands, views, menus, settings
 +-- esbuild.js              # Two bundles (host, template webview) + copies codicons into media/
 +-- install.sh              # Package a .vsix and install it into VSCode
 +-- .vscodeignore           # What stays out of the packaged .vsix
@@ -49,6 +49,7 @@ vscode-prompt-studio/
 |   |   +-- cardColors.ts       # The seven-color palette and its shared messages
 |   |   +-- noteAttachments.ts  # The files stored beside a note, and dropping the unused ones
 |   |   +-- sendToClaude.ts     # Paste a prompt and its attached files into the Claude Code chat input
+|   |   +-- noteView.ts         # Whether a plain open lands in the template editor or the raw file
 |   |   +-- vaultNode.ts        # The node shape passed between host, webviews, and commands
 |   |   +-- utils/              # Purpose-named stateless helpers: paths, fs, webview, clipboard,
 |   |                           # imageClipboard, compare
@@ -56,7 +57,8 @@ vscode-prompt-studio/
 |   +-- template/           # Template panel host, mention index, on-disk path browsing, attachment storage
 |   +-- visual/             # Canvas panel host and the folder-to-cards reader
 |   +-- skills/             # Skills sidebar host, skill and sub-project scanners, per-root config
-|                           # stores, skill commands
+|   |                       # stores, skill commands
+|   +-- settings/           # The settings page panel and the command that opens it
 |
 +-- webview/                # Browser source bundled into media/ (own tsconfig: DOM, no node types)
 |   +-- template/           # main.ts, livePreview.ts, codeHighlight.ts, listIndent.ts,
@@ -66,11 +68,12 @@ vscode-prompt-studio/
 +-- media/                  # Everything a webview loads at runtime, plus the icons the manifest names. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
 |   +-- marketplaceIcon.png # 128x128 marketplace icon, exported from docs/marketplace-icon.svg
-|   +-- common/             # contextMenu + palette, shared by both trees and the canvas
+|   +-- common/             # contextMenu + noteOpen + palette, shared by more than one webview
 |   +-- vault/              # tree.html/.css/.js. tree.css also styles the skills view
 |   +-- skills/             # tree.html/.js for the Claude Skills sidebar
 |   +-- visual/             # canvas.html/.css/.js for the card canvas
 |   +-- template/           # template.html/.css plus the generated template.js bundle
+|   +-- settings/           # settings.html/.css/.js for the settings page
 |   +-- codicons/           # VSCode icon font, copied from node_modules at build time
 |
 +-- dist/                   # Built extension bundle
@@ -84,7 +87,7 @@ vscode-prompt-studio/
 |-------|------------|
 | Extension host | TypeScript 5.5, targeting Node 18, VSCode API `^1.85` |
 | Bundler | esbuild 0.24 - `cjs` for the host, `iife` for the template webview |
-| Sidebar and canvas views | Webviews rendering hand-written plain JS, no framework |
+| Sidebar, canvas, and settings views | Webviews rendering hand-written plain JS, no framework |
 | Template editor | CodeMirror 6: markdown + GFM, autocomplete, search, seven fenced-code languages |
 | Per-entry metadata | YAML (`yaml` 2.9), one `config.yml` per root |
 | Icons | `@vscode/codicons` font, copied into `media/` at build |

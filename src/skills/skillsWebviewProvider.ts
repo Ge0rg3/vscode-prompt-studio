@@ -15,7 +15,7 @@ import { buildSkillsTree } from './skillsTree';
 
 type InboundMessage =
   | { type: 'ready' }
-  | { type: 'openNote'; path: string }
+  | { type: 'openFile'; path: string }
   | { type: 'setColor'; path: string; color: string | null }
   | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'command'; command: string; node?: SkillTreeNode };
@@ -116,9 +116,13 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
       case 'ready':
         await this.postState();
         return;
-      case 'openNote':
-        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
+      case 'openFile': {
+        const target = this.rowPath(msg.path);
+        if (target) {
+          await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(target));
+        }
         return;
+      }
       case 'setColor': {
         const target = this.rowPath(msg.path);
         const config = target ? this.skillsConfigs.configFor(target) : undefined;

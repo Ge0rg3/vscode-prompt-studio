@@ -13,7 +13,7 @@ Open `index.html` in a browser. There is no build step.
 
 ## Using this for screenshots
 
-This folder is the demo project behind the screenshots in the extension's [README](../README.md). Open **this folder** as the VSCode workspace, then set the vault to `prompts` through **Configure Vault > Folder inside this workspace**.
+This folder is the demo project behind the screenshots in the extension's [README](../README.md). Open **this folder** as the VSCode workspace, then open the settings page from the Vault title bar and set the vault to `prompts` through **Folder inside this workspace**.
 
 That fills both sidebar sections at once:
 

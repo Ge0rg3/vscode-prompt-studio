@@ -1,0 +1,135 @@
+/* Styles the settings page, its sections, and the vault location choices */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+}
+
+#page {
+  max-width: 680px;
+  padding: 24px 28px 40px;
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 1.5em;
+  font-weight: 600;
+}
+
+h2 {
+  margin: 0 0 4px;
+  font-size: 1.05em;
+  font-weight: 600;
+}
+
+.setting {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+}
+
+.description {
+  margin: 0 0 12px;
+  color: var(--vscode-descriptionForeground);
+  line-height: 1.5;
+}
+
+select {
+  min-width: 240px;
+  padding: 4px 6px;
+  color: var(--vscode-dropdown-foreground);
+  background: var(--vscode-dropdown-background);
+  border: 1px solid var(--vscode-dropdown-border, transparent);
+  border-radius: 2px;
+}
+
+select:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.path {
+  margin-bottom: 14px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.12));
+  font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.path.unset {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.choice:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.choice .choice-mark {
+  margin-top: 1px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.choice.current .choice-mark {
+  color: var(--vscode-textLink-foreground, var(--vscode-focusBorder));
+}
+
+.choice-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice-detail {
+  color: var(--vscode-descriptionForeground);
+}
+
+.badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: var(--vscode-badge-background);
+  color: var(--vscode-badge-foreground);
+  font-size: 0.85em;
+}
+
+.choice:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.choice:disabled:hover {
+  background: transparent;
+}

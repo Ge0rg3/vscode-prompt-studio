@@ -21,9 +21,11 @@
   let cards = [];
   let cardEls = new Map();
   let activePreview = null;
+  let noteView = window.PromptStudioNoteOpen.INITIAL_NOTE_VIEW;
 
   const { create, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
   const { applyTint } = window.PromptStudioPalette;
+  const { alternateOpen } = window.PromptStudioNoteOpen;
 
   // Build the context menu shared by the cards and the background
   const menu = create(menuEl, (command, node) => vscode.postMessage({ type: 'command', command, node: serialize(node) }), CARD_COLORS);
@@ -215,7 +217,7 @@
     el.appendChild(preview);
 
     attachDrag(el, card, () => {
-      vscode.postMessage({ type: 'openNote', path: card.absPath });
+      vscode.postMessage({ type: 'openNote', node: serialize(card) });
     });
     attachResize(el, card);
     return el;
@@ -473,11 +475,12 @@
   // Build the right-click menu for a card, without Rename and Delete on a read-only canvas
   function menuFor(card) {
     if (card.kind === 'note') {
+      const alternate = alternateOpen(noteView, serialize(card));
       return compactMenu([
         { kind: 'swatches', target: cardColorTarget(card) },
         'sep',
-        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: card.absPath }) },
-        { label: 'Open as Template', icon: 'files', cmd: 'promptStudio.openTemplate' },
+        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', node: serialize(card) }) },
+        { label: alternate.label, icon: alternate.icon, action: () => vscode.postMessage(alternate.message) },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
@@ -548,6 +551,8 @@
 
       // Save what VSCode needs to restore the canvas after a reload
       vscode.setState({ folder: currentFolderNode().absPath, root: state.breadcrumbs[0].path, allowCrud: ALLOW_CRUD });
+    } else if (message && message.type === 'noteView') {
+      noteView = message.view;
     } else if (message && message.type === 'previewColor') {
       applyIncomingPreview(message.path, message.color);
       trackPreview(message.path, message.color);

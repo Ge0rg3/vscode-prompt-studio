@@ -4,12 +4,12 @@ import * as vscode from 'vscode';
 import { ColorPreview } from './common/cardColors';
 import { VaultConfig } from './common/vaultConfig';
 import { VaultManager } from './common/vaultManager';
+import { registerOpenSettings, registerSettingsSerializer } from './settings/openSettings';
 import { SkillCommands } from './skills/skillCommands';
 import { SkillsConfigs } from './skills/skillsConfigs';
 import { SkillsWebviewProvider } from './skills/skillsWebviewProvider';
 import { MentionIndex } from './template/mentionIndex';
 import { registerOpenTemplate, registerTemplateSerializer } from './template/openTemplate';
-import { registerConfigureVault } from './vault/configureVault';
 import { registerCreateFolder, registerCreateNote } from './vault/createEntries';
 import {
   registerCopyContents,
@@ -64,7 +64,8 @@ export function activate(context: vscode.ExtensionContext): void {
     skillCommands.register(),
     skillCommands.registerViewCommands(),
     activeFolderEmitter.event((folder) => provider.setActiveVisualFolder(folder)),
-    registerConfigureVault(vaultManager, context.globalStorageUri.fsPath),
+    registerOpenSettings(context.extensionUri, vaultManager, context.globalStorageUri.fsPath),
+    registerSettingsSerializer(context.extensionUri, vaultManager, context.globalStorageUri.fsPath),
     registerVaultViewCommands(provider),
     visualCommands.registerOpenCommand(),
     visualCommands.registerSerializer((root) => skillsConfigs.configFor(root)),

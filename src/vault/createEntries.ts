@@ -32,7 +32,7 @@ function ensureVault(parentDir: string | undefined): parentDir is string {
   if (parentDir) {
     return true;
   }
-  void vscode.window.showWarningMessage('Prompt Studio: configure a vault first.');
+  void vscode.window.showWarningMessage('Prompt Studio: set a vault in Settings first.');
   return false;
 }
 

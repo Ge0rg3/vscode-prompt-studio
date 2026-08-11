@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.0
+
+- A `promptStudio.defaultNoteView` setting picking whether a note opens in the template editor or as raw markdown. The view you skip sits on the row's hover button and in the right-click menu.
+- A settings page behind the Vault title-bar gear, holding that setting and the vault location. It replaces **Prompt Studio: Configure Vault**.
+
 ## 0.1.0
 
 First public release.

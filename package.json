@@ -2,7 +2,7 @@
   "name": "prompt-studio",
   "displayName": "Prompt Studio",
   "description": "Obsidian-like vault of markdown notes and reusable prompts inside VSCode.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "Ge0rg3",
   "license": "GPL-3.0-only",
   "icon": "media/marketplaceIcon.png",
@@ -35,13 +35,14 @@
   "activationEvents": [
     "onStartupFinished",
     "onWebviewPanel:promptStudio.visual",
-    "onWebviewPanel:promptStudio.template"
+    "onWebviewPanel:promptStudio.template",
+    "onWebviewPanel:promptStudio.settings"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "promptStudio.configureVault",
-        "title": "Configure Vault",
+        "command": "promptStudio.openSettings",
+        "title": "Settings",
         "category": "Prompt Studio",
         "icon": "$(gear)"
       },
@@ -218,7 +219,7 @@
           "group": "navigation@5"
         },
         {
-          "command": "promptStudio.configureVault",
+          "command": "promptStudio.openSettings",
           "when": "view == promptStudio.vault",
           "group": "navigation@99"
         },
@@ -334,6 +335,24 @@
           "when": "false"
         }
       ]
+    },
+    "configuration": {
+      "title": "Prompt Studio",
+      "properties": {
+        "promptStudio.defaultNoteView": {
+          "type": "string",
+          "enum": [
+            "template",
+            "file"
+          ],
+          "enumDescriptions": [
+            "Open the note in the template editor.",
+            "Open the note's markdown in a text editor."
+          ],
+          "default": "template",
+          "description": "Which view a note opens in when you click it in the Vault view or on the canvas. The other view stays on the row's hover button and in the right-click menu."
+        }
+      }
     }
   },
   "scripts": {

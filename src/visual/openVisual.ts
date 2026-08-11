@@ -27,7 +27,7 @@ export class VisualCommands {
     return vscode.commands.registerCommand('promptStudio.openVisual', (contextNode?: VaultNode) => {
       const root = this.vaultManager.getVaultRoot();
       if (!root) {
-        void vscode.window.showWarningMessage('Prompt Studio: configure a vault first.');
+        void vscode.window.showWarningMessage('Prompt Studio: set a vault in Settings first.');
         return;
       }
 

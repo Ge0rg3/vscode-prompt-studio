@@ -30,6 +30,11 @@ export class VaultManager implements vscode.Disposable {
     return this.current;
   }
 
+  // Say whether the vault is still the folder kept for this workspace
+  isDefaultLocation(): boolean {
+    return !this.configuredPath();
+  }
+
   // Save the chosen vault folder, an empty string goes back to the default one
   async setVaultPath(value: string): Promise<void> {
     await this.workspaceState.update(STATE_KEY, value);
@@ -59,9 +64,14 @@ export class VaultManager implements vscode.Disposable {
     void vscode.commands.executeCommand('setContext', HAS_VAULT_CONTEXT, this.current !== undefined);
   }
 
+  // Read the folder the user chose, empty when they never chose one
+  private configuredPath(): string | undefined {
+    return this.workspaceState.get<string>(STATE_KEY)?.trim();
+  }
+
   // Read the saved path, falling back to a folder kept for this workspace
   private resolveVaultRoot(): string | undefined {
-    const configured = this.workspaceState.get<string>(STATE_KEY)?.trim();
+    const configured = this.configuredPath();
     if (configured) {
       return ensureDir(configured);
     }

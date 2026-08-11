@@ -10,11 +10,13 @@
   let activePreview = null;
   let activeRename = null;
   let deferredRender = false;
+  let noteView = window.PromptStudioNoteOpen.INITIAL_NOTE_VIEW;
 
   const treeEl = document.getElementById('tree');
   const menuEl = document.getElementById('context-menu');
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
   const { applyTint } = window.PromptStudioPalette;
+  const { alternateOpen } = window.PromptStudioNoteOpen;
 
   // --- focus tracking ---
 
@@ -247,11 +249,14 @@
     if (!message) return;
     if (message.type === 'state') {
       state = message.state;
-      if (activeRename) {
-        deferredRender = true;
-        return;
+      renderUnlessRenaming();
+    } else if (message.type === 'noteView') {
+      noteView = message.view;
+
+      // Wait for the first state before drawing
+      if (state) {
+        renderUnlessRenaming();
       }
-      render();
     } else if (message.type === 'expandAll') {
       expandAll();
     } else if (message.type === 'collapseAll') {
@@ -270,6 +275,16 @@
   vscode.postMessage({ type: 'ready' });
 
   // --- rendering ---
+
+  // Redraw, holding the update back until an open rename is finished
+  function renderUnlessRenaming() {
+    if (activeRename) {
+      deferredRender = true;
+      return;
+    }
+
+    render();
+  }
 
   // Rebuild every row from the current state, dropping any edit in progress
   function render() {
@@ -290,19 +305,19 @@
     reapplyPreview();
   }
 
-  // Show the configure-vault panel when no vault is set
+  // Offer the settings page when there is no vault yet
   function renderWelcome() {
     const wrap = document.createElement('div');
     wrap.id = 'welcome';
 
     const paragraph = document.createElement('p');
-    paragraph.textContent = 'No vault is configured.';
+    paragraph.textContent = 'No vault yet.';
     wrap.appendChild(paragraph);
 
     const button = document.createElement('button');
-    button.textContent = 'Configure Vault';
+    button.textContent = 'Open Settings';
     button.addEventListener('click', () => {
-      vscode.postMessage({ type: 'command', command: 'promptStudio.configureVault' });
+      vscode.postMessage({ type: 'command', command: 'promptStudio.openSettings' });
     });
     wrap.appendChild(button);
 
@@ -393,20 +408,21 @@
     actions.className = 'actions';
 
     if (!isFolder) {
-      actions.appendChild(actionButton('file-code', 'Open as File', () => vscode.postMessage({ type: 'openNote', path: node.absPath })));
+      const alternate = alternateOpen(noteView, serialize(node));
+      actions.appendChild(actionButton(alternate.icon, alternate.label, () => vscode.postMessage(alternate.message)));
       actions.appendChild(actionButton('claude', 'Send to Claude', () => postCommand('promptStudio.sendToClaude', node)));
     }
     actions.appendChild(actionButton('layout', 'Open Visual Canvas', () => postCommand('promptStudio.openVisual', node)));
     row.appendChild(actions);
 
-    // Toggle a folder on click, open a note in the template editor
+    // Toggle a folder on click, open a note in whichever view the setting names
     row.addEventListener('click', (event) => {
       event.stopPropagation();
       select(node.absPath);
       if (isFolder) {
         toggleExpand(node);
       } else {
-        vscode.postMessage({ type: 'openTemplate', node: serialize(node), preserveFocus: true });
+        vscode.postMessage({ type: 'openNote', node: serialize(node), preserveFocus: true });
       }
     });
 
@@ -669,11 +685,12 @@
   // Build the right-click menu for a node's kind
   function menuFor(node) {
     if (node.kind === 'note') {
+      const alternate = alternateOpen(noteView, serialize(node));
       return [
         { kind: 'swatches', target: colorTarget(node) },
         'sep',
-        { label: 'Open', icon: 'go-to-file', cmd: 'promptStudio.openTemplate' },
-        { label: 'Open as File', icon: 'file-code', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
+        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', node: serialize(node) }) },
+        { label: alternate.label, icon: alternate.icon, action: () => vscode.postMessage(alternate.message) },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',

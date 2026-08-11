@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { carryNoteAttachments } from '../common/noteAttachments';
+import { defaultNoteView, onDidChangeNoteView, openNoteInView } from '../common/noteView';
 import { isWithin } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
@@ -16,8 +17,8 @@ import { readTree, TreeState } from './vaultTree';
 
 type InboundMessage =
   | { type: 'ready' }
-  | { type: 'openNote'; path: string; preserveFocus?: boolean }
-  | { type: 'openTemplate'; node: VaultNode; preserveFocus?: boolean }
+  | { type: 'openNote'; node: VaultNode; preserveFocus?: boolean }
+  | { type: 'openFile'; path: string }
   | { type: 'move'; source: string; destDir: string }
   | { type: 'paste'; source: string; contextNode?: VaultNode }
   | { type: 'rename'; node: VaultNode; newName: string }
@@ -29,7 +30,7 @@ const REFRESH_DEBOUNCE_MS = 100;
 const ALLOWED_COMMANDS = new Set([
   'promptStudio.newNote',
   'promptStudio.newFolder',
-  'promptStudio.configureVault',
+  'promptStudio.openSettings',
   'promptStudio.delete',
   'promptStudio.copyContents',
   'promptStudio.openTemplate',
@@ -63,6 +64,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         void this.postState();
       }),
       config.onDidChange(() => this.scheduleRefresh()),
+      onDidChangeNoteView(() => this.postNoteView()),
       vscode.window.onDidChangeActiveTextEditor(() => this.syncSelection()),
       colorPreviewEmitter.event((preview) => postColorPreview(this.view?.webview, preview))
     );
@@ -151,6 +153,11 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     await this.view.webview.postMessage({ type: 'state', state });
   }
 
+  // Push the view a note click opens
+  private postNoteView(): void {
+    void this.view?.webview.postMessage({ type: 'noteView', view: defaultNoteView() });
+  }
+
   // Highlight the folder the active canvas shows, falling back to the note in the active editor
   private syncSelection(): void {
     if (this.activeVisualFolder) {
@@ -164,19 +171,32 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     void this.view?.webview.postMessage({ type: 'select', path: notePath });
   }
 
+  // Check a path from the webview really sits in the vault, a message can say anything
+  private insideVault(absPath: string): boolean {
+    const root = this.vaultManager.getVaultRoot();
+    return root !== undefined && isWithin(absPath, root);
+  }
+
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
+        this.postNoteView();
         await this.postState();
         this.syncSelection();
         return;
       case 'openNote':
-        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path), {
-          preserveFocus: msg.preserveFocus === true
-        });
+        if (!this.insideVault(msg.node.absPath)) {
+          return;
+        }
+
+        await openNoteInView(defaultNoteView(), msg.node, msg.preserveFocus === true);
         return;
-      case 'openTemplate':
-        await vscode.commands.executeCommand('promptStudio.openTemplate', msg.node, msg.preserveFocus === true);
+      case 'openFile':
+        if (!this.insideVault(msg.path)) {
+          return;
+        }
+
+        await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
         return;
       case 'move': {
         const root = this.vaultManager.getVaultRoot();
@@ -201,10 +221,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         return;
       }
       case 'rename': {
-        const root = this.vaultManager.getVaultRoot();
-
-        // Check the path and the name again, a webview message can say anything
-        if (!root || !isWithin(msg.node.absPath, root) || validateEntryName(msg.newName)) {
+        if (!this.insideVault(msg.node.absPath) || validateEntryName(msg.newName)) {
           return;
         }
 
@@ -235,6 +252,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      noteOpenJs: assetUri(webview, this.extensionUri, 'media/common/noteOpen.js'),
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
       treeJs: assetUri(webview, this.extensionUri, 'media/vault/tree.js'),

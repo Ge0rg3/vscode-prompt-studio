@@ -97,11 +97,13 @@ The extension reads and writes the `visual` block: card position, size, stacking
 
 ### Choosing the vault location
 
-With a folder open, a vault is created automatically. To move it, use the gear in the view title bar or run **Prompt Studio: Configure Vault**, then pick one of:
+With a folder open, a vault is created automatically. To move it, open the settings page and pick one of:
 
 1. **Per-workspace default.** A vault under the extension's global storage at `<extension storage>/<basename>-<hash>`, the hash taken from the workspace path. Nothing is written into your project.
 2. **Custom folder.** Any absolute path on disk.
-3. **Folder inside this workspace.** A subfolder such as `<workspace>/prompts`, so the vault is versioned alongside your code. Offered only when a folder is open.
+3. **Folder inside this workspace.** A subfolder such as `<workspace>/prompts`, so the vault is versioned alongside your code.
+
+With no folder open, only the custom folder can be picked.
 
 </details>
 
@@ -112,7 +114,7 @@ The **Vault** view lists the vault as a tree, with right-click menus on rows and
 
 Only `.md` files appear, and dotfiles are hidden.
 
-- **Title bar.** **New Note**, **New Folder**, **Open Visual Canvas**, **Expand All**, **Collapse All**, and a **Configure Vault** gear. Entries created from the title bar land at the vault root.
+- **Title bar.** **New Note**, **New Folder**, **Open Visual Canvas**, **Expand All**, **Collapse All**, and a **Settings** gear. Entries created from the title bar land at the vault root.
 - **Right-click empty area.** **Open as Canvas**, **New Note**, **New Folder**.
 - **Right-click a folder.** A row of color swatches, then **Open as Canvas**, **New Note**, **New Folder**, **Rename**, **Duplicate Folder**, **Reveal in File Manager**, **Copy as Path**, **Delete**. Entries created here land inside that folder.
 - **Right-click a note.** A row of color swatches, then **Open**, **Open as File**, **Send to Claude**, **Rename**, **Duplicate File**, **Copy Contents**, **Reveal in File Manager**, **Copy as Path**, **Delete**.
@@ -121,16 +123,14 @@ Only `.md` files appear, and dotfiles are hidden.
 - **Color swatches.** Hover to preview, click to apply, or pick the leftmost clear swatch to remove. The tint colors the entry's icon and is the same color the canvas uses.
 - **Drag and drop.** Drag a note or folder onto another folder row to move it, or onto empty space to lift it to the vault root. A drop is refused when it would nest a folder inside itself or in one of its own subfolders, or when the name is already taken.
 - **Keyboard.** **F2** renames inline, **Delete** deletes after a confirmation, and **Ctrl+C** then **Ctrl+V** duplicates. A paste lands in the selected entry's folder, named `<name> (Copy)` when the name is taken.
-- **Command palette.** **New Note**, **New Folder**, **Open Visual Canvas**, and **Configure Vault**.
+- **Command palette.** **New Note**, **New Folder**, **Open Visual Canvas**, and **Settings**.
 
 </details>
 
 <details>
 <summary><b>Template view</b></summary>
 
-Clicking a note opens it in the template view: an editable tab of its own, titled `<note> (template)`. Edits stay in the tab until you save.
-
-**Open as File** opens the raw markdown in a plain text editor instead.
+A note opens in the template view by default: an editable tab of its own, titled `<note> (template)`. Edits stay in the tab until you save.
 
 The editor styles markdown inline as you type. The marks themselves (`#`, `**`, backticks) stay visible but dimmed, so Save and Copy hand off exactly what you wrote.
 
@@ -172,11 +172,11 @@ Once open, cards respond to the pointer:
 
 - **Drag.** Reposition a card anywhere, OneNote style.
 - **Resize.** Drag the handle at a card's bottom-right corner. Resizing a folder card reveals more of its preview.
-- **Click.** Without dragging, a note opens in an editor and a folder card navigates into it.
+- **Click.** Without dragging, a note opens and a folder card navigates into it.
 
 Position, size, and stacking order save to the card's `visual` block in `config.yml`, so the layout survives reopening and follows the card when you rename or move it in the tree.
 
-- **Card menu.** Color swatches, **Rename**, **Reveal in File Manager**, **Copy as Path**, and **Delete**, with **Open**, **Open as Template**, **Send to Claude**, and **Copy Contents** on note cards.
+- **Card menu.** Color swatches, **Rename**, **Reveal in File Manager**, **Copy as Path**, and **Delete**, with **Open**, **Open as File**, **Send to Claude**, and **Copy Contents** on note cards.
 - **Background menu.** Color swatches, **New Note**, **New Folder**, **Reveal in File Manager**, and **Copy as Path**. New entries land in the open folder, their card placed where you right-clicked.
 
 A card swatch tints the card, and a background swatch tints the open folder and the canvas behind it. Each color saves to that entry's `visual` block.
@@ -218,7 +218,10 @@ A deleted sub-project's row lingers until **Refresh Skills** clears it.
 
 ## Settings
 
-The extension has no settings. The vault location is set through **Prompt Studio: Configure Vault**.
+The gear in the Vault title bar opens a settings tab, and **Prompt Studio: Settings** in the palette does the same. It holds two things:
+
+- **Default note view.** Which view a vault note opens in when you click it, `promptStudio.defaultNoteView` in VSCode's own settings. The other view sits on the row's hover button and in the right-click menu.
+- **Vault location.** Which folder holds your notes, remembered per workspace rather than stored as a setting.
 
 ## Contributing
 

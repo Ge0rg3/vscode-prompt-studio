@@ -140,7 +140,7 @@
     // Open a file on click, toggle a row that has children
     row.addEventListener('click', () => {
       if (node.kind === 'file') {
-        vscode.postMessage({ type: 'openNote', path: node.absPath });
+        vscode.postMessage({ type: 'openFile', path: node.absPath });
       } else if (hasChildren) {
         toggleExpand(key);
       }
@@ -307,7 +307,7 @@
       return [
         { kind: 'swatches', target: colorTarget(node) },
         'sep',
-        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', path: node.absPath }) },
+        { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openFile', path: node.absPath }) },
         'sep',
         REVEAL_ITEM,
         COPY_PATH_ITEM

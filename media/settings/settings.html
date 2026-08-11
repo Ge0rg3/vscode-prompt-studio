@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- The settings page, one section per setting -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="{{csp}}" />
+  <link rel="stylesheet" href="{{codiconCss}}" />
+  <link rel="stylesheet" href="{{settingsCss}}" />
+  <title>Prompt Studio Settings</title>
+</head>
+<body>
+  <main id="page">
+    <h1>Prompt Studio Settings</h1>
+
+    <section class="setting">
+      <h2>Default note view</h2>
+      <p class="description">Which view a note opens in when you click it in the Vault view or on the canvas. The other view stays on the row's hover button and in the right-click menu.</p>
+      <select id="note-view">
+        <option value="template">Template editor</option>
+        <option value="file">Markdown file</option>
+      </select>
+    </section>
+
+    <section class="setting">
+      <h2>Vault location</h2>
+      <p class="description">Which folder holds your notes. The choice is remembered for this workspace, so another project can point somewhere else.</p>
+      <div id="vault-root" class="path"></div>
+      <div id="vault-modes" class="choices">
+        <button type="button" class="choice" data-mode="default">
+          <span class="choice-mark codicon"></span>
+          <span class="choice-body">
+            <span class="choice-label">Per-workspace default <span class="badge">recommended</span></span>
+            <span class="choice-detail">A folder under the extension's own storage. Nothing is written into your project.</span>
+          </span>
+        </button>
+        <button type="button" class="choice" data-mode="custom">
+          <span class="choice-mark codicon"></span>
+          <span class="choice-body">
+            <span class="choice-label">Custom folder...</span>
+            <span class="choice-detail">Any folder on disk.</span>
+          </span>
+        </button>
+        <button type="button" class="choice" data-mode="in-workspace">
+          <span class="choice-mark codicon"></span>
+          <span class="choice-body">
+            <span class="choice-label">Folder inside this workspace...</span>
+            <span class="choice-detail">Keeps prompts versioned alongside your code.</span>
+          </span>
+        </button>
+      </div>
+    </section>
+  </main>
+  <script nonce="{{nonce}}" src="{{settingsJs}}"></script>
+</body>
+</html>

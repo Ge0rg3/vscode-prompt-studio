@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
+import { defaultNoteView, NoteView, onDidChangeNoteView, openNoteInView } from '../common/noteView';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
@@ -23,7 +24,8 @@ export interface CanvasContext {
 
 type InboundMessage =
   | { type: 'ready' }
-  | { type: 'openNote'; path: string }
+  | { type: 'openNote'; node: VaultNode }
+  | { type: 'openFile'; path: string }
   | { type: 'navigate'; folder: string }
   | { type: 'moveCard'; path: string; x: number; y: number; z: number }
   | { type: 'resizeCard'; path: string; width: number; height: number }
@@ -103,6 +105,7 @@ export class VisualPanel {
       this.panel.onDidDispose(() => this.dispose()),
       this.panel.onDidChangeViewState(() => this.emitActiveFolder()),
       this.context.store.onDidChange(() => this.scheduleRefresh()),
+      onDidChangeNoteView(() => this.postNoteView()),
       this.context.colorPreviewEmitter.event((preview) => postColorPreview(this.panel.webview, preview))
     );
     this.rebuildWatcher();
@@ -182,9 +185,21 @@ export class VisualPanel {
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
+        this.postNoteView();
         await this.postState();
         return;
       case 'openNote':
+        if (!isWithin(msg.node.absPath, this.context.root)) {
+          return;
+        }
+
+        await openNoteInView(this.cardView(), msg.node, false);
+        return;
+      case 'openFile':
+        if (!isWithin(msg.path, this.context.root)) {
+          return;
+        }
+
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
         return;
       case 'navigate':
@@ -242,6 +257,16 @@ export class VisualPanel {
     await this.panel.webview.postMessage({ type: 'state', state });
   }
 
+  // Pick the view a card opens in, forcing the raw file on a skills canvas so edits save to disk
+  private cardView(): NoteView {
+    return this.context.allowCrud ? defaultNoteView() : 'file';
+  }
+
+  // Push the view a card click opens
+  private postNoteView(): void {
+    void this.panel.webview.postMessage({ type: 'noteView', view: this.cardView() });
+  }
+
   private renderHtml(): string {
     const webview = this.panel.webview;
     return renderWebviewHtml(webview, this.extensionUri, 'media/visual/canvas.html', {
@@ -249,6 +274,7 @@ export class VisualPanel {
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
+      noteOpenJs: assetUri(webview, this.extensionUri, 'media/common/noteOpen.js'),
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       canvasCss: assetUri(webview, this.extensionUri, 'media/visual/canvas.css'),
       canvasJs: assetUri(webview, this.extensionUri, 'media/visual/canvas.js'),
