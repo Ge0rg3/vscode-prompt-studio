@@ -2,11 +2,12 @@
 notes:
   Architecture:
     visual:
-      x: 40
-      y: 250
+      x: 20
+      y: 244
       width: 300
       height: 230
       color: orange
+      z: 5
   Architecture/Design a New Service.md:
     type: prompt
     tags:
@@ -36,11 +37,12 @@ notes:
       color: yellow
   Code Review:
     visual:
-      x: 360
-      y: 250
+      x: 342
+      y: 255
       width: 300
       height: 230
       color: green
+      z: 11
   Code Review/Find Security Issues.md:
     type: prompt
     tags:
@@ -86,11 +88,12 @@ notes:
       color: green
   Debugging:
     visual:
-      x: 680
-      y: 250
+      x: 676
+      y: 260
       width: 300
       height: 230
       color: red
+      z: 17
   Debugging/Explain a Stack Trace.md:
     type: prompt
     tags:
@@ -123,18 +126,20 @@ notes:
     tags:
       - index
     visual:
-      x: 40
-      y: 40
+      x: 26
+      y: 35
       width: 718
       height: 187
       color: blue
+      z: 18
   Refactoring:
     visual:
-      x: 40
-      y: 500
+      x: 21
+      y: 507
       width: 300
       height: 230
       color: purple
+      z: 6
   Refactoring/Extract a Function.md:
     type: prompt
     visual:
@@ -155,18 +160,20 @@ notes:
     tags:
       - upkeep
     visual:
-      x: 680
-      y: 500
+      x: 23
+      y: 1103
       width: 300
       height: 230
       color: gray
+      z: 19
   Writing:
     visual:
-      x: 360
-      y: 500
-      width: 300
-      height: 230
+      x: 341
+      y: 519
+      width: 642
+      height: 210
       color: yellow
+      z: 15
   Writing/Draft a PR Description.md:
     type: prompt
     tags:

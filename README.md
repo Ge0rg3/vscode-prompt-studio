@@ -12,12 +12,25 @@
 </p>
 
 <p align="center">
+  <img src="docs/template-editor.png" alt="The vault tree and Claude Skills in the sidebar, with a prompt open in the template editor">
+</p>
+
+<p align="center">
+  <i>Both sidebar sections on the left, a prompt open in the template editor, and Send to Claude in the bar along the bottom.</i>
+</p>
+
+<details>
+<summary><b>See a folder open as a canvas</b></summary>
+
+<p align="center">
   <img src="docs/canvas.png" alt="A folder of prompts open as a canvas of colored cards, with Claude Code alongside">
 </p>
 
 <p align="center">
   <i>Any folder, opened as a pinboard. Drag the cards where you want them.</i>
 </p>
+
+</details>
 
 ---
 
@@ -32,19 +45,6 @@ Your prompts and notes are plain `.md` files in a folder you choose, so the same
 - **Your Claude skills, listed.** Every `.claude/skills` folder in the workspace and its sub-projects, in one sidebar section.
 - **`@` mentions that resolve.** Type `@` to search the workspace the way you would in Claude Code. A mention naming a real path is tinted, and Ctrl+click opens it.
 - **A vault per project.** The vault location lives in workspace state, so different projects point at different vaults.
-
-<details>
-<summary><b>See the sidebar and the template editor</b></summary>
-
-<p align="center">
-  <img src="docs/template-editor.png" alt="The vault tree and Claude Skills in the sidebar, with a prompt open in the template editor">
-</p>
-
-<p align="center">
-  <i>Both sidebar sections on the left, a prompt open in the template editor, and Send to Claude in the bar along the bottom.</i>
-</p>
-
-</details>
 
 ## Install
 
