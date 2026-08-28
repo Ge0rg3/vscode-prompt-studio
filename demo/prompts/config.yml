@@ -2,12 +2,12 @@
 notes:
   Architecture:
     visual:
-      x: 20
-      y: 244
+      x: 16
+      y: 252
       width: 300
       height: 230
       color: orange
-      z: 5
+      z: 23
   Architecture/Design a New Service.md:
     type: prompt
     tags:
@@ -88,12 +88,12 @@ notes:
       color: green
   Debugging:
     visual:
-      x: 676
-      y: 260
+      x: 704
+      y: 332
       width: 300
       height: 230
       color: red
-      z: 17
+      z: 29
   Debugging/Explain a Stack Trace.md:
     type: prompt
     tags:
@@ -160,20 +160,20 @@ notes:
     tags:
       - upkeep
     visual:
-      x: 23
-      y: 1103
-      width: 300
-      height: 230
+      x: 806
+      y: 31
+      width: 368
+      height: 239
       color: gray
-      z: 19
+      z: 27
   Writing:
     visual:
-      x: 341
-      y: 519
+      x: 369
+      y: 623
       width: 642
       height: 210
       color: yellow
-      z: 15
+      z: 28
   Writing/Draft a PR Description.md:
     type: prompt
     tags:

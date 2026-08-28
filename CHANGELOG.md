@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- The canvas pans and zooms. Drag the background or hold the middle button to pan, ctrl+wheel or the bottom bar to zoom, and **Fit** to frame every card.
+- Zooming into a folder card opens it as its own canvas, and zooming back out returns to the parent.
+- Note cards take text directly while **Edit** is on in the bottom bar, saved back to the note as you type.
+- A canvas comes back to the folder, the view, and the edit mode it was left at after a window reload.
+
 ## 0.2.1
 
 - Refreshed the README screenshots and the demo vault behind them.

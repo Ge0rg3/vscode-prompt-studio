@@ -7,10 +7,12 @@ import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
 import { defaultNoteView, NoteView, onDidChangeNoteView, openNoteInView } from '../common/noteView';
 import { copyPathToClipboard } from '../common/utils/clipboard';
+import { pathExists } from '../common/utils/fs';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
+import { NOTE_EXT } from '../vault/entryName';
 import { readFolder } from './folderContents';
 
 // What one canvas is bound to
@@ -32,9 +34,13 @@ type InboundMessage =
   | { type: 'setColor'; path: string; color: string | null }
   | { type: 'previewColor'; path: string; color: string | null }
   | { type: 'newEntry'; kind: 'note' | 'folder'; x: number; y: number }
+  | { type: 'saveNote'; path: string; text: string }
   | { type: 'command'; command: string; node: VaultNode };
 
 const REFRESH_DEBOUNCE_MS = 100;
+
+// Ignore a note's change event for this long after writing it from a card
+const OWN_WRITE_IGNORE_MS = 1000;
 
 // Run only these commands from a canvas message, a webview can send anything
 const ALLOWED_COMMANDS = new Set([
@@ -87,8 +93,13 @@ export class VisualPanel {
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly watcherSubs: vscode.Disposable[] = [];
+  private readonly ownWrites = new Map<string, number>();
   private watcher: vscode.FileSystemWatcher | undefined;
+  // Card edits on their way to disk, awaited by any case that sends the host to the note
+  private pendingNoteWrites: Promise<void> = Promise.resolve();
   private refreshScheduled = false;
+  private stateRequests = 0;
+  private saveRequests = 0;
   private folder: string;
 
   private constructor(
@@ -157,8 +168,22 @@ export class VisualPanel {
     this.watcherSubs.push(
       this.watcher.onDidCreate((uri) => this.onFolderEvent(uri)),
       this.watcher.onDidDelete((uri) => this.onFolderEvent(uri)),
-      this.watcher.onDidChange((uri) => this.onFolderEvent(uri))
+      this.watcher.onDidChange((uri) => this.onNoteChange(uri))
     );
+  }
+
+  // Test whether an event is the one a card's own write just caused
+  private isOwnWrite(absPath: string): boolean {
+    const writtenAt = this.ownWrites.get(absPath);
+    if (writtenAt === undefined) {
+      return false;
+    }
+
+    if (Date.now() - writtenAt > OWN_WRITE_IGNORE_MS) {
+      this.ownWrites.delete(absPath);
+      return false;
+    }
+    return true;
   }
 
   // Refresh on any entry change, the layout store fires its own event for the config file
@@ -167,6 +192,14 @@ export class VisualPanel {
       return;
     }
     this.scheduleRefresh();
+  }
+
+  // Skip the edit a card just wrote, the canvas already shows the text it holds
+  private onNoteChange(uri: vscode.Uri): void {
+    if (this.isOwnWrite(uri.fsPath)) {
+      return;
+    }
+    this.onFolderEvent(uri);
   }
 
   // Collapse a burst of file events into one delayed state push
@@ -181,6 +214,53 @@ export class VisualPanel {
     }, REFRESH_DEBOUNCE_MS);
   }
 
+  // Test whether a path names a note card in the folder the canvas is showing
+  private isCardNote(absPath: string): boolean {
+    const name = path.basename(absPath);
+    return path.dirname(absPath) === this.folder &&
+      isWithin(absPath, this.context.root) &&
+      !name.startsWith('.') &&
+      name.toLowerCase().endsWith(NOTE_EXT);
+  }
+
+  // Queue a card's edited text, so a command reading the note off disk sees it
+  private saveNote(absPath: string, text: string): void {
+    if (!this.isCardNote(absPath)) {
+      return;
+    }
+
+    const requestId = ++this.saveRequests;
+    this.pendingNoteWrites = this.pendingNoteWrites.then(async () => {
+      await this.writeNote(absPath, text);
+
+      // Push the folder again once the typing settles, so the card titles catch up
+      if (requestId === this.saveRequests) {
+        this.scheduleRefresh();
+      }
+    });
+  }
+
+  // Write the text over the note, marking it so the change event it fires is skipped
+  private async writeNote(absPath: string, text: string): Promise<void> {
+    // A note renamed or deleted mid-edit must not be written back into place
+    const uri = vscode.Uri.file(absPath);
+    if (!(await pathExists(uri))) {
+      void vscode.window.showWarningMessage(
+        `Prompt Studio: could not save ${path.basename(absPath)}, the note is gone.`
+      );
+      return;
+    }
+
+    this.ownWrites.set(absPath, Date.now());
+    try {
+      await vscode.workspace.fs.writeFile(uri, new TextEncoder().encode(text));
+    } catch (err) {
+      void vscode.window.showErrorMessage(
+        `Prompt Studio: could not save ${path.basename(absPath)} - ${(err as Error).message}`
+      );
+    }
+  }
+
   // Act on one message from the canvas webview
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
@@ -193,6 +273,7 @@ export class VisualPanel {
           return;
         }
 
+        await this.pendingNoteWrites;
         await openNoteInView(this.cardView(), msg.node, false);
         return;
       case 'openFile':
@@ -200,6 +281,7 @@ export class VisualPanel {
           return;
         }
 
+        await this.pendingNoteWrites;
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
         return;
       case 'navigate':
@@ -218,6 +300,11 @@ export class VisualPanel {
       case 'previewColor':
         this.context.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
         return;
+      case 'saveNote':
+        if (typeof msg.path === 'string' && typeof msg.text === 'string') {
+          this.saveNote(msg.path, msg.text);
+        }
+        return;
       case 'newEntry':
         if (this.context.allowCrud) {
           await this.createEntry(msg.kind, { x: msg.x, y: msg.y });
@@ -227,6 +314,7 @@ export class VisualPanel {
         if (!ALLOWED_COMMANDS.has(msg.command) || this.isBlockedCommand(msg.command)) {
           return;
         }
+        await this.pendingNoteWrites;
         if (msg.command === 'promptStudio.copyPathRelative') {
           await this.copyRelativePath(msg.node);
           return;
@@ -252,8 +340,15 @@ export class VisualPanel {
     await vscode.commands.executeCommand(command, node, position);
   }
 
+  // Read the folder and push it, dropping a read that a newer one has already overtaken
   private async postState(): Promise<void> {
+    const requestId = ++this.stateRequests;
+    await this.pendingNoteWrites;
     const state = await readFolder(this.context.store, this.context.root, this.folder);
+    if (requestId !== this.stateRequests) {
+      return;
+    }
+
     await this.panel.webview.postMessage({ type: 'state', state });
   }
 
@@ -273,10 +368,14 @@ export class VisualPanel {
       codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
+      toolbarCss: assetUri(webview, this.extensionUri, 'media/common/toolbar.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
       noteOpenJs: assetUri(webview, this.extensionUri, 'media/common/noteOpen.js'),
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       canvasCss: assetUri(webview, this.extensionUri, 'media/visual/canvas.css'),
+      viewportJs: assetUri(webview, this.extensionUri, 'media/visual/viewport.js'),
+      folderZoomJs: assetUri(webview, this.extensionUri, 'media/visual/folderZoom.js'),
+      noteEditingJs: assetUri(webview, this.extensionUri, 'media/visual/noteEditing.js'),
       canvasJs: assetUri(webview, this.extensionUri, 'media/visual/canvas.js'),
       cardColors: JSON.stringify(CARD_COLORS),
       allowCrud: JSON.stringify(this.context.allowCrud)

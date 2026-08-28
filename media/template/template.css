@@ -1,4 +1,4 @@
-/* Styles the template editor, its rendered markdown, the mention popup, the find widget, the attachment chips, and the bottom bar */
+/* Styles the template editor, its rendered markdown, the mention popup, the find widget, and the attachment chips */
 html,
 body {
   margin: 0;
@@ -529,51 +529,4 @@ body.vscode-high-contrast-light .cm-editor .cm-searchMatch-selected {
 
 .attachment-remove:hover {
   opacity: 1;
-}
-
-/* --- bottom bar --- */
-
-#toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding: 6px 10px;
-  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
-  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-}
-
-.spacer {
-  flex: 1;
-}
-
-.bar-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: inherit;
-  color: var(--vscode-button-secondaryForeground);
-  background: var(--vscode-button-secondaryBackground);
-}
-
-.bar-button:hover {
-  background: var(--vscode-button-secondaryHoverBackground);
-}
-
-.bar-button.primary {
-  color: var(--vscode-button-foreground);
-  background: var(--vscode-button-background);
-}
-
-.bar-button.primary:hover {
-  background: var(--vscode-button-hoverBackground);
-}
-
-.bar-button .codicon {
-  font-size: 14px;
 }

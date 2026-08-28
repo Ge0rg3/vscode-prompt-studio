@@ -207,6 +207,7 @@ export class TemplatePanel {
       'media/template/template.html',
       {
         codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
+        toolbarCss: assetUri(webview, this.extensionUri, 'media/common/toolbar.css'),
         templateCss: assetUri(webview, this.extensionUri, 'media/template/template.css'),
         templateJs: assetUri(webview, this.extensionUri, 'media/template/template.js')
       },

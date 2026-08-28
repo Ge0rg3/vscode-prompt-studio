@@ -14,7 +14,7 @@ export interface VisualCard {
   absPath: string;
   name: string;
   title: string;
-  preview?: string;
+  text?: string;
   color?: string;
   x: number;
   y: number;
@@ -33,6 +33,7 @@ export interface VisualState {
   breadcrumbs: Breadcrumb[];
   cards: VisualCard[];
   folderColor?: string;
+  parentColor?: string;
 }
 
 const NOTE_EXT = '.md';
@@ -66,11 +67,6 @@ function deriveTitle(raw: string, fallback: string): string {
     }
   }
   return fallback;
-}
-
-// Drop the leading heading from the note body
-function previewOf(raw: string): string {
-  return raw.replace(/^\s*#{1,6}\s+[^\n]*\n?/, '').trim();
 }
 
 // Compare two cards by title, ignoring case
@@ -193,7 +189,7 @@ async function readEntries(store: CardLayoutStore, folder: string): Promise<Visu
         absPath,
         name,
         title: deriveTitle(raw, stem),
-        preview: previewOf(raw),
+        text: raw,
         color: store.getColor(absPath),
         x: 0,
         y: 0,
@@ -240,9 +236,14 @@ export async function readFolder(
   const cards = await readEntries(store, folder);
   await attachPreviews(store, cards, PREVIEW_DEPTH);
 
+  // Read the color of the folder one crumb up as well
+  const breadcrumbs = buildBreadcrumbs(root, folder);
+  const parent = breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2].path : undefined;
+
   return {
-    breadcrumbs: buildBreadcrumbs(root, folder),
+    breadcrumbs,
     cards,
-    folderColor: store.getColor(folder)
+    folderColor: store.getColor(folder),
+    parentColor: parent ? store.getColor(parent) : undefined
   };
 }

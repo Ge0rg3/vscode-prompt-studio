@@ -1,0 +1,52 @@
+/* Styles the bottom button bar carried by the template editor and the canvas */
+#toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-top: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+  background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.bar-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.bar-button:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+/* An active toggle takes the primary button colors */
+.bar-button.primary,
+.bar-button.active {
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+}
+
+.bar-button.primary:hover,
+.bar-button.active:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.bar-button.icon-only {
+  padding: 4px 7px;
+}
+
+.bar-button .codicon {
+  font-size: 14px;
+}

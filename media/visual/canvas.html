@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- The canvas page, a breadcrumb bar above the card surface and its right-click menu -->
+<!-- The canvas page, with breadcrumbs above the card surface and a button bar below it -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -7,19 +7,42 @@
   <link rel="stylesheet" href="{{codiconCss}}" />
   <link rel="stylesheet" href="{{paletteCss}}" />
   <link rel="stylesheet" href="{{contextMenuCss}}" />
+  <link rel="stylesheet" href="{{toolbarCss}}" />
   <link rel="stylesheet" href="{{canvasCss}}" />
   <title>Visual</title>
 </head>
 <body data-card-colors='{{cardColors}}' data-allow-crud='{{allowCrud}}'>
   <nav id="breadcrumbs"></nav>
   <div id="canvas">
+    <div id="fade"></div>
     <div id="surface"></div>
     <div id="empty" class="hidden">This folder is empty.</div>
+  </div>
+  <div id="toolbar">
+    <button id="edit-toggle" class="bar-button" type="button" title="Edit note text on the cards">
+      <span class="codicon codicon-edit"></span>
+      <span>Edit</span>
+    </button>
+    <span class="toolbar-spacer"></span>
+    <button id="zoom-out" class="bar-button icon-only" type="button" title="Zoom out">
+      <span class="codicon codicon-zoom-out"></span>
+    </button>
+    <button id="zoom-level" class="bar-button" type="button" title="Zoom to 100%">100%</button>
+    <button id="zoom-in" class="bar-button icon-only" type="button" title="Zoom in">
+      <span class="codicon codicon-zoom-in"></span>
+    </button>
+    <button id="zoom-fit" class="bar-button" type="button" title="Fit every card on screen">
+      <span class="codicon codicon-screen-full"></span>
+      <span>Fit</span>
+    </button>
   </div>
   <div id="context-menu" class="hidden"></div>
   <script nonce="{{nonce}}" src="{{contextMenuJs}}"></script>
   <script nonce="{{nonce}}" src="{{noteOpenJs}}"></script>
   <script nonce="{{nonce}}" src="{{paletteJs}}"></script>
+  <script nonce="{{nonce}}" src="{{viewportJs}}"></script>
+  <script nonce="{{nonce}}" src="{{folderZoomJs}}"></script>
+  <script nonce="{{nonce}}" src="{{noteEditingJs}}"></script>
   <script nonce="{{nonce}}" src="{{canvasJs}}"></script>
 </body>
 </html>

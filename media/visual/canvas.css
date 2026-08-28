@@ -1,4 +1,4 @@
-/* Styles the canvas panel, its breadcrumb bar, and the note and folder cards on it */
+/* Styles the canvas panel, its breadcrumb bar, and the note and folder cards it pans and zooms over */
 html,
 body {
   margin: 0;
@@ -56,17 +56,38 @@ body {
 #canvas {
   position: relative;
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
 }
 
-#canvas.surface-tinted {
+#canvas.panning {
+  cursor: grabbing;
+}
+
+/* Covers the canvas with the color of the folder the zoom is opening or leaving */
+#fade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background-color: var(--vscode-editor-background);
+}
+
+#canvas.surface-tinted,
+#fade.tinted {
   background-color: color-mix(in srgb, var(--ps-fill) 20%, var(--vscode-editor-background));
 }
 
+/* The layer holding every card, moved by the viewport's transform */
 #surface {
-  position: relative;
-  min-width: 100%;
-  min-height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* Give the surface its own layer while a gesture runs, so a scale repaints nothing else */
+#surface.gesturing {
+  will-change: transform;
 }
 
 .card {
@@ -84,7 +105,8 @@ body {
   user-select: none;
 }
 
-.card:hover {
+.card:hover,
+.card:focus-within {
   border-color: var(--vscode-focusBorder);
 }
 
@@ -137,14 +159,11 @@ body {
 
 .card .preview {
   flex: 1;
+  margin: 0;
 
-  /* Pull the scrollbar out to the card edge, keep the text inset */
-  margin: 0 -14px 0 0;
-  padding-right: 14px;
+  /* The card clips its body, since zooming in is how you read the rest */
+  overflow: hidden;
   white-space: pre-wrap;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
   color: var(--vscode-descriptionForeground);
   font-family: var(--vscode-editor-font-family, monospace), Menlo, Consolas, monospace;
   font-size: 12px;
@@ -154,6 +173,27 @@ body {
 .card .preview.empty {
   font-style: italic;
   opacity: 0.7;
+}
+
+.card .note-text {
+  flex: 1;
+  box-sizing: border-box;
+
+  /* Pull the scrollbar out to the card edge, keep the text inset */
+  margin: 0 -14px 0 0;
+  padding: 0 14px 0 0;
+  border: none;
+  outline: none;
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+  background: transparent;
+  color: var(--vscode-foreground);
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: text;
+  user-select: text;
 }
 
 .card .folder-preview {
@@ -192,16 +232,21 @@ body {
 
   /* Keep the fill and text neutral inside a colored folder */
   color: var(--vscode-foreground);
-  background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten, 14%), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten, 0%), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
   overflow: hidden;
 }
 
+/* Give the top level of preview cards a real card's shadow, since a zoom lands on them */
+.card > .folder-preview > .mini-surface > .mini-card {
+  box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+}
+
 .mini-card .mini-card {
-  --ps-mini-lighten: 28%;
+  --ps-mini-lighten: 14%;
 }
 
 .mini-card .mini-card .mini-card {
-  --ps-mini-lighten: 42%;
+  --ps-mini-lighten: 28%;
 }
 
 .folder-preview .mini-title {
@@ -235,6 +280,18 @@ body {
   line-height: 1.4;
 }
 
+.folder-preview .mini-preview.empty {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+/* Hold the readout at one width, so the zoom buttons stay put as the number changes */
+#zoom-level {
+  justify-content: center;
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+}
+
 #empty {
   position: absolute;
   inset: 0;
@@ -261,22 +318,41 @@ body {
 
 /* Lighten toward white, one step per nesting level */
 .mini-card.colored {
-  background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten, 14%), var(--ps-fill));
+  background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten, 0%), var(--ps-fill));
 }
 
 /* Darken the icon and preview text inside a colored card */
 .card.colored > .title > .codicon,
 .card.colored > .preview,
+.card.colored > .note-text,
 .mini-card.colored > .mini-title > .codicon,
 .mini-card.colored > .mini-preview {
   color: #3a3a3a;
 }
 
-/* Tint the preview scrollbar with the card's accent color */
-.card.colored > .preview {
+/* Tint the text field's scrollbar with the card's accent color */
+.card.colored > .note-text {
   scrollbar-color: var(--ps-accent) transparent;
 }
 
 .card.colored .resize-handle {
   background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.4) 50%);
+}
+
+/* How far the opening folder card has faded, kept off its children so they are not restyled with it */
+@property --ps-open-progress {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
+/* Fade the card's own paint out as the canvas comes through, leaving the surface underneath */
+.card.opening {
+  background-color: color-mix(in srgb, var(--vscode-editorWidget-background, var(--vscode-editor-background)) calc(100% - var(--ps-open-progress) * 100%), var(--vscode-editor-background));
+  border-color: color-mix(in srgb, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)) calc(100% - var(--ps-open-progress) * 100%), transparent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3)) calc(100% - var(--ps-open-progress) * 100%), transparent);
+}
+
+.card.colored.opening {
+  background-color: color-mix(in srgb, var(--ps-fill) calc(100% - var(--ps-open-progress) * 80%), var(--vscode-editor-background));
 }
