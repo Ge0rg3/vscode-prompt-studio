@@ -3,7 +3,7 @@
 Build, run, packaging, and release instructions for working on the extension itself.
 
 * For what the extension does, read [README.md](README.md).
-* For the code map and the conventions, read [AGENTS.md](AGENTS.md).
+* For the conventions and the code style, read [AGENTS.md](AGENTS.md).
 
 ## Quickstart
 
@@ -28,7 +28,7 @@ vscode-prompt-studio/
 +-- README.md               # Human-facing overview and feature reference
 +-- CHANGELOG.md            # What changed in each released version. The marketplace renders it
 +-- CONTRIBUTING.md         # This file. Setup, build, packaging, releases
-+-- AGENTS.md               # Code map, conventions, code style
++-- AGENTS.md               # Conventions, code style, and what the code cannot say for itself
 +-- LICENSE                 # GPL-3.0
 +-- package.json            # Manifest: commands, views, menus, settings
 +-- esbuild.js              # Two bundles (host, template webview) + copies codicons into media/
@@ -68,10 +68,12 @@ vscode-prompt-studio/
 +-- media/                  # Everything a webview loads at runtime, plus the icons the manifest names. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
 |   +-- marketplaceIcon.png # 128x128 marketplace icon, exported from docs/marketplace-icon.svg
-|   +-- common/             # contextMenu + noteOpen + palette, shared by more than one webview
+|   +-- common/             # contextMenu + noteOpen + palette + toolbar, shared by more than one webview
 |   +-- vault/              # tree.html/.css/.js. tree.css also styles the skills view
 |   +-- skills/             # tree.html/.js for the Claude Skills sidebar
-|   +-- visual/             # canvas.html/.css/.js for the card canvas
+|   +-- visual/             # canvas.html/.css/.js for the card canvas, viewport.js for its pan and
+|   |                       # zoom, folderZoom.js for moving between folders, noteEditing.js for
+|   |                       # the text fields on its cards
 |   +-- template/           # template.html/.css plus the generated template.js bundle
 |   +-- settings/           # settings.html/.css/.js for the settings page
 |   +-- codicons/           # VSCode icon font, copied from node_modules at build time
@@ -132,13 +134,26 @@ Install the extension into your everyday VSCode:
 
 That packages a `.vsix` and installs it over any previous copy of the same version. Reload VSCode and the Prompt Studio icon appears in the activity bar.
 
-The script calls `code`, so set `CODE_CLI=code-insiders` when your VSCode CLI goes by another name.
+The script calls `code`, so set `CODE_CLI=code-insiders` when your VSCode CLI goes by another name. It builds the package through `npm run vsix`, piping `yes` in to answer the confirmation `vsce` puts up.
+
+`vsce` packages from disk rather than from git, so anything added at the repo root that a user should not receive needs a line in [.vscodeignore](.vscodeignore).
 
 ## Releases
 
 Only the maintainer can cut a release, since it goes out under their personal marketplace account.
 
-[.github/workflows/publish.yml](.github/workflows/publish.yml) publishes on a push to `main` when the version in [package.json](package.json) has no `v<version>` release yet. So leave the version and the [CHANGELOG.md](CHANGELOG.md) entry alone in a pull request.
+[.github/workflows/publish.yml](.github/workflows/publish.yml) publishes on a push to `main` when the version in [package.json](package.json) has no `v<version>` release yet, then cuts that release with the `.vsix` attached. So leave the version and the [CHANGELOG.md](CHANGELOG.md) entry alone in a pull request.
+
+A release is a version bump:
+
+```bash
+npm version patch -m "chore: release %s"  # or minor / major
+git push
+```
+
+Commit the version's [CHANGELOG.md](CHANGELOG.md) entry first, since `npm version` refuses a dirty tree.
+
+The workflow publishes with the `VSCE_PAT` repository secret, an [Azure DevOps token](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#get-a-personal-access-token) with **Marketplace > Manage** scope. A token lasts a year at most, so a publish step failing with a `401` means it is time for a new one. Publishing by hand is `npm run publish`, which needs `npx vsce login` first.
 
 ## Not built yet
 
