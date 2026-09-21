@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { NotePosition } from '../common/cardLayoutStore';
+import { defaultNoteView, openNoteInView } from '../common/noteView';
 import { pathExists } from '../common/utils/fs';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
@@ -90,11 +91,11 @@ export function registerCreateNote(
         return;
       }
 
-      // Place the card where the canvas asked for it, then open the note
+      // Place the card where the canvas asked for it, then open the note the way a click would
       if (position) {
         config.setPosition(created, position);
       }
-      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(created));
+      await openNoteInView(defaultNoteView(), { kind: 'note', absPath: created, name: filename }, false);
     }
   );
 }

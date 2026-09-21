@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- A new note opens in the default note view, so it starts as a blank template when the template editor is the default.
+
 ## 0.3.1
 
 - The `@` mention list no longer drops files in large workspaces, untracked ones included. It leaves out Python virtual environments, tool caches, and bare git repos to make room.
