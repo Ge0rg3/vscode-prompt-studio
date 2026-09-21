@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- The `@` mention list no longer drops files in large workspaces, untracked ones included. It leaves out Python virtual environments, tool caches, and bare git repos to make room.
+- A mention of a file the list leaves out, such as one in `node_modules`, still turns blue and opens with ctrl+click.
+
 ## 0.3.0
 
 - The canvas pans and zooms. Drag the background or hold the middle button to pan, ctrl+wheel or the bottom bar to zoom, and **Fit** to frame every card.

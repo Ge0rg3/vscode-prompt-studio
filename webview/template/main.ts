@@ -93,7 +93,7 @@ interface PersistedState {
   text: string;
 }
 
-// A listDir request waiting for its reply, resolved with undefined when the timer fires first
+// A folder listing request waiting for its reply, resolved with undefined when the timer fires first
 interface PendingDirectory {
   resolve: (entries: MentionEntry[] | undefined) => void;
   timer: number;
@@ -112,7 +112,7 @@ const vscode = acquireVsCodeApi();
 const pendingDirectories = new Map<number, PendingDirectory>();
 const directoryCache = new DirectoryCache(fetchDirectory);
 const checkingPaths = new Set<string>();
-const queuedVerifies = new Set<string>();
+const queuedPaths = new Set<string>();
 const pendingAttachments = new Map<number, (reference: string | undefined) => void>();
 const requestedAttachments = new Set<string>();
 let nextRequestId = 1;
@@ -146,12 +146,12 @@ const attachmentHost: AttachmentHost = {
 const renderedMarkdown = [livePreview(), hideAttachmentMarkdown()];
 
 let attachedReferences = new Set<string>();
-let sourceMode = false;
-let loading = false;
+let isSourceMode = false;
+let isLoading = false;
 let notePath = '';
 let claudeCommand: string | undefined;
 let savedText = '';
-let dirty = false;
+let isDirty = false;
 
 const view = new EditorView({
   parent: editorEl,
@@ -186,7 +186,7 @@ const view = new EditorView({
       noteAttachments(attachmentHost),
       findReplace(),
       EditorView.updateListener.of((update) => {
-        if (update.docChanged && !loading) {
+        if (update.docChanged && !isLoading) {
           onDocChanged();
         }
       }),
@@ -207,7 +207,7 @@ function fetchDirectory(dirPath: string): Promise<MentionEntry[] | undefined> {
   });
 }
 
-// Finish a waiting listDir request, with undefined when it timed out
+// Finish a waiting folder listing request, with undefined when it timed out
 function settleDirectory(id: number, entries: MentionEntry[] | undefined): void {
   const pending = pendingDirectories.get(id);
   if (!pending) {
@@ -219,25 +219,25 @@ function settleDirectory(id: number, entries: MentionEntry[] | undefined): void 
   pending.resolve(entries);
 }
 
-// Queue absolute paths for one existence check once the scans settle
+// Queue paths for one existence check once the scans settle
 function verifyPaths(paths: string[]): void {
-  let queued = false;
+  let hasQueued = false;
   for (const path of paths) {
     if (!checkingPaths.has(path)) {
       checkingPaths.add(path);
-      queuedVerifies.add(path);
-      queued = true;
+      queuedPaths.add(path);
+      hasQueued = true;
     }
   }
 
-  if (!queued) {
+  if (!hasQueued) {
     return;
   }
 
   clearTimeout(verifyTimer);
   verifyTimer = setTimeout(() => {
-    vscode.postMessage({ type: 'checkPaths', paths: [...queuedVerifies] });
-    queuedVerifies.clear();
+    vscode.postMessage({ type: 'checkPaths', paths: [...queuedPaths] });
+    queuedPaths.clear();
   }, VERIFY_DEBOUNCE_MS);
 }
 
@@ -281,7 +281,7 @@ function showAttachments(attached: readonly Attachment[]): void {
   const references = new Set(attached.map((attachment) => attachment.reference));
 
   // Only an edit takes a file off, a fresh load just brings the note in
-  if (!loading) {
+  if (!isLoading) {
     for (const removed of attachedReferences) {
       if (references.has(removed)) {
         continue;
@@ -298,12 +298,12 @@ function showAttachments(attached: readonly Attachment[]): void {
 
 // Swap the note's text into the editor, kept out of the undo history and the modified check
 function setContent(text: string): void {
-  loading = true;
+  isLoading = true;
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: text },
     annotations: Transaction.addToHistory.of(false)
   });
-  loading = false;
+  isLoading = false;
 }
 
 // Ask the host to write the editor's text over the note
@@ -359,12 +359,12 @@ function onDocChanged(): void {
 
 // Tell the host to add or drop the tab's modified marker
 function setDirty(next: boolean): void {
-  if (next === dirty) {
+  if (next === isDirty) {
     return;
   }
 
-  dirty = next;
-  vscode.postMessage({ type: 'dirty', dirty });
+  isDirty = next;
+  vscode.postMessage({ type: 'dirty', dirty: isDirty });
 }
 
 // Keep the current text in webview state so a reload restores unsaved edits
@@ -374,7 +374,7 @@ function persist(): void {
 
 // Switch between the rendered markdown and the raw source, the button names the mode on screen
 function setSourceMode(on: boolean): void {
-  sourceMode = on;
+  isSourceMode = on;
   view.dispatch({ effects: live.reconfigure(on ? [] : renderedMarkdown) });
   toggleIcon.className = on ? 'codicon codicon-code' : 'codicon codicon-eye';
   toggleLabel.textContent = on ? 'Source' : 'Rendered';
@@ -459,7 +459,7 @@ window.addEventListener('message', (event) => handleHostMessage(event.data as In
 toolbar.addEventListener('mousedown', (event) => event.preventDefault());
 attachmentStrip.addEventListener('mousedown', (event) => event.preventDefault());
 
-toggle.addEventListener('click', () => setSourceMode(!sourceMode));
+toggle.addEventListener('click', () => setSourceMode(!isSourceMode));
 attach.addEventListener('click', () => vscode.postMessage({ type: 'attachFromDisk' }));
 save.addEventListener('click', saveNote);
 copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));

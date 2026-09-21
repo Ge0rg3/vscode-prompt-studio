@@ -7,8 +7,28 @@ export interface MentionEntry {
   isFolder: boolean;
 }
 
-const MAX_INDEXED_FILES = 20000;
+// Cap the scan, since the popup ranks every indexed path on each keystroke
+const MAX_INDEXED_FILES = 50000;
 const REBUILD_DELAY_MS = 500;
+
+// Skip installed packages, tool caches, and bare git repos, since they fill the scan cap on their own
+const GENERATED_FOLDERS = [
+  '**/.venv',
+  '**/venv',
+  '**/__pycache__',
+  '**/.pytest_cache',
+  '**/.mypy_cache',
+  '**/.ruff_cache',
+  '**/.tox',
+  '**/.next',
+  '**/.nuxt',
+  '**/.svelte-kit',
+  '**/.turbo',
+  '**/.angular',
+  '**/.gradle',
+  '**/.terraform',
+  '**/*.git'
+] as const;
 
 export class MentionIndex implements vscode.Disposable {
   private readonly emitter = new vscode.EventEmitter<void>();
@@ -85,19 +105,19 @@ export class MentionIndex implements vscode.Disposable {
     this.rebuildTimer = setTimeout(() => this.emitter.fire(), REBUILD_DELAY_MS);
   }
 
-  // Fold the enabled files.exclude and search.exclude patterns into one glob
-  private excludeGlob(folder: vscode.WorkspaceFolder): string | undefined {
-    const files = vscode.workspace.getConfiguration('files', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
-    const search = vscode.workspace.getConfiguration('search', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
+  // Combine the generated folders with every enabled files.exclude and search.exclude pattern into one glob
+  private excludeGlob(folder: vscode.WorkspaceFolder): string {
+    const fileExcludes = vscode.workspace.getConfiguration('files', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
+    const searchExcludes = vscode.workspace.getConfiguration('search', folder.uri).get<Record<string, unknown>>('exclude') ?? {};
 
-    const patterns = new Set<string>();
-    for (const [pattern, enabled] of [...Object.entries(files), ...Object.entries(search)]) {
+    const patterns = new Set<string>(GENERATED_FOLDERS);
+    for (const [pattern, enabled] of [...Object.entries(fileExcludes), ...Object.entries(searchExcludes)]) {
       if (enabled === true) {
         patterns.add(pattern);
       }
     }
 
-    return patterns.size > 0 ? `{${[...patterns].join(',')}}` : undefined;
+    return `{${[...patterns].join(',')}}`;
   }
 
   // List each file plus every folder above it, without repeats

@@ -307,7 +307,7 @@ Two obligations that no type and no call site checks, and both fail quietly.
 Four things in [webview/template/](webview/template/) that read as tidy-up material and are not.
 
 - **`isOutsideAttachments` has to stay one shared function.** CodeMirror's `SearchQuery.eq` compares `test` by identity, so building the filter inline makes every query unequal, and a replace then rewrites an attachment path and deletes the file with it.
-- **`verifiedPaths` hands back the `Set` it already had when the host finds nothing.** The mention scan runs again whenever that field changes identity, so a fresh empty `Set` restarts the scan, finds the same missing path, and asks again every 200ms forever.
+- **`verifiedPaths` hands back the `Set` it already had when the host finds nothing new.** The mention scan runs again whenever that field changes identity, so a fresh `Set` with nothing new in it restarts the scan, finds the same unresolved path, and asks again every 200ms forever.
 - **Browsing ignores case, and a mention is only colored as resolved when the case matches exactly.** Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
 - **Every popup rule in [media/template/template.css](media/template/template.css) is prefixed `.cm-editor`, and the selected row carries both `.cm-tooltip` and `.cm-tooltip-autocomplete`.** They are outranking CodeMirror's own injected theme. Flatten the selectors and the popup reverts to its colors.
 

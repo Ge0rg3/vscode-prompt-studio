@@ -50,6 +50,12 @@ interface MentionScan {
   unverified: string[];
 }
 
+// A stretch of the document the editor is showing
+interface VisibleRange {
+  from: number;
+  to: number;
+}
+
 // The @ token before the cursor and the range its options replace
 interface MentionToken {
   typed: string;
@@ -85,7 +91,7 @@ const mentionMark = Decoration.mark({ class: 'cm-mention' });
 // The workspace paths the popup offers, pushed in by the extension host
 export const setMentionEntries = StateEffect.define<readonly MentionEntry[]>();
 
-// Absolute paths the host has confirmed exist
+// Paths outside the workspace list that the host found on disk
 export const addVerifiedPaths = StateEffect.define<readonly MentionEntry[]>();
 
 const mentionCatalog = StateField.define<MentionCatalog>({
@@ -104,12 +110,14 @@ const verifiedPaths = StateField.define<ReadonlySet<string>>({
   create: () => new Set(),
   update(paths, tr) {
     for (const effect of tr.effects) {
-      if (effect.is(addVerifiedPaths) && effect.value.length > 0) {
+      if (effect.is(addVerifiedPaths)) {
         const next = new Set(paths);
         for (const entry of effect.value) {
           addLookupForms(next, entry);
         }
-        return next;
+
+        // Keep the old set when nothing new arrived, a fresh one rescans and asks the host again forever
+        return next.size > paths.size ? next : paths;
       }
     }
     return paths;
@@ -152,7 +160,7 @@ function buildCatalog(entries: readonly MentionEntry[]): MentionCatalog {
 }
 
 // Check whether the position sits inside a fenced block or a backtick span
-function insideCode(tree: Tree, pos: number): boolean {
+function isInsideCode(tree: Tree, pos: number): boolean {
   for (let node: SyntaxNode | null = tree.resolveInner(pos, 1); node; node = node.parent) {
     if (CODE_NODES.has(node.name)) {
       return true;
@@ -313,7 +321,7 @@ function mentionToken(context: CompletionContext): MentionToken | null {
   }
 
   const from = context.pos - token[1].length;
-  if (insideCode(syntaxTree(context.state), from - 1)) {
+  if (isInsideCode(syntaxTree(context.state), from - 1)) {
     return null;
   }
 
@@ -390,14 +398,10 @@ function resolveMention(token: string, catalog: MentionCatalog, verified: Readon
   return catalog.paths.has(trimmed) || verified.has(trimmed) ? trimmed : undefined;
 }
 
-// Take the absolute path an @ token points at, undefined when the token names none
-function absoluteTarget(token: string): string | undefined {
-  if (!token.startsWith('/')) {
-    return undefined;
-  }
-
-  const trimmed = token.replace(TRAILING_PUNCTUATION, '').replace(/\/$/, '');
-  return trimmed.length > 1 ? trimmed : undefined;
+// Trim an @ token down to the path it names, undefined when nothing is left
+function trimMentionPath(token: string): string | undefined {
+  const trimmed = token.replace(TRAILING_PUNCTUATION, '').replace(/\/+$/, '');
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 // Test a click for the open gesture: ctrl on Windows and Linux, cmd on macOS
@@ -420,7 +424,7 @@ function mentionPathAt(marks: DecorationSet, state: EditorState, pos: number): s
 }
 
 // Mark every @ mention in the visible lines that names a real file or folder
-function scanMentions(state: EditorState, ranges: readonly { from: number; to: number }[]): MentionScan {
+function scanMentions(state: EditorState, ranges: readonly VisibleRange[]): MentionScan {
   const catalog = state.field(mentionCatalog);
   const verified = state.field(verifiedPaths);
   const tree = syntaxTree(state);
@@ -430,6 +434,7 @@ function scanMentions(state: EditorState, ranges: readonly { from: number; to: n
   let scannedTo = 0;
 
   for (const range of ranges) {
+    // Widen each range to whole lines, skipping lines the previous range already covered
     const from = Math.max(scannedTo, state.doc.lineAt(range.from).from);
     const to = state.doc.lineAt(range.to).to;
     if (to <= from) {
@@ -439,8 +444,9 @@ function scanMentions(state: EditorState, ranges: readonly { from: number; to: n
 
     const text = state.doc.sliceString(from, to);
     for (const match of text.matchAll(MENTION_SCAN)) {
+      // Find the @ itself, since the match can open on the space or bracket before it
       const at = from + (match.index ?? 0) + match[0].length - match[1].length - 1;
-      if (insideCode(tree, at)) {
+      if (isInsideCode(tree, at)) {
         continue;
       }
 
@@ -450,7 +456,8 @@ function scanMentions(state: EditorState, ranges: readonly { from: number; to: n
         continue;
       }
 
-      const target = absoluteTarget(match[1]);
+      // Look on disk for a path the workspace list leaves out, such as one in an excluded folder
+      const target = trimMentionPath(match[1]);
       if (target) {
         unverified.push(target);
       }
@@ -512,7 +519,7 @@ export function fileMentions(host: MentionHost): Extension {
           return true;
         }
 
-        private scan(state: EditorState, ranges: readonly { from: number; to: number }[]): DecorationSet {
+        private scan(state: EditorState, ranges: readonly VisibleRange[]): DecorationSet {
           const { marks, unverified } = scanMentions(state, ranges);
           if (unverified.length > 0) {
             host.verifyPaths(unverified);
