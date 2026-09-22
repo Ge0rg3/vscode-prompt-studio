@@ -218,7 +218,7 @@ These patterns make code look obviously machine-generated. Don't do any of these
 - **VS5** Webview message handling follows the same split: the host validates the incoming message shape, calls a service, and posts back a typed reply. The renderer in `media/` only renders and emits intent.
 - **VS6** Treat every field of a webview message as untrusted. Re-resolve a node from its path and re-run the same containment and name checks the host would run for a command.
 - **VS7** Filesystem operations go through `vscode.workspace.fs` rather than raw `node:fs`, unless the operation is about the extension's own storage on the local disk.
-- **VS8** Read a setting through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down. The vault location lives in workspace state rather than a setting.
+- **VS8** Read a setting through `vscode.workspace.getConfiguration('promptStudio')` at the boundary and pass plain values down. The project vault location lives in workspace state rather than a setting.
 - **VS9** Icons come from the product codicon font. No custom glyphs.
 
 ### Webview JavaScript (JS)
@@ -280,15 +280,18 @@ Both sidebars are webviews rather than `TreeView`s, because a `TreeView` cannot 
 
 A command a webview asks for has to be in that host's allowed list as well as in `package.json`. An unlisted one hits a bare `return`, with no message and no error, so the menu row just does nothing.
 
+The project-or-global switch sits in both title bars on purpose. The Claude Skills view disappears when the project collection holds nothing, so the one on the Vault view is the only button always on screen.
+
 </details>
 
 <details>
 <summary><b>Rules nothing enforces</b></summary>
 
-Two obligations that no type and no call site checks, and both fail quietly.
+Three obligations that no type and no call site checks, and all of them fail quietly.
 
 - **Any code that renames, moves, copies, or deletes an entry has to call `relocate`, `duplicate`, or `remove`** on the store in [src/common/vaultConfig.ts](src/common/vaultConfig.ts). `moveEntry.ts`, `copyEntry.ts`, and a plain delete know nothing about it, so a new caller compiles, runs, and leaves the card's position and color behind under the old key.
 - **Any code that moves, copies, or deletes a note has to call `carryNoteAttachments` or `dropNoteAttachments`** in [src/common/noteAttachments.ts](src/common/noteAttachments.ts). Skip it and the note's stored files are left orphaned, or the moved note points at nothing.
+- **Anything describing the project vault has to read `projectVaultRoot` on [src/common/vaultManager.ts](src/common/vaultManager.ts)**, never `getVaultRoot`. The two answer differently while the global scope is on, so the settings page would name the global folder under the project vault heading.
 
 </details>
 
@@ -298,6 +301,8 @@ Two obligations that no type and no call site checks, and both fail quietly.
 - **`configFor` in [src/skills/skillsConfigs.ts](src/skills/skillsConfigs.ts) has to keep caching what it builds.** The map reads as ordinary memoisation, but building a config fires a change event, the event schedules a refresh, and the refresh builds the config again. Without the cache that never stops.
 - **Deleting a whole sub-project fires none of the skills watchers**, so its row stays until the next skills event or a manual **Refresh Skills**.
 - **`skillsDir` has to stay on the node the renderer sends.** The field is optional on the type and the fallback is silent, so trimming the field list in [media/skills/tree.js](media/skills/tree.js) makes **New Skill** on a sub-project row create the skill in the workspace `.claude/skills`.
+- **The watcher on `~/.claude` has to keep the plain pattern `skills`.** A pattern carrying `**` or a slash makes VSCode watch its base folder recursively, and `~/.claude/projects` holds the session transcripts Claude Code rewrites on every turn.
+- **The global scan has to stay flat.** Claude Code keeps the skill sets synced from claude.ai under `~/.claude/skills/synced/<id>/`, and several of them hold copies of the same skill names.
 
 </details>
 

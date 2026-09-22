@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
 import { carryNoteAttachments } from '../common/noteAttachments';
 import { defaultNoteView, onDidChangeNoteView, openNoteInView } from '../common/noteView';
+import { ScopeManager } from '../common/scopeManager';
 import { isWithin } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultConfig } from '../common/vaultConfig';
@@ -55,7 +56,8 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     private readonly vaultManager: VaultManager,
     private readonly config: VaultConfig,
     private readonly extensionUri: vscode.Uri,
-    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>,
+    private readonly scopeManager: ScopeManager
   ) {
     this.rebuildWatcher();
     this.disposables.push(
@@ -63,6 +65,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         this.rebuildWatcher();
         void this.postState();
       }),
+      scopeManager.onDidChangeScope(() => scopeManager.labelView(this.view)),
       config.onDidChange(() => this.scheduleRefresh()),
       onDidChangeNoteView(() => this.postNoteView()),
       vscode.window.onDidChangeActiveTextEditor(() => this.syncSelection()),
@@ -77,10 +80,14 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
     };
     view.webview.html = this.renderHtml(view.webview);
+    this.scopeManager.labelView(view);
+
+    // Dispose the message handler with the view, since VSCode resolves a new view whenever the section reappears
+    const messageSub = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
     view.onDidDispose(() => {
       this.view = undefined;
+      messageSub.dispose();
     });
-    this.disposables.push(view.webview.onDidReceiveMessage((msg) => this.handle(msg)));
   }
 
   expandAll(): void {
@@ -238,7 +245,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
         this.colorPreviewEmitter.fire({ path: msg.path, color: msg.color });
         return;
       case 'command':
-        if (!ALLOWED_COMMANDS.has(msg.command)) {
+        if (!ALLOWED_COMMANDS.has(msg.command) || (msg.node && !this.insideVault(msg.node.absPath))) {
           return;
         }
         await vscode.commands.executeCommand(msg.command, msg.node);
@@ -254,7 +261,7 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
       noteOpenJs: assetUri(webview, this.extensionUri, 'media/common/noteOpen.js'),
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
-      treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
+      treeCss: assetUri(webview, this.extensionUri, 'media/common/tree.css'),
       treeJs: assetUri(webview, this.extensionUri, 'media/vault/tree.js'),
       cardColors: JSON.stringify(CARD_COLORS)
     });

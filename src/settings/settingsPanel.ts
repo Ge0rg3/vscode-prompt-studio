@@ -4,12 +4,22 @@ import * as vscode from 'vscode';
 import { defaultNoteView, NOTE_VIEWS, NoteView, onDidChangeNoteView, setDefaultNoteView } from '../common/noteView';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { VaultManager } from '../common/vaultManager';
-import { applyVaultMode, currentVaultMode, VAULT_LOCATION_MODES, VaultLocationMode } from '../vault/vaultLocation';
+import {
+  applyGlobalVaultMode,
+  applyProjectVaultMode,
+  currentGlobalVaultMode,
+  currentProjectVaultMode,
+  GLOBAL_VAULT_MODES,
+  GlobalVaultMode,
+  PROJECT_VAULT_MODES,
+  ProjectVaultMode
+} from '../vault/vaultLocation';
 
 type InboundMessage =
   | { type: 'ready' }
   | { type: 'setNoteView'; view: NoteView }
-  | { type: 'setVaultMode'; mode: VaultLocationMode };
+  | { type: 'setProjectVaultMode'; mode: ProjectVaultMode }
+  | { type: 'setGlobalVaultMode'; mode: GlobalVaultMode };
 
 const PANEL_TITLE = 'Prompt Studio Settings';
 
@@ -23,8 +33,7 @@ export class SettingsPanel {
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
-    private readonly vaultManager: VaultManager,
-    private readonly globalStorageDir: string
+    private readonly vaultManager: VaultManager
   ) {
     this.panel.title = PANEL_TITLE;
     this.panel.webview.html = this.renderHtml();
@@ -63,14 +72,22 @@ export class SettingsPanel {
         // Show what the setting reads back as, since a workspace entry can outrank the write
         this.postState();
         return;
-      case 'setVaultMode':
-        if (!VAULT_LOCATION_MODES.includes(msg.mode)) {
+      case 'setProjectVaultMode':
+        if (!PROJECT_VAULT_MODES.includes(msg.mode)) {
           return;
         }
 
-        await applyVaultMode(msg.mode, this.vaultManager, this.globalStorageDir);
+        await applyProjectVaultMode(msg.mode, this.vaultManager);
 
         // Put the page back on the saved choice, since a cancelled dialog moves nothing
+        this.postState();
+        return;
+      case 'setGlobalVaultMode':
+        if (!GLOBAL_VAULT_MODES.includes(msg.mode)) {
+          return;
+        }
+
+        await applyGlobalVaultMode(msg.mode, this.vaultManager);
         this.postState();
         return;
     }
@@ -80,8 +97,10 @@ export class SettingsPanel {
     void this.panel.webview.postMessage({
       type: 'state',
       noteView: defaultNoteView(),
-      vaultRoot: this.vaultManager.getVaultRoot() ?? null,
-      vaultMode: currentVaultMode(this.vaultManager),
+      projectVaultRoot: this.vaultManager.projectVaultRoot() ?? null,
+      projectVaultMode: currentProjectVaultMode(this.vaultManager),
+      globalVaultRoot: this.vaultManager.globalVaultRoot(),
+      globalVaultMode: currentGlobalVaultMode(this.vaultManager),
       hasWorkspace: (vscode.workspace.workspaceFolders?.length ?? 0) > 0
     });
   }
@@ -104,7 +123,7 @@ export class SettingsPanel {
   }
 
   // Reveal the settings page, creating it on first use
-  static show(extensionUri: vscode.Uri, vaultManager: VaultManager, globalStorageDir: string): void {
+  static show(extensionUri: vscode.Uri, vaultManager: VaultManager): void {
     if (SettingsPanel.openPanel) {
       SettingsPanel.openPanel.panel.reveal(vscode.ViewColumn.Active);
       return;
@@ -116,22 +135,17 @@ export class SettingsPanel {
       vscode.ViewColumn.Active,
       SettingsPanel.webviewOptions(extensionUri)
     );
-    SettingsPanel.openPanel = new SettingsPanel(panel, extensionUri, vaultManager, globalStorageDir);
+    SettingsPanel.openPanel = new SettingsPanel(panel, extensionUri, vaultManager);
   }
 
   // Reattach the settings page VSCode restored after a window reload
-  static restore(
-    panel: vscode.WebviewPanel,
-    extensionUri: vscode.Uri,
-    vaultManager: VaultManager,
-    globalStorageDir: string
-  ): void {
+  static restore(panel: vscode.WebviewPanel, extensionUri: vscode.Uri, vaultManager: VaultManager): void {
     if (SettingsPanel.openPanel) {
       panel.dispose();
       return;
     }
 
     panel.webview.options = SettingsPanel.webviewOptions(extensionUri);
-    SettingsPanel.openPanel = new SettingsPanel(panel, extensionUri, vaultManager, globalStorageDir);
+    SettingsPanel.openPanel = new SettingsPanel(panel, extensionUri, vaultManager);
   }
 }

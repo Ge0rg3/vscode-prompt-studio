@@ -1,4 +1,5 @@
 // Reads .claude/skills off disk and pulls the name and description out of each SKILL.md
+import { homedir } from 'node:os';
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -14,6 +15,11 @@ export interface Skill {
   skillFile: string;
 }
 
+interface SkillFrontmatter {
+  name?: string;
+  description?: string;
+}
+
 export const SKILL_FILE = 'SKILL.md';
 export const CLAUDE_DIR = '.claude';
 const SKILLS_DIR = 'skills';
@@ -22,7 +28,7 @@ const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---/;
 // --- helpers ---
 
 // Pull name and description out of a SKILL.md's leading YAML frontmatter
-function parseFrontmatter(text: string): { name?: string; description?: string } {
+function parseFrontmatter(text: string): SkillFrontmatter {
   const match = FRONTMATTER.exec(text);
   if (!match) {
     return {};
@@ -71,10 +77,9 @@ export function skillsDirIn(dirPath: string): string {
   return path.join(dirPath, CLAUDE_DIR, SKILLS_DIR);
 }
 
-// Find the workspace's .claude/skills directory, undefined when no folder is open
-export function skillsRoot(): string | undefined {
-  const workspace = vscode.workspace.workspaceFolders?.[0];
-  return workspace ? skillsDirIn(workspace.uri.fsPath) : undefined;
+// Find the user's own .claude/skills directory, the one Claude Code reads in every project
+export function globalSkillsRoot(): string {
+  return skillsDirIn(homedir());
 }
 
 // Walk up from a path to the .claude/skills folder it lives in

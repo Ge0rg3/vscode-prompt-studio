@@ -30,10 +30,31 @@
   // Redraw every row from the current children
   function render() {
     treeEl.replaceChildren();
+    if (children.length === 0) {
+      renderWelcome();
+      return;
+    }
     for (const node of children) {
       renderNode(node, 0);
     }
     reapplyPreview();
+  }
+
+  // Offer a first skill when the tree has no rows
+  function renderWelcome() {
+    const welcome = document.createElement('div');
+    welcome.id = 'welcome';
+
+    const emptyMessage = document.createElement('p');
+    emptyMessage.textContent = 'No skills here yet.';
+    welcome.appendChild(emptyMessage);
+
+    const newSkillButton = document.createElement('button');
+    newSkillButton.textContent = NEW_SKILL_ITEM.label;
+    newSkillButton.addEventListener('click', () => postCommand(NEW_SKILL_ITEM.cmd, null));
+    welcome.appendChild(newSkillButton);
+
+    treeEl.appendChild(welcome);
   }
 
   // Key a node's expand state by its absolute path
@@ -74,8 +95,8 @@
 
   // Draw one row, then the rows under it when it is open
   function renderNode(node, depth) {
-    const expandable = node.kind !== 'file';
-    const hasChildren = expandable && node.children && node.children.length > 0;
+    const isExpandable = node.kind !== 'file';
+    const hasChildren = isExpandable && node.children && node.children.length > 0;
     const key = keyOf(node);
     const isOpen = hasChildren && expanded.has(key);
 

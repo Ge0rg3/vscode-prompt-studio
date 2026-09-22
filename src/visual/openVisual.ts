@@ -35,6 +35,11 @@ export class VisualCommands {
     });
   }
 
+  // Close the vault canvases when the vault changes folder, since their cards belong to the old one
+  closeCanvasesOnVaultChange(): vscode.Disposable {
+    return this.vaultManager.onDidChangeVault(() => VisualPanel.closeVaultCanvases());
+  }
+
   // Reattach canvas panels VSCode restored after a window reload
   registerSerializer(resolveSkillStore: (root: string) => CardLayoutStore | undefined): vscode.Disposable {
     return vscode.window.registerWebviewPanelSerializer(VisualPanel.viewType, {
@@ -58,9 +63,9 @@ export class VisualCommands {
           return;
         }
 
-        // Fall back to the vault canvas for any state not marked read-only
+        // Restore the vault canvas, dropping a panel whose saved root is no longer the vault
         const vaultRoot = this.vaultManager.getVaultRoot();
-        if (!vaultRoot) {
+        if (!vaultRoot || (root && root !== vaultRoot)) {
           panel.dispose();
           return;
         }

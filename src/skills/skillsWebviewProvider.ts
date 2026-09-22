@@ -4,12 +4,13 @@ import * as path from 'node:path';
 import * as vscode from 'vscode';
 
 import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '../common/cardColors';
+import { ScopeManager } from '../common/scopeManager';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { SkillTreeNode } from './skillNode';
-import { owningSkillsDir } from './skillScanner';
+import { globalSkillsRoot, owningSkillsDir } from './skillScanner';
 import { SkillsConfigs } from './skillsConfigs';
 import { buildSkillsTree } from './skillsTree';
 
@@ -35,7 +36,7 @@ const ALLOWED_COMMANDS = new Set([
 ]);
 
 // Watch every .claude/skills in the workspace, the bare .claude catches a new sub-project appearing
-const WATCH_PATTERNS = ['**/.claude', '**/.claude/skills', '**/.claude/skills/**'] as const;
+const PROJECT_WATCH_PATTERNS = ['**/.claude', '**/.claude/skills', '**/.claude/skills/**'] as const;
 
 export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode.Disposable {
   static readonly viewType = 'promptStudio.skills';
@@ -45,17 +46,24 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
   private readonly watcherSubs: vscode.Disposable[] = [];
   private watchers: vscode.FileSystemWatcher[] = [];
   private children: SkillTreeNode[] = [];
+  private refreshRequests = 0;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly skillsConfigs: SkillsConfigs,
-    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>
+    private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>,
+    private readonly scopeManager: ScopeManager
   ) {
     this.rebuildWatchers();
     this.disposables.push(
       vscode.workspace.onDidChangeWorkspaceFolders(() => {
         this.rebuildWatchers();
+        this.scheduleRefresh();
+      }),
+      scopeManager.onDidChangeScope(() => {
+        this.rebuildWatchers();
+        scopeManager.labelView(this.view);
         this.scheduleRefresh();
       }),
       skillsConfigs.onDidChange(() => this.scheduleRefresh()),
@@ -71,10 +79,14 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
       localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media')]
     };
     view.webview.html = this.renderHtml(view.webview);
+    this.scopeManager.labelView(view);
+
+    // Dispose the message handler with the view, since VSCode resolves a new view whenever the section reappears
+    const messageSub = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
     view.onDidDispose(() => {
       this.view = undefined;
+      messageSub.dispose();
     });
-    this.disposables.push(view.webview.onDidReceiveMessage((msg) => this.handle(msg)));
   }
 
   expandAll(): void {
@@ -87,11 +99,21 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
 
   // Re-scan and repaint the tree
   async refresh(): Promise<void> {
-    this.children = await buildSkillsTree(this.skillsConfigs);
+    const requestId = ++this.refreshRequests;
+    const children = await buildSkillsTree(this.skillsConfigs, this.scopeManager.getScope());
+
+    // Drop this scan when a newer one has started, or a slow scan of the old scope paints over the new tree
+    if (requestId !== this.refreshRequests) {
+      return;
+    }
+
+    this.children = children;
+
+    // Keep the section up on an empty global collection, or the button that swaps back goes with it
     await vscode.commands.executeCommand(
       'setContext',
       HAS_SKILLS_CONTEXT,
-      this.children.length > 0
+      this.children.length > 0 || this.scopeManager.isGlobal()
     );
     await this.postState();
   }
@@ -173,26 +195,38 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
     await copyPathToClipboard(relativeToRoot(root, node.absPath), node.name);
   }
 
-  // Replace the watchers with one per pattern in the workspace folder
+  // Replace the watchers with the ones the current scope needs
   private rebuildWatchers(): void {
     this.teardownWatchers();
 
+    // Watch ~/.claude/skills, plus a plain pattern on ~/.claude that catches the folder being created
+    if (this.scopeManager.isGlobal()) {
+      const root = globalSkillsRoot();
+      this.watchPattern(path.dirname(root), path.basename(root));
+      this.watchPattern(root, '**');
+      return;
+    }
+
+    // Watch every .claude/skills in the workspace
     const workspace = vscode.workspace.workspaceFolders?.[0];
     if (!workspace) {
       return;
     }
 
-    for (const pattern of WATCH_PATTERNS) {
-      const watcher = vscode.workspace.createFileSystemWatcher(
-        new vscode.RelativePattern(workspace, pattern)
-      );
-      this.watchers.push(watcher);
-      this.watcherSubs.push(
-        watcher.onDidCreate((uri) => this.onSkillsEvent(uri)),
-        watcher.onDidChange((uri) => this.onSkillsEvent(uri)),
-        watcher.onDidDelete((uri) => this.onSkillsEvent(uri))
-      );
+    for (const pattern of PROJECT_WATCH_PATTERNS) {
+      this.watchPattern(workspace, pattern);
     }
+  }
+
+  // Add one watcher and send every event it reports to the re-scan
+  private watchPattern(base: vscode.WorkspaceFolder | string, pattern: string): void {
+    const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(base, pattern));
+    this.watchers.push(watcher);
+    this.watcherSubs.push(
+      watcher.onDidCreate((uri) => this.onSkillsEvent(uri)),
+      watcher.onDidChange((uri) => this.onSkillsEvent(uri)),
+      watcher.onDidDelete((uri) => this.onSkillsEvent(uri))
+    );
   }
 
   // Re-scan on skill edits, skipping the config.yml layout writes
@@ -230,7 +264,7 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
       codiconCss: assetUri(webview, this.extensionUri, 'media/codicons/codicon.css'),
       paletteCss: assetUri(webview, this.extensionUri, 'media/common/palette.css'),
       contextMenuCss: assetUri(webview, this.extensionUri, 'media/common/contextMenu.css'),
-      treeCss: assetUri(webview, this.extensionUri, 'media/vault/tree.css'),
+      treeCss: assetUri(webview, this.extensionUri, 'media/common/tree.css'),
       contextMenuJs: assetUri(webview, this.extensionUri, 'media/common/contextMenu.js'),
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       treeJs: assetUri(webview, this.extensionUri, 'media/skills/tree.js'),

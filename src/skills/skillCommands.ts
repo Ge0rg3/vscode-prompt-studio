@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { stringify } from 'yaml';
 
 import { ColorPreview } from '../common/cardColors';
+import { ScopeManager } from '../common/scopeManager';
 import { sendToClaude } from '../common/sendToClaude';
 import { pathExists } from '../common/utils/fs';
 import { MentionIndex } from '../template/mentionIndex';
@@ -12,7 +13,7 @@ import { TemplatePanel } from '../template/templatePanel';
 import { validateEntryName } from '../vault/entryName';
 import { CanvasContext, VisualPanel } from '../visual/visualPanel';
 import { SkillNode, SkillTreeNode } from './skillNode';
-import { scanSkills, SKILL_FILE, skillsRoot } from './skillScanner';
+import { globalSkillsRoot, scanSkills, SKILL_FILE, skillsDirIn } from './skillScanner';
 import { SkillsConfigs } from './skillsConfigs';
 import { SkillsWebviewProvider } from './skillsWebviewProvider';
 
@@ -22,7 +23,8 @@ export class SkillCommands {
     private readonly extensionUri: vscode.Uri,
     private readonly skillsConfigs: SkillsConfigs,
     private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>,
-    private readonly mentionIndex: MentionIndex
+    private readonly mentionIndex: MentionIndex,
+    private readonly scopeManager: ScopeManager
   ) {}
 
   // Register the skill row and empty-area action commands
@@ -79,9 +81,19 @@ export class SkillCommands {
     );
   }
 
-  // Prompt for a name and create the skill folder, defaulting to the workspace skills root
+  // Find the .claude/skills directory the sidebar is showing, undefined for a project with no folder open
+  private scopedSkillsRoot(): string | undefined {
+    if (this.scopeManager.isGlobal()) {
+      return globalSkillsRoot();
+    }
+
+    const workspace = vscode.workspace.workspaceFolders?.[0];
+    return workspace ? skillsDirIn(workspace.uri.fsPath) : undefined;
+  }
+
+  // Prompt for a name and create the skill folder, defaulting to the root the sidebar is showing
   private async createSkill(skillsDir?: string): Promise<void> {
-    const root = skillsDir ?? skillsRoot();
+    const root = skillsDir ?? this.scopedSkillsRoot();
     if (!root) {
       void vscode.window.showWarningMessage('Prompt Studio: open a folder to create a skill.');
       return;
@@ -116,7 +128,7 @@ export class SkillCommands {
 
   // Open the skills root as a read-only canvas
   private async openSkillsCanvas(): Promise<void> {
-    const root = skillsRoot();
+    const root = this.scopedSkillsRoot();
     if (!root || (await scanSkills(root)).length === 0) {
       void vscode.window.showWarningMessage('Prompt Studio: no Claude skills found.');
       return;

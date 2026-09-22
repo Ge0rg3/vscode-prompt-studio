@@ -2,8 +2,10 @@
 import * as vscode from 'vscode';
 
 import { ColorPreview } from './common/cardColors';
+import { ScopeManager } from './common/scopeManager';
 import { VaultConfig } from './common/vaultConfig';
 import { VaultManager } from './common/vaultManager';
+import { registerScopeCommands } from './scope/scopeCommands';
 import { registerOpenSettings, registerSettingsSerializer } from './settings/openSettings';
 import { SkillCommands } from './skills/skillCommands';
 import { SkillsConfigs } from './skills/skillsConfigs';
@@ -24,8 +26,11 @@ import { registerVaultViewCommands, VaultWebviewProvider } from './vault/vaultWe
 import { VisualCommands } from './visual/openVisual';
 
 export function activate(context: vscode.ExtensionContext): void {
-  // Find the vault and read the metadata saved inside it
-  const vaultManager = new VaultManager(context.globalStorageUri.fsPath, context.workspaceState);
+  // Pick the project or global vault and read the metadata saved inside it
+  const scopeManager = new ScopeManager(context.workspaceState);
+  context.subscriptions.push(scopeManager);
+
+  const vaultManager = new VaultManager(context.globalStorageUri.fsPath, context.workspaceState, scopeManager);
   context.subscriptions.push(vaultManager);
 
   const config = new VaultConfig(() => vaultManager.getVaultRoot(), vaultManager.onDidChangeVault);
@@ -38,19 +43,19 @@ export function activate(context: vscode.ExtensionContext): void {
   const colorPreviewEmitter = new vscode.EventEmitter<ColorPreview>();
   context.subscriptions.push(colorPreviewEmitter);
 
-  const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri, colorPreviewEmitter);
+  const provider = new VaultWebviewProvider(vaultManager, config, context.extensionUri, colorPreviewEmitter, scopeManager);
   context.subscriptions.push(provider);
 
   const skillsConfigs = new SkillsConfigs();
   context.subscriptions.push(skillsConfigs);
 
-  const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfigs, colorPreviewEmitter);
+  const skillsProvider = new SkillsWebviewProvider(context.extensionUri, skillsConfigs, colorPreviewEmitter, scopeManager);
   context.subscriptions.push(skillsProvider);
 
   const mentionIndex = new MentionIndex();
   context.subscriptions.push(mentionIndex);
 
-  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfigs, colorPreviewEmitter, mentionIndex);
+  const skillCommands = new SkillCommands(skillsProvider, context.extensionUri, skillsConfigs, colorPreviewEmitter, mentionIndex, scopeManager);
   const visualCommands = new VisualCommands(vaultManager, config, context.extensionUri, activeFolderEmitter, colorPreviewEmitter);
 
   // Register every view, command, and listener
@@ -64,10 +69,12 @@ export function activate(context: vscode.ExtensionContext): void {
     skillCommands.register(),
     skillCommands.registerViewCommands(),
     activeFolderEmitter.event((folder) => provider.setActiveVisualFolder(folder)),
-    registerOpenSettings(context.extensionUri, vaultManager, context.globalStorageUri.fsPath),
-    registerSettingsSerializer(context.extensionUri, vaultManager, context.globalStorageUri.fsPath),
+    registerOpenSettings(context.extensionUri, vaultManager),
+    registerSettingsSerializer(context.extensionUri, vaultManager),
     registerVaultViewCommands(provider),
+    registerScopeCommands(scopeManager),
     visualCommands.registerOpenCommand(),
+    visualCommands.closeCanvasesOnVaultChange(),
     visualCommands.registerSerializer((root) => skillsConfigs.configFor(root)),
     registerCreateNote(vaultManager, config),
     registerCreateFolder(vaultManager, config),

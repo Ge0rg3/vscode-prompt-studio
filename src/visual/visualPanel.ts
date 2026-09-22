@@ -91,11 +91,21 @@ export class VisualPanel {
     VisualPanel.panels.set(context.root, new VisualPanel(panel, extensionUri, context, folder));
   }
 
+  // Close every canvas over the vault, leaving the read-only skill ones open
+  static closeVaultCanvases(): void {
+    for (const canvas of [...VisualPanel.panels.values()]) {
+      if (canvas.context.allowCrud) {
+        canvas.panel.dispose();
+      }
+    }
+  }
+
   private readonly disposables: vscode.Disposable[] = [];
   private readonly watcherSubs: vscode.Disposable[] = [];
   private readonly ownWrites = new Map<string, number>();
   private watcher: vscode.FileSystemWatcher | undefined;
-  // Card edits on their way to disk, awaited by any case that sends the host to the note
+
+  // Card saves still being written to disk
   private pendingNoteWrites: Promise<void> = Promise.resolve();
   private refreshScheduled = false;
   private stateRequests = 0;

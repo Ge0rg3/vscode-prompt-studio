@@ -27,7 +27,7 @@ An Obsidian-like storage solution for your prompt collection, with live markdown
 
 ---
 
-Store and manage your project prompt collections  in one place.
+Store and manage your project prompt collections in one place.
 
 Write your prompts in a live markdown viewer, and store them as plain md files on your disk (stored anywhere, even inside your project folder).
 
@@ -41,7 +41,7 @@ Auto-detect project and sub-project skill files easily view/edit them alongside 
 - **Send directly to Claude** Send your prompts straight to claude, including media attachments.
 - **Skills management** All `.claude/skills` folders in the workspace and its sub-projects, browsable and editable in the live editor.
 - **Enhanced `@` browsing.** A filesystem cache is held meaning that `@` file links resolve immediately, instead of long loading on Claude.
-- **A vault per project.** The project vault location lives wherever you want, so different projects point at different vaults (combine together if you want!).
+- **A vault per project, or one shared by all.** A title-bar button swaps both sidebars to the global vault and your own `~/.claude/skills`.
 
 ## Install
 
@@ -56,11 +56,12 @@ Search for **Prompt Studio** in the Extensions view, or install it from the [mar
 
 ## Settings
 
-Press the gear icon in your studio to open the settings tab (or select **Prompt Studio: Settings** in the palette.
+Press the gear icon in your studio to open the settings tab (or select **Prompt Studio: Settings** in the palette).
 
 Current settings:
-- **Default note view** (`promptStudio.defaultNoteView`): Wether to use the built-in Markdown template editor, or just use default editor.
-- **Vault location**: Where the collection is stored on disk (can be within the project itself). Each defaults to a location in the extension files.
+- **Default note view** (`promptStudio.defaultNoteView`): Whether to use the built-in Markdown template editor, or just use default editor.
+- **Project vault location**: Where this project's collection is stored on disk (can be within the project itself). Defaults to a location in the extension files.
+- **Global vault location** (`promptStudio.globalVaultLocation`): Where the collection shared by every project is stored on disk. Defaults to a location in the extension files.
 
 ## Contributing
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+
+- A globe button in the Vault and Claude Skills title bars swaps both sidebars to a global vault shared by every project, and to your own `~/.claude/skills`. The home button swaps back.
+- A `promptStudio.globalVaultLocation` setting, also on the settings page, picks where the global vault lives.
+
 ## 0.3.2
 
 - A new note opens in the default note view, so it starts as a blank template when the template editor is the default.

@@ -1,5 +1,6 @@
-// Checks whether one path sits inside another, makes paths relative, and names per-project storage folders
+// Checks whether one path sits inside another, makes paths relative or absolute, and names per-project storage folders
 import { createHash } from 'node:crypto';
+import { homedir } from 'node:os';
 import * as path from 'node:path';
 
 const HASH_LENGTH = 8;
@@ -19,6 +20,15 @@ function shortHash(input: string): string {
 // Swap characters that are unsafe in a file or folder name for underscores
 export function sanitizeBasename(name: string): string {
   return name.replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
+// Expand a leading ~ to the home folder, undefined for an empty or relative path
+export function resolveTypedPath(input: string): string | undefined {
+  const typed = input.trim();
+  if (typed === '~' || typed.startsWith('~/') || typed.startsWith(`~${path.sep}`)) {
+    return path.resolve(path.join(homedir(), typed.slice(1)));
+  }
+  return path.isAbsolute(typed) ? path.resolve(typed) : undefined;
 }
 
 // Test whether target is the directory itself or sits beneath it

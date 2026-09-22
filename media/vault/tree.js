@@ -9,7 +9,7 @@
   let dragSource = null;
   let activePreview = null;
   let activeRename = null;
-  let deferredRender = false;
+  let hasDeferredRender = false;
   let noteView = window.PromptStudioNoteOpen.INITIAL_NOTE_VIEW;
 
   const treeEl = document.getElementById('tree');
@@ -145,11 +145,11 @@
   function endRename(text) {
     const rename = activeRename;
     activeRename = null;
-    const keepFocus = document.activeElement === rename.input;
+    const shouldKeepFocus = document.activeElement === rename.input;
     rename.row.draggable = true;
     rename.label.textContent = text;
     rename.input.replaceWith(rename.label);
-    if (keepFocus) {
+    if (shouldKeepFocus) {
       treeEl.focus();
     }
   }
@@ -162,7 +162,7 @@
     endRename(activeRename.original);
 
     // Apply any state update that arrived mid-edit
-    if (deferredRender) {
+    if (hasDeferredRender) {
       render();
     }
   }
@@ -248,6 +248,14 @@
     const message = event.data;
     if (!message) return;
     if (message.type === 'state') {
+      // Drop the rename, the copied entry, and the selection when the tree switches to another vault
+      const nextRoot = message.state ? message.state.root : null;
+      if (state && nextRoot !== state.root) {
+        cancelRename();
+        clipboardPath = null;
+        selectedPath = null;
+      }
+
       state = message.state;
       renderUnlessRenaming();
     } else if (message.type === 'noteView') {
@@ -272,14 +280,12 @@
     }
   });
 
-  vscode.postMessage({ type: 'ready' });
-
   // --- rendering ---
 
   // Redraw, holding the update back until an open rename is finished
   function renderUnlessRenaming() {
     if (activeRename) {
-      deferredRender = true;
+      hasDeferredRender = true;
       return;
     }
 
@@ -289,7 +295,7 @@
   // Rebuild every row from the current state, dropping any edit in progress
   function render() {
     activeRename = null;
-    deferredRender = false;
+    hasDeferredRender = false;
     treeEl.replaceChildren();
     if (!state) {
       renderWelcome();
@@ -307,21 +313,21 @@
 
   // Offer the settings page when there is no vault yet
   function renderWelcome() {
-    const wrap = document.createElement('div');
-    wrap.id = 'welcome';
+    const welcome = document.createElement('div');
+    welcome.id = 'welcome';
 
-    const paragraph = document.createElement('p');
-    paragraph.textContent = 'No vault yet.';
-    wrap.appendChild(paragraph);
+    const emptyMessage = document.createElement('p');
+    emptyMessage.textContent = 'No vault yet.';
+    welcome.appendChild(emptyMessage);
 
-    const button = document.createElement('button');
-    button.textContent = 'Open Settings';
-    button.addEventListener('click', () => {
+    const openSettingsButton = document.createElement('button');
+    openSettingsButton.textContent = 'Open Settings';
+    openSettingsButton.addEventListener('click', () => {
       vscode.postMessage({ type: 'command', command: 'promptStudio.openSettings' });
     });
-    wrap.appendChild(button);
+    welcome.appendChild(openSettingsButton);
 
-    treeEl.appendChild(wrap);
+    treeEl.appendChild(welcome);
   }
 
   function renderEmptyHint() {
@@ -454,10 +460,10 @@
         row.classList.remove('drop-target');
         event.preventDefault();
         event.stopPropagation();
-        const src = dragSource || event.dataTransfer.getData('text/plain');
+        const sourcePath = dragSource || event.dataTransfer.getData('text/plain');
         dragSource = null;
-        if (!canDrop(src, node.absPath)) return;
-        vscode.postMessage({ type: 'move', source: src, destDir: node.absPath });
+        if (!canDrop(sourcePath, node.absPath)) return;
+        vscode.postMessage({ type: 'move', source: sourcePath, destDir: node.absPath });
       });
     }
 
@@ -542,11 +548,11 @@
   }
 
   // Refuse a drop onto the entry itself, into its own subfolder, or where it already sits
-  function canDrop(src, destDir) {
-    if (!src || !destDir) return false;
-    if (src === destDir) return false;
-    if (destDir.startsWith(src + '/') || destDir.startsWith(src + '\\')) return false;
-    if (parentDir(src) === destDir) return false;
+  function canDrop(sourcePath, destDir) {
+    if (!sourcePath || !destDir) return false;
+    if (sourcePath === destDir) return false;
+    if (destDir.startsWith(sourcePath + '/') || destDir.startsWith(sourcePath + '\\')) return false;
+    if (parentDir(sourcePath) === destDir) return false;
     return true;
   }
 
@@ -577,10 +583,10 @@
     if (!state) return;
     if (event.target.closest('.row')) return;
     event.preventDefault();
-    const src = dragSource || event.dataTransfer.getData('text/plain');
+    const sourcePath = dragSource || event.dataTransfer.getData('text/plain');
     dragSource = null;
-    if (!canDrop(src, state.root)) return;
-    vscode.postMessage({ type: 'move', source: src, destDir: state.root });
+    if (!canDrop(sourcePath, state.root)) return;
+    vscode.postMessage({ type: 'move', source: sourcePath, destDir: state.root });
   });
 
   // --- context menu ---
@@ -734,4 +740,6 @@
   function serialize(node) {
     return { kind: node.kind, absPath: node.absPath, name: node.name };
   }
+
+  vscode.postMessage({ type: 'ready' });
 })();

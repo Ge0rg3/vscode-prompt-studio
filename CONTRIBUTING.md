@@ -44,7 +44,8 @@ vscode-prompt-studio/
 |   +-- extension.ts        # activate(): builds the shared services, registers every provider and command
 |   +-- common/             # Shared state, domain types, and helpers
 |   |   +-- vaultConfig.ts      # The config.yml store, with debounced writes and metadata that moves with an entry
-|   |   +-- vaultManager.ts     # Which folder is the vault, remembered per workspace
+|   |   +-- vaultManager.ts     # Which folder is the vault, the project one or the shared global one
+|   |   +-- scopeManager.ts     # Whether the vault and skills views show the project or the global collection
 |   |   +-- cardLayoutStore.ts  # The interface a canvas needs from a metadata store
 |   |   +-- cardColors.ts       # The seven-color palette and its shared messages
 |   |   +-- noteAttachments.ts  # The files stored beside a note, and dropping the unused ones
@@ -59,6 +60,7 @@ vscode-prompt-studio/
 |   +-- skills/             # Skills sidebar host, skill and sub-project scanners, per-root config
 |   |                       # stores, skill commands
 |   +-- settings/           # The settings page panel and the command that opens it
+|   +-- scope/              # The title-bar buttons that swap both sidebars between project and global
 |
 +-- webview/                # Browser source bundled into media/ (own tsconfig: DOM, no node types)
 |   +-- template/           # main.ts, livePreview.ts, codeHighlight.ts, listIndent.ts,
@@ -68,8 +70,8 @@ vscode-prompt-studio/
 +-- media/                  # Everything a webview loads at runtime, plus the icons the manifest names. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
 |   +-- marketplaceIcon.png # 128x128 marketplace icon, exported from docs/marketplace-icon.svg
-|   +-- common/             # contextMenu + noteOpen + palette + toolbar, shared by more than one webview
-|   +-- vault/              # tree.html/.css/.js. tree.css also styles the skills view
+|   +-- common/             # contextMenu + noteOpen + palette + toolbar + tree.css, shared by more than one webview
+|   +-- vault/              # tree.html/.js for the Vault sidebar
 |   +-- skills/             # tree.html/.js for the Claude Skills sidebar
 |   +-- visual/             # canvas.html/.css/.js for the card canvas, viewport.js for its pan and
 |   |                       # zoom, folderZoom.js for moving between folders, noteEditing.js for
@@ -111,7 +113,7 @@ npm run watch      # rebuild on change, leave running during F5 debug
 
 Open this folder in VSCode and press **F5**. That runs the `npm: watch` task, then opens an Extension Development Host window with the extension loaded.
 
-The Prompt Studio icon appears in that window's activity bar. Open a folder there before testing the vault, since the vault location is resolved per workspace.
+The Prompt Studio icon appears in that window's activity bar. Open a folder there before testing the project vault, since its location is resolved per workspace.
 
 ## Typechecking and tests
 

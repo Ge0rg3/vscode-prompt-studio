@@ -5,25 +5,17 @@ import { VaultManager } from '../common/vaultManager';
 import { SettingsPanel } from './settingsPanel';
 
 // Open the settings page from the gear or the palette
-export function registerOpenSettings(
-  extensionUri: vscode.Uri,
-  vaultManager: VaultManager,
-  globalStorageDir: string
-): vscode.Disposable {
+export function registerOpenSettings(extensionUri: vscode.Uri, vaultManager: VaultManager): vscode.Disposable {
   return vscode.commands.registerCommand('promptStudio.openSettings', () => {
-    SettingsPanel.show(extensionUri, vaultManager, globalStorageDir);
+    SettingsPanel.show(extensionUri, vaultManager);
   });
 }
 
 // Reattach the settings page VSCode restored after a window reload
-export function registerSettingsSerializer(
-  extensionUri: vscode.Uri,
-  vaultManager: VaultManager,
-  globalStorageDir: string
-): vscode.Disposable {
+export function registerSettingsSerializer(extensionUri: vscode.Uri, vaultManager: VaultManager): vscode.Disposable {
   return vscode.window.registerWebviewPanelSerializer(SettingsPanel.viewType, {
     async deserializeWebviewPanel(panel: vscode.WebviewPanel): Promise<void> {
-      SettingsPanel.restore(panel, extensionUri, vaultManager, globalStorageDir);
+      SettingsPanel.restore(panel, extensionUri, vaultManager);
     }
   });
 }

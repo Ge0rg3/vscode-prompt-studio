@@ -22,10 +22,10 @@
     </section>
 
     <section class="setting">
-      <h2>Vault location</h2>
-      <p class="description">Which folder holds your notes. The choice is remembered for this workspace, so another project can point somewhere else.</p>
-      <div id="vault-root" class="path"></div>
-      <div id="vault-modes" class="choices">
+      <h2>Project vault location</h2>
+      <p class="description">Which folder holds this project's notes. The choice is remembered for this workspace, so another project can point somewhere else.</p>
+      <div id="project-vault-root" class="path"></div>
+      <div id="project-vault-modes" class="choices">
         <button type="button" class="choice" data-mode="default">
           <span class="choice-mark codicon"></span>
           <span class="choice-body">
@@ -45,6 +45,28 @@
           <span class="choice-body">
             <span class="choice-label">Folder inside this workspace...</span>
             <span class="choice-detail">Keeps prompts versioned alongside your code.</span>
+          </span>
+        </button>
+      </div>
+    </section>
+
+    <section class="setting">
+      <h2>Global vault location</h2>
+      <p class="description">Which folder holds the notes every project shares. The Vault view swaps over to them with the globe button in its title bar.</p>
+      <div id="global-vault-root" class="path"></div>
+      <div id="global-vault-modes" class="choices">
+        <button type="button" class="choice" data-mode="default">
+          <span class="choice-mark codicon"></span>
+          <span class="choice-body">
+            <span class="choice-label">Extension storage <span class="badge">recommended</span></span>
+            <span class="choice-detail">A folder under the extension's own storage, the same one in every window.</span>
+          </span>
+        </button>
+        <button type="button" class="choice" data-mode="custom">
+          <span class="choice-mark codicon"></span>
+          <span class="choice-body">
+            <span class="choice-label">Custom folder...</span>
+            <span class="choice-detail">Any folder on disk, such as one you sync between machines.</span>
           </span>
         </button>
       </div>

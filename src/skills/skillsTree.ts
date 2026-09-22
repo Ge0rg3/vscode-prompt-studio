@@ -1,13 +1,14 @@
-// Builds the rows the skills sidebar renders, sub-projects and the skills under them
+// Builds the skills sidebar rows, the sub-projects and their skills or the flat global list
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
 
+import { StudioScope } from '../common/scopeManager';
 import { compareCaseInsensitive } from '../common/utils/compare';
 import { VaultConfig } from '../common/vaultConfig';
 import { ProjectSkills, scanProjectSkills } from './projectScanner';
 import { SkillTreeNode } from './skillNode';
-import { scanSkills, Skill, skillsRoot } from './skillScanner';
+import { globalSkillsRoot, scanSkills, Skill, skillsDirIn } from './skillScanner';
 import { SkillsConfigs } from './skillsConfigs';
 
 // A workspace directory that holds a nested skills root, or leads down to one
@@ -144,10 +145,29 @@ async function buildProjectNode(dir: ProjectDir, configs: SkillsConfigs): Promis
   };
 }
 
+// Build a row for every skill sitting directly in one .claude/skills root
+async function buildRootSkillNodes(root: string, configs: SkillsConfigs): Promise<SkillTreeNode[]> {
+  const config = configs.configFor(root);
+  if (!config) {
+    return [];
+  }
+
+  const nodes: SkillTreeNode[] = [];
+  for (const skill of await scanSkills(root)) {
+    nodes.push(await buildSkillNode(skill, config));
+  }
+  return nodes;
+}
+
 // --- exports ---
 
 // Build the tree with sub-project dirs on top and the workspace's own skills below
-export async function buildSkillsTree(configs: SkillsConfigs): Promise<SkillTreeNode[]> {
+export async function buildSkillsTree(configs: SkillsConfigs, scope: StudioScope): Promise<SkillTreeNode[]> {
+  // List the global skills flat, straight from ~/.claude/skills
+  if (scope === 'global') {
+    return buildRootSkillNodes(globalSkillsRoot(), configs);
+  }
+
   const workspace = vscode.workspace.workspaceFolders?.[0];
   if (!workspace) {
     return [];
@@ -161,13 +181,6 @@ export async function buildSkillsTree(configs: SkillsConfigs): Promise<SkillTree
   }
 
   // Then add the workspace's own skills
-  const root = skillsRoot();
-  const config = root ? configs.configFor(root) : undefined;
-  if (root && config) {
-    for (const skill of await scanSkills(root)) {
-      nodes.push(await buildSkillNode(skill, config));
-    }
-  }
-
+  nodes.push(...(await buildRootSkillNodes(skillsDirIn(workspace.uri.fsPath), configs)));
   return nodes;
 }

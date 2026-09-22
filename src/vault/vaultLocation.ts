@@ -1,12 +1,14 @@
-// The three places a vault can live, and moving it to one of them
+// Where the project vault and the global vault can live, and moving either one there
 import * as vscode from 'vscode';
 
-import { isWithin, projectStorageDir } from '../common/utils/paths';
+import { isWithin } from '../common/utils/paths';
 import { VaultManager } from '../common/vaultManager';
 
-export const VAULT_LOCATION_MODES = ['default', 'custom', 'in-workspace'] as const;
+export const PROJECT_VAULT_MODES = ['default', 'custom', 'in-workspace'] as const;
+export const GLOBAL_VAULT_MODES = ['default', 'custom'] as const;
 
-export type VaultLocationMode = (typeof VAULT_LOCATION_MODES)[number];
+export type ProjectVaultMode = (typeof PROJECT_VAULT_MODES)[number];
+export type GlobalVaultMode = (typeof GLOBAL_VAULT_MODES)[number];
 
 // Show the folder picker and return the path the user chose
 async function pickFolder(defaultUri?: vscode.Uri): Promise<string | undefined> {
@@ -20,14 +22,14 @@ async function pickFolder(defaultUri?: vscode.Uri): Promise<string | undefined> 
   return pickedFolders?.[0]?.fsPath;
 }
 
-// Name where the vault sits now
-export function currentVaultMode(vaultManager: VaultManager): VaultLocationMode {
-  if (vaultManager.isDefaultLocation()) {
+// Name where the project vault sits now
+export function currentProjectVaultMode(vaultManager: VaultManager): ProjectVaultMode {
+  if (vaultManager.isDefaultProjectLocation()) {
     return 'default';
   }
 
   const workspace = vscode.workspace.workspaceFolders?.[0];
-  const root = vaultManager.getVaultRoot();
+  const root = vaultManager.projectVaultRoot();
   if (workspace && root && isWithin(root, workspace.uri.fsPath)) {
     return 'in-workspace';
   }
@@ -35,25 +37,21 @@ export function currentVaultMode(vaultManager: VaultManager): VaultLocationMode 
   return 'custom';
 }
 
-// Move the vault, asking for a folder when the mode needs one
-export async function applyVaultMode(
-  mode: VaultLocationMode,
-  vaultManager: VaultManager,
-  globalStorageDir: string
-): Promise<void> {
+// Move the project vault, asking for a folder when the mode needs one
+export async function applyProjectVaultMode(mode: ProjectVaultMode, vaultManager: VaultManager): Promise<void> {
   // Take the per-workspace default, stored as an empty path
   if (mode === 'default') {
-    const workspace = vscode.workspace.workspaceFolders?.[0];
-    if (!workspace) {
+    if (!vscode.workspace.workspaceFolders?.length) {
       void vscode.window.showWarningMessage(
         'Per-workspace default needs an open workspace folder. Pick a custom folder instead.'
       );
       return;
     }
 
-    await vaultManager.setVaultPath('');
-    const root = projectStorageDir(globalStorageDir, workspace.uri.fsPath);
-    void vscode.window.showInformationMessage(`Vault set to per-workspace default: ${root}`);
+    await vaultManager.setProjectVaultPath('');
+    void vscode.window.showInformationMessage(
+      `Project vault set to per-workspace default: ${vaultManager.projectVaultRoot()}`
+    );
     return;
   }
 
@@ -64,6 +62,30 @@ export async function applyVaultMode(
     return;
   }
 
-  await vaultManager.setVaultPath(pickedFolder);
-  void vscode.window.showInformationMessage(`Vault set to ${pickedFolder}`);
+  await vaultManager.setProjectVaultPath(pickedFolder);
+  void vscode.window.showInformationMessage(`Project vault set to ${pickedFolder}`);
+}
+
+// Name where the global vault sits now
+export function currentGlobalVaultMode(vaultManager: VaultManager): GlobalVaultMode {
+  return vaultManager.isDefaultGlobalLocation() ? 'default' : 'custom';
+}
+
+// Move the global vault, asking for a folder when the mode needs one
+export async function applyGlobalVaultMode(mode: GlobalVaultMode, vaultManager: VaultManager): Promise<void> {
+  // Go back to the folder under the extension's own storage, stored as an empty path
+  if (mode === 'default') {
+    await vaultManager.setGlobalVaultPath('');
+    void vscode.window.showInformationMessage(`Global vault set to ${vaultManager.globalVaultRoot()}`);
+    return;
+  }
+
+  // Pick a folder off disk
+  const pickedFolder = await pickFolder();
+  if (!pickedFolder) {
+    return;
+  }
+
+  await vaultManager.setGlobalVaultPath(pickedFolder);
+  void vscode.window.showInformationMessage(`Global vault set to ${pickedFolder}`);
 }

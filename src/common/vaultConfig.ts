@@ -7,6 +7,7 @@ import { parse, stringify } from 'yaml';
 import { CardLayoutStore, CardSize, NotePosition } from './cardLayoutStore';
 import { compareCaseInsensitive } from './utils/compare';
 import { pathExists } from './utils/fs';
+import { isWithin } from './utils/paths';
 
 type NoteMetadata = Record<string, unknown>;
 
@@ -181,15 +182,17 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     this.emitter.dispose();
   }
 
-  // Turn an absolute path into its vault-relative config.yml key
+  // Turn an absolute path into its vault-relative config.yml key, undefined for a path outside the vault
   private configKeyOf(absPath: string): string | undefined {
-    return this.vaultRoot === undefined
-      ? undefined
-      : this.toConfigKey(path.relative(this.vaultRoot, absPath));
+    if (this.vaultRoot === undefined || !isWithin(absPath, this.vaultRoot)) {
+      return undefined;
+    }
+    return this.toConfigKey(path.relative(this.vaultRoot, absPath));
   }
 
   // Switch to the current vault root, reading its config.yml and watching it again
   private reload(): void {
+    this.flushPending();
     this.teardownWatcher();
     this.entries = new Map();
     this.vaultRoot = this.resolveRoot();
@@ -260,15 +263,27 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
     }
+
+    const root = this.vaultRoot;
     this.writeTimer = setTimeout(() => {
       this.writeTimer = undefined;
-      void this.flush();
+      void this.flush(root);
     }, WRITE_DEBOUNCE_MS);
   }
 
-  // Write the entries map back to config.yml
-  private async flush(): Promise<void> {
-    const root = this.vaultRoot;
+  // Write any waiting save now, before the switch to another vault clears the entries
+  private flushPending(): void {
+    if (!this.writeTimer) {
+      return;
+    }
+
+    clearTimeout(this.writeTimer);
+    this.writeTimer = undefined;
+    void this.flush(this.vaultRoot);
+  }
+
+  // Write the entries map back to the config.yml in the vault the edits were made in
+  private async flush(root: string | undefined): Promise<void> {
     if (!root) {
       return;
     }
