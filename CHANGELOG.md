@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0
+
+- Notes keep a version history. The arrows in the template editor's bottom bar step back through earlier versions, each shown against the note, and restore the one you pick.
+- **Show History** on a note, in the sidebar or on the canvas, opens an earlier version side by side with the note, with a button to restore it.
+- History needs git installed. It lives outside the vault, so it never touches your own repository.
+
 ## 0.4.0
 
 - A globe button in the Vault and Claude Skills title bars swaps both sidebars to a global vault shared by every project, and to your own `~/.claude/skills`. The home button swaps back.

@@ -309,11 +309,12 @@ Three obligations that no type and no call site checks, and all of them fail qui
 <details>
 <summary><b>The template editor</b></summary>
 
-Four things in [webview/template/](webview/template/) that read as tidy-up material and are not.
+Five things in [webview/template/](webview/template/) that read as tidy-up material and are not.
 
 - **`isOutsideAttachments` has to stay one shared function.** CodeMirror's `SearchQuery.eq` compares `test` by identity, so building the filter inline makes every query unequal, and a replace then rewrites an attachment path and deletes the file with it.
 - **`verifiedPaths` hands back the `Set` it already had when the host finds nothing new.** The mention scan runs again whenever that field changes identity, so a fresh `Set` with nothing new in it restarts the scan, finds the same unresolved path, and asks again every 200ms forever.
 - **Browsing ignores case, and a mention is only colored as resolved when the case matches exactly.** Claude Code reads the written path literally, so a wrong-case mention has to show as unresolved.
+- **A saved version shows in its own read-only `EditorView` in [webview/template/versionStepper.ts](webview/template/versionStepper.ts).** Loaded into the live editor, it would go into the undo history, mark the note unsaved, and make the attachment strip delete every file the old text leaves out.
 - **Every popup rule in [media/template/template.css](media/template/template.css) is prefixed `.cm-editor`, and the selected row carries both `.cm-tooltip` and `.cm-tooltip-autocomplete`.** They are outranking CodeMirror's own injected theme. Flatten the selectors and the popup reverts to its colors.
 
 </details>
@@ -325,6 +326,15 @@ Four things in [webview/template/](webview/template/) that read as tidy-up mater
 - **`allowCrud` gates the folder's structure, and `saveNote` is deliberately left outside it**, so a read-only skills canvas still saves what is typed into a card.
 - **`root` and `allowCrud` go into `vscode.setState` for the host, not the webview.** The renderer never reads them back, so they look like dead payload. The panel serializer needs them: without `allowCrud` a reloaded skills canvas comes back editable, and without `root` it closes.
 - **Saving a card never prunes the note's attachments**, since the canvas saves between keystrokes and would read a link the user is still typing.
+
+</details>
+
+<details>
+<summary><b>Note history</b></summary>
+
+- **Code that saves, moves, or deletes a note needs no history call.** [src/history/noteHistory.ts](src/history/noteHistory.ts) snapshots the vault from a file watcher.
+- **A note renamed and more than half rewritten between two snapshots starts a fresh history.** Git spots a moved note by its text alone.
+- **Every git call has to go through `runGit` in [src/history/git.ts](src/history/git.ts).** The vault often sits inside the user's own repository, so a plain `git` run from the vault folder commits there.
 
 </details>
 

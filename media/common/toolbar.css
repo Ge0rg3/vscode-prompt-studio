@@ -27,6 +27,19 @@
   background: var(--vscode-button-secondaryBackground);
 }
 
+.bar-button.hidden {
+  display: none;
+}
+
+.bar-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.bar-button:disabled:hover {
+  background: var(--vscode-button-secondaryBackground);
+}
+
 .bar-button:hover {
   background: var(--vscode-button-secondaryHoverBackground);
 }

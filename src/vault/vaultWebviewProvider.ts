@@ -36,6 +36,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.copyContents',
   'promptStudio.openTemplate',
   'promptStudio.sendToClaude',
+  'promptStudio.showHistory',
   'promptStudio.copyPathStatic',
   'promptStudio.copyPathRelative',
   'promptStudio.revealInOS',
@@ -83,10 +84,10 @@ export class VaultWebviewProvider implements vscode.WebviewViewProvider, vscode.
     this.scopeManager.labelView(view);
 
     // Dispose the message handler with the view, since VSCode resolves a new view whenever the section reappears
-    const messageSub = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
+    const messageSubscription = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
     view.onDidDispose(() => {
       this.view = undefined;
-      messageSub.dispose();
+      messageSubscription.dispose();
     });
   }
 

@@ -7,7 +7,7 @@ import { parse, stringify } from 'yaml';
 import { CardLayoutStore, CardSize, NotePosition } from './cardLayoutStore';
 import { compareCaseInsensitive } from './utils/compare';
 import { pathExists } from './utils/fs';
-import { isWithin } from './utils/paths';
+import { isWithin, toForwardSlashes } from './utils/paths';
 
 type NoteMetadata = Record<string, unknown>;
 
@@ -21,7 +21,7 @@ const BANNER = '# Prompt Studio per-entry metadata. Safe to edit and commit.\n';
 export class VaultConfig implements vscode.Disposable, CardLayoutStore {
   private readonly emitter = new vscode.EventEmitter<void>();
   private readonly watcherSubs: vscode.Disposable[] = [];
-  private readonly rootSub: vscode.Disposable;
+  private readonly rootChangeSubscription: vscode.Disposable;
   private watcher: vscode.FileSystemWatcher | undefined;
   private entries = new Map<string, NoteMetadata>();
   private vaultRoot: string | undefined;
@@ -34,7 +34,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     private readonly resolveRoot: () => string | undefined,
     onRootChange: vscode.Event<unknown>
   ) {
-    this.rootSub = onRootChange(() => this.reload());
+    this.rootChangeSubscription = onRootChange(() => this.reload());
     this.reload();
   }
 
@@ -175,7 +175,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
 
   dispose(): void {
     this.teardownWatcher();
-    this.rootSub.dispose();
+    this.rootChangeSubscription.dispose();
     if (this.writeTimer) {
       clearTimeout(this.writeTimer);
     }
@@ -187,7 +187,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     if (this.vaultRoot === undefined || !isWithin(absPath, this.vaultRoot)) {
       return undefined;
     }
-    return this.toConfigKey(path.relative(this.vaultRoot, absPath));
+    return toForwardSlashes(path.relative(this.vaultRoot, absPath));
   }
 
   // Switch to the current vault root, reading its config.yml and watching it again
@@ -316,11 +316,6 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
   }
 
-  // Swap in forward slashes so a key reads the same on every platform
-  private toConfigKey(relPath: string): string {
-    return relPath.split(path.sep).join('/');
-  }
-
   // Change a card's visual block and save it, false when no vault is set
   private mutateVisual(absPath: string, mutate: (visual: Record<string, unknown>) => void): boolean {
     const key = this.configKeyOf(absPath);
@@ -408,7 +403,7 @@ export class VaultConfig implements vscode.Disposable, CardLayoutStore {
     }
     for (const [relPath, meta] of Object.entries(notes as Record<string, unknown>)) {
       if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
-        out.set(this.toConfigKey(relPath), meta as NoteMetadata);
+        out.set(toForwardSlashes(relPath), meta as NoteMetadata);
       }
     }
     return out;

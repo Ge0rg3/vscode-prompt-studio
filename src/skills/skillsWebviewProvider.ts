@@ -82,10 +82,10 @@ export class SkillsWebviewProvider implements vscode.WebviewViewProvider, vscode
     this.scopeManager.labelView(view);
 
     // Dispose the message handler with the view, since VSCode resolves a new view whenever the section reappears
-    const messageSub = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
+    const messageSubscription = view.webview.onDidReceiveMessage((msg) => this.handle(msg));
     view.onDidDispose(() => {
       this.view = undefined;
-      messageSub.dispose();
+      messageSubscription.dispose();
     });
   }
 

@@ -1,4 +1,4 @@
-// Checks whether one path sits inside another, makes paths relative or absolute, and names per-project storage folders
+// Checks whether one path sits inside another, makes paths relative or absolute, and names a storage folder for a path
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import * as path from 'node:path';
@@ -49,15 +49,20 @@ export function resolveRelativePath(dir: string, reference: string): string | un
   return path.resolve(dir, reference);
 }
 
+// Swap in forward slashes so a relative path reads the same on every platform
+export function toForwardSlashes(relPath: string): string {
+  return relPath.split(path.sep).join('/');
+}
+
 // Make target relative to root, '.' for root itself
 export function relativeToRoot(root: string, target: string): string {
   return path.relative(root, target) || '.';
 }
 
-// Map a workspace path to a "<basename>-<shorthash>" folder under the extension's global storage
-export function projectStorageDir(globalStorageDir: string, workspaceFsPath: string): string {
-  const hash = shortHash(workspaceFsPath);
-  const base = sanitizeBasename(path.basename(workspaceFsPath));
+// Map a path to its own "<basename>-<shorthash>" folder under a storage folder
+export function hashedStorageDir(storageDir: string, fsPath: string): string {
+  const hash = shortHash(fsPath);
+  const base = sanitizeBasename(path.basename(fsPath));
   const folder = base ? `${base}-${hash}` : hash;
-  return path.join(globalStorageDir, folder);
+  return path.join(storageDir, folder);
 }

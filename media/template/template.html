@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- The template editor, an empty editor pane above its attachment chips and toolbar buttons -->
+<!-- The template editor, the live and saved-version panes above its attachment chips and toolbar buttons -->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -11,16 +11,31 @@
 </head>
 <body data-nonce="{{nonce}}">
   <div id="editor"></div>
+  <div id="version-pane" class="hidden"></div>
   <div id="attachments"></div>
   <div id="toolbar">
     <button id="toggle" class="bar-button" type="button">
       <span id="toggle-icon" class="codicon codicon-eye"></span>
       <span id="toggle-label">Rendered</span>
     </button>
+    <button id="older" class="bar-button icon-only hidden" type="button" title="Older version">
+      <span class="codicon codicon-chevron-left"></span>
+    </button>
+    <button id="history" class="bar-button hidden" type="button">
+      <span class="codicon codicon-history"></span>
+      <span id="history-label">History</span>
+    </button>
+    <button id="newer" class="bar-button icon-only hidden" type="button" title="Newer version">
+      <span class="codicon codicon-chevron-right"></span>
+    </button>
     <span class="toolbar-spacer"></span>
     <button id="attach" class="bar-button" type="button">
       <span class="codicon codicon-attach"></span>
       <span>Attach</span>
+    </button>
+    <button id="restore" class="bar-button hidden" type="button">
+      <span class="codicon codicon-discard"></span>
+      <span>Restore</span>
     </button>
     <button id="save" class="bar-button" type="button">
       <span class="codicon codicon-save"></span>

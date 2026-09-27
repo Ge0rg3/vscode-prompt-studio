@@ -7,6 +7,7 @@ import { dropNoteAttachments } from '../common/noteAttachments';
 import { copyPathToClipboard } from '../common/utils/clipboard';
 import { pathExists } from '../common/utils/fs';
 import { relativeToRoot } from '../common/utils/paths';
+import { flashStatusMessage } from '../common/utils/statusBar';
 import { VaultConfig } from '../common/vaultConfig';
 import { VaultManager } from '../common/vaultManager';
 import { VaultNode } from '../common/vaultNode';
@@ -69,7 +70,7 @@ export function registerCopyContents(): vscode.Disposable {
       const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(target.absPath));
       const text = new TextDecoder('utf-8').decode(bytes);
       await vscode.env.clipboard.writeText(text);
-      void vscode.window.setStatusBarMessage(`Copied "${target.name}" to clipboard.`, 2000);
+      flashStatusMessage(`Copied "${target.name}" to clipboard.`);
     }
   );
 }

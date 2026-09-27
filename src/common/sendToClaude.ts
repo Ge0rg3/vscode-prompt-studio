@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 
 import { copyImageToClipboard } from './utils/imageClipboard';
+import { delay } from './utils/time';
 
 // Give the chat input time to take focus, and to take each paste in turn
 const PASTE_SETTLE_MS = 60;
@@ -14,11 +15,6 @@ const ATTACHMENTS_HEADING = '--- attachments <agent MUST read> ---';
 
 // --- helpers ---
 
-// Hold off long enough for the chat input to catch up with the last command
-function waitForChatInput(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, PASTE_SETTLE_MS));
-}
-
 // Paste each file into the chat as an attachment, handing back the ones the clipboard could not carry
 async function pasteAttachments(attachments: readonly string[]): Promise<string[]> {
   const missedAttachments: string[] = [];
@@ -30,7 +26,7 @@ async function pasteAttachments(attachments: readonly string[]): Promise<string[
     }
 
     await vscode.commands.executeCommand(PASTE_COMMAND);
-    await waitForChatInput();
+    await delay(PASTE_SETTLE_MS);
   }
 
   return missedAttachments;
@@ -48,7 +44,7 @@ async function chatInputHasFocus(): Promise<boolean> {
   const selection = editor?.selection;
 
   await vscode.commands.executeCommand(SELECT_ALL_COMMAND);
-  await waitForChatInput();
+  await delay(PASTE_SETTLE_MS);
 
   // No open file at all means nothing else could have taken the paste
   if (!editor || !selection || !hasWholeFileSelected(editor)) {
@@ -74,7 +70,7 @@ function appendAttachmentSection(text: string, attachmentPaths: readonly string[
 export async function sendToClaude(text: string, attachments: readonly string[] = []): Promise<void> {
   try {
     await vscode.commands.executeCommand('claude-vscode.focus');
-    await waitForChatInput();
+    await delay(PASTE_SETTLE_MS);
 
     // Find out where a paste would go before making one, so nothing lands in an open file
     if (!(await chatInputHasFocus())) {

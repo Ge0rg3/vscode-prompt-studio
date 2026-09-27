@@ -8,6 +8,7 @@ import { ColorPreview } from '../common/cardColors';
 import { ScopeManager } from '../common/scopeManager';
 import { sendToClaude } from '../common/sendToClaude';
 import { pathExists } from '../common/utils/fs';
+import { NoteHistory } from '../history/noteHistory';
 import { MentionIndex } from '../template/mentionIndex';
 import { TemplatePanel } from '../template/templatePanel';
 import { validateEntryName } from '../vault/entryName';
@@ -24,7 +25,8 @@ export class SkillCommands {
     private readonly skillsConfigs: SkillsConfigs,
     private readonly colorPreviewEmitter: vscode.EventEmitter<ColorPreview>,
     private readonly mentionIndex: MentionIndex,
-    private readonly scopeManager: ScopeManager
+    private readonly scopeManager: ScopeManager,
+    private readonly noteHistory: NoteHistory
   ) {}
 
   // Register the skill row and empty-area action commands
@@ -43,7 +45,7 @@ export class SkillCommands {
           return;
         }
 
-        TemplatePanel.show(this.extensionUri, this.mentionIndex, target.skill.skillFile, this.slashCommand(target));
+        TemplatePanel.show(this.extensionUri, this.mentionIndex, this.noteHistory, target.skill.skillFile, this.slashCommand(target));
       }),
 
       vscode.commands.registerCommand('promptStudio.openSkillVisual', (target?: SkillTreeNode) => {

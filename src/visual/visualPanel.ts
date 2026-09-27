@@ -49,6 +49,7 @@ const ALLOWED_COMMANDS = new Set([
   'promptStudio.copyContents',
   'promptStudio.openTemplate',
   'promptStudio.sendToClaude',
+  'promptStudio.showHistory',
   'promptStudio.copyPathStatic',
   'promptStudio.copyPathRelative',
   'promptStudio.revealInOS'

@@ -1,11 +1,10 @@
 // Builds the template editor's CodeMirror view and wires it to the host and the toolbar
 import { acceptCompletion, completionStatus } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentLess, insertTab } from '@codemirror/commands';
-import { markdown, markdownKeymap, markdownLanguage } from '@codemirror/lang-markdown';
+import { markdownKeymap } from '@codemirror/lang-markdown';
 import { closeSearchPanel } from '@codemirror/search';
 import { Compartment, EditorState, Transaction } from '@codemirror/state';
 import { EditorView, keymap, tooltips } from '@codemirror/view';
-import { GFM } from '@lezer/markdown';
 
 import { createAttachmentStrip } from './attachmentStrip';
 import {
@@ -19,12 +18,13 @@ import {
   removeAttachment,
   ResolvedAttachment
 } from './attachments';
-import { codeHighlighting, codeLanguages } from './codeHighlight';
+import { markdownWithCode } from './codeHighlight';
 import { DirectoryCache } from './directoryCache';
 import { addVerifiedPaths, fileMentions, MentionEntry, setMentionEntries } from './fileMentions';
 import { findReplace, stepFindMatch, toggleFindWidget } from './findReplace';
 import { listIndentKeymap } from './listIndent';
 import { livePreview } from './livePreview';
+import { VersionEntry, VersionStepper } from './versionStepper';
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -37,6 +37,8 @@ interface ContentMessage {
   text: string;
   notePath: string;
   claudeCommand?: string;
+  hasHistory: boolean;
+  isReload: boolean;
 }
 
 interface MentionsMessage {
@@ -76,6 +78,17 @@ interface ResolvedAttachmentsMessage {
   entries: ResolvedAttachment[];
 }
 
+interface VersionsMessage {
+  type: 'versions';
+  versions: VersionEntry[];
+}
+
+interface VersionTextMessage {
+  type: 'versionText';
+  blobId: string;
+  text: string;
+}
+
 type InboundMessage =
   | ContentMessage
   | MentionsMessage
@@ -84,7 +97,9 @@ type InboundMessage =
   | SavedMessage
   | AttachedMessage
   | AttachedFromDiskMessage
-  | ResolvedAttachmentsMessage;
+  | ResolvedAttachmentsMessage
+  | VersionsMessage
+  | VersionTextMessage;
 
 // The webview state kept across a window reload, with any unsaved text
 interface PersistedState {
@@ -118,7 +133,9 @@ const requestedAttachments = new Set<string>();
 let nextRequestId = 1;
 let verifyTimer: number | undefined;
 
+const nonce = document.body.dataset.nonce ?? '';
 const editorEl = document.getElementById('editor') as HTMLElement;
+const versionPane = document.getElementById('version-pane') as HTMLElement;
 const toolbar = document.getElementById('toolbar') as HTMLElement;
 const toggle = document.getElementById('toggle') as HTMLElement;
 const toggleIcon = document.getElementById('toggle-icon') as HTMLElement;
@@ -127,11 +144,17 @@ const save = document.getElementById('save') as HTMLElement;
 const copy = document.getElementById('copy') as HTMLElement;
 const send = document.getElementById('send') as HTMLElement;
 const attach = document.getElementById('attach') as HTMLElement;
+const historyButton = document.getElementById('history') as HTMLElement;
+const historyLabel = document.getElementById('history-label') as HTMLElement;
+const olderButton = document.getElementById('older') as HTMLButtonElement;
+const newerButton = document.getElementById('newer') as HTMLButtonElement;
+const restoreButton = document.getElementById('restore') as HTMLButtonElement;
 const attachmentStrip = document.getElementById('attachments') as HTMLElement;
 
 const persisted = vscode.getState() as PersistedState | undefined;
 
 const live = new Compartment();
+const undoHistory = new Compartment();
 const drawAttachments = createAttachmentStrip(attachmentStrip, (attachment: Attachment) =>
   removeAttachment(view, attachment)
 );
@@ -158,8 +181,8 @@ const view = new EditorView({
   state: EditorState.create({
     doc: '',
     extensions: [
-      EditorView.cspNonce.of(document.body.dataset.nonce ?? ''),
-      history(),
+      EditorView.cspNonce.of(nonce),
+      undoHistory.of(history()),
       EditorView.lineWrapping,
       keymap.of([
         { key: 'Tab', run: acceptCompletion },
@@ -174,8 +197,7 @@ const view = new EditorView({
       tooltips({
         tooltipSpace: () => ({ left: 0, top: 0, right: window.innerWidth, bottom: toolbar.getBoundingClientRect().top })
       }),
-      markdown({ base: markdownLanguage, extensions: GFM, codeLanguages }),
-      codeHighlighting,
+      markdownWithCode,
       fileMentions({
         listDirectory: (dirPath) => directoryCache.list(dirPath),
         cachedDirectory: (dirPath) => directoryCache.cached(dirPath),
@@ -194,6 +216,22 @@ const view = new EditorView({
     ]
   })
 });
+
+const versionStepper = new VersionStepper(
+  {
+    editor: editorEl,
+    versionPane,
+    olderButton,
+    newerButton,
+    historyButton,
+    historyLabel,
+    restoreButton,
+    hiddenWhileViewing: [save, attach, attachmentStrip]
+  },
+  { readText: () => view.state.doc.toString(), isDirty: () => isDirty, focus: () => view.focus() },
+  (message) => vscode.postMessage(message),
+  nonce
+);
 
 // --- helpers ---
 
@@ -306,9 +344,36 @@ function setContent(text: string): void {
   isLoading = false;
 }
 
-// Ask the host to write the editor's text over the note
+// Load the note the host sent, putting back unsaved text from before a window reload
+function loadContent(msg: ContentMessage): void {
+  notePath = msg.notePath;
+  claudeCommand = msg.claudeCommand;
+  versionStepper.reset(msg.hasHistory);
+
+  // Start the undo history over on a reload, or undo splices the replaced text back into the new one
+  if (msg.isReload) {
+    view.dispatch({ effects: undoHistory.reconfigure([]) });
+    view.dispatch({ effects: undoHistory.reconfigure(history()) });
+  }
+
+  // Take the baseline from the editor, CodeMirror can normalize the text on load
+  setContent(msg.text);
+  savedText = view.state.doc.toString();
+
+  // Put back the unsaved text from before a window reload, never over a version the host just restored
+  if (!msg.isReload && typeof persisted?.text === 'string' && persisted.text !== savedText) {
+    setContent(persisted.text);
+  }
+
+  setDirty(view.state.doc.toString() !== savedText);
+  persist();
+}
+
+// Ask the host to write the editor's text over the note, never while a saved version is on screen
 function saveNote(): void {
-  vscode.postMessage({ type: 'save', text: view.state.doc.toString() });
+  if (!versionStepper.isViewing()) {
+    vscode.postMessage({ type: 'save', text: view.state.doc.toString() });
+  }
 }
 
 // Match a ctrl or cmd shortcut on key and on code, so any keyboard layout reaches it
@@ -376,9 +441,10 @@ function persist(): void {
 function setSourceMode(on: boolean): void {
   isSourceMode = on;
   view.dispatch({ effects: live.reconfigure(on ? [] : renderedMarkdown) });
+  versionStepper.setRendered(!on);
   toggleIcon.className = on ? 'codicon codicon-code' : 'codicon codicon-eye';
   toggleLabel.textContent = on ? 'Source' : 'Rendered';
-  view.focus();
+  versionStepper.focus();
 }
 
 // --- inbound messages ---
@@ -386,21 +452,7 @@ function setSourceMode(on: boolean): void {
 // Act on one message from the extension host
 function handleHostMessage(msg: InboundMessage | undefined): void {
   if (msg?.type === 'content') {
-    notePath = msg.notePath;
-    claudeCommand = msg.claudeCommand;
-
-    // Take the baseline from the editor, CodeMirror can normalize the text on load
-    setContent(msg.text);
-    savedText = view.state.doc.toString();
-
-    // Put back the unsaved text from before the reload
-    const buffer = typeof persisted?.text === 'string' ? persisted.text : undefined;
-    if (buffer !== undefined && buffer !== savedText) {
-      setContent(buffer);
-    }
-
-    setDirty(view.state.doc.toString() !== savedText);
-    persist();
+    loadContent(msg);
     return;
   }
 
@@ -445,6 +497,16 @@ function handleHostMessage(msg: InboundMessage | undefined): void {
     return;
   }
 
+  if (msg?.type === 'versions') {
+    versionStepper.receiveVersions(msg.versions);
+    return;
+  }
+
+  if (msg?.type === 'versionText') {
+    versionStepper.receiveVersionText(msg.blobId, msg.text);
+    return;
+  }
+
   // An answer with nothing in it changes no decoration, and dispatching it would ask again
   if (msg?.type === 'resolvedAttachments' && msg.entries.length > 0) {
     view.dispatch({ effects: addResolvedAttachments.of(msg.entries) });
@@ -462,8 +524,8 @@ attachmentStrip.addEventListener('mousedown', (event) => event.preventDefault())
 toggle.addEventListener('click', () => setSourceMode(!isSourceMode));
 attach.addEventListener('click', () => vscode.postMessage({ type: 'attachFromDisk' }));
 save.addEventListener('click', saveNote);
-copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: view.state.doc.toString() }));
-send.addEventListener('click', () => vscode.postMessage({ type: 'sendToClaude', text: view.state.doc.toString() }));
+copy.addEventListener('click', () => vscode.postMessage({ type: 'copy', text: versionStepper.readViewedText() }));
+send.addEventListener('click', () => vscode.postMessage({ type: 'sendToClaude', text: versionStepper.readViewedText() }));
 
 // Catch keys on the way down, the editor only holds focus once the note has been clicked
 window.addEventListener(
@@ -475,8 +537,9 @@ window.addEventListener(
       return;
     }
 
-    // Stop the key here, VSCode's own find shortcuts pick it up otherwise
-    if (runFindShortcut(event)) {
+    // Stop the key here, VSCode's own find shortcuts pick it up otherwise. A saved version
+    // on screen skips this, since the find widget only searches the live note
+    if (!versionStepper.isViewing() && runFindShortcut(event)) {
       event.preventDefault();
       event.stopImmediatePropagation();
     }

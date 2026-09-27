@@ -16,7 +16,8 @@ body {
   flex-direction: column;
 }
 
-#editor {
+#editor,
+#version-pane {
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -529,4 +530,30 @@ body.vscode-high-contrast-light .cm-editor .cm-searchMatch-selected {
 
 .attachment-remove:hover {
   opacity: 1;
+}
+
+/* --- saved version pane --- */
+
+#editor.hidden,
+#version-pane.hidden,
+#attachments.hidden {
+  display: none;
+}
+
+/* Color the saved version like Show History's diff, red for text the note has since lost */
+#version-pane .cm-changedLine {
+  background: var(--vscode-diffEditor-removedLineBackground, rgba(255, 0, 0, 0.2));
+}
+
+#version-pane .cm-changedText {
+  background: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.2));
+}
+
+/* The merge view diffs against the live note, so its deleted chunks hold the text added since, in green */
+#version-pane .cm-deletedChunk {
+  background: var(--vscode-diffEditor-insertedLineBackground, rgba(155, 185, 85, 0.2));
+}
+
+#version-pane .cm-deletedChunk .cm-deletedText {
+  background: var(--vscode-diffEditor-insertedTextBackground, rgba(156, 204, 44, 0.25));
 }

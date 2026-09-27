@@ -42,6 +42,7 @@ Auto-detect project and sub-project skill files easily view/edit them alongside 
 - **Skills management** All `.claude/skills` folders in the workspace and its sub-projects, browsable and editable in the live editor.
 - **Enhanced `@` browsing.** A filesystem cache is held meaning that `@` file links resolve immediately, instead of long loading on Claude.
 - **A vault per project, or one shared by all.** A title-bar button swaps both sidebars to the global vault and your own `~/.claude/skills`.
+- **Version history** Compare a note with its earlier versions and restore one, from the arrows in the editor's bottom bar or **Show History** on the note.
 
 ## Install
 
@@ -51,6 +52,7 @@ Search for **Prompt Studio** in the Extensions view, or install it from the [mar
 
 - VSCode 1.85 or newer.
 - **Optional** | The [Claude Code extension](https://marketplace.visualstudio.com/items?itemName=anthropic.claude-code), for the **Send to Claude** actions (you can still copy to clipboard).
+- **Optional** | Git, for a note's version history.
 - **Optional** | On Linux, `wl-copy` or `xclip`, so a note's images can be attached to what you send (if uninstalled, the filepath is pasted into the prompt instead).
 
 

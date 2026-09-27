@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 
 import { ScopeManager } from './scopeManager';
 import { ensureDir } from './utils/fs';
-import { projectStorageDir, resolveTypedPath } from './utils/paths';
+import { hashedStorageDir, resolveTypedPath } from './utils/paths';
 
 const STATE_KEY = 'vaultPath';
 const HAS_VAULT_CONTEXT = 'promptStudio.hasVault';
@@ -54,7 +54,7 @@ export class VaultManager implements vscode.Disposable {
     if (!workspace) {
       return undefined;
     }
-    return projectStorageDir(this.globalStorageDir, workspace.uri.fsPath);
+    return hashedStorageDir(this.globalStorageDir, workspace.uri.fsPath);
   }
 
   // Find the global vault folder the setting names, falling back to one under extension storage

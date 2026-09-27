@@ -42,6 +42,7 @@ vscode-prompt-studio/
 |
 +-- src/                    # Extension host source (node)
 |   +-- extension.ts        # activate(): builds the shared services, registers every provider and command
+|   |                       # deactivate(): snapshots the note edits still waiting
 |   +-- common/             # Shared state, domain types, and helpers
 |   |   +-- vaultConfig.ts      # The config.yml store, with debounced writes and metadata that moves with an entry
 |   |   +-- vaultManager.ts     # Which folder is the vault, the project one or the shared global one
@@ -53,19 +54,21 @@ vscode-prompt-studio/
 |   |   +-- noteView.ts         # Whether a plain open lands in the template editor or the raw file
 |   |   +-- vaultNode.ts        # The node shape passed between host, webviews, and commands
 |   |   +-- utils/              # Purpose-named stateless helpers: paths, fs, webview, clipboard,
-|   |                           # imageClipboard, compare
+|   |                           # imageClipboard, compare, time, statusBar
 |   +-- vault/              # Vault sidebar host, create/rename/delete, move/copy, vault location
-|   +-- template/           # Template panel host, mention index, on-disk path browsing, attachment storage
+|   +-- template/           # Template panel host, mention index, on-disk path browsing, attachment storage,
+|   |                       # saved versions for the bottom bar
 |   +-- visual/             # Canvas panel host and the folder-to-cards reader
 |   +-- skills/             # Skills sidebar host, skill and sub-project scanners, per-root config
 |   |                       # stores, skill commands
+|   +-- history/            # Note history kept in a git repository per vault, the version picker, restore
 |   +-- settings/           # The settings page panel and the command that opens it
 |   +-- scope/              # The title-bar buttons that swap both sidebars between project and global
 |
 +-- webview/                # Browser source bundled into media/ (own tsconfig: DOM, no node types)
 |   +-- template/           # main.ts, livePreview.ts, codeHighlight.ts, listIndent.ts,
 |                           # fileMentions.ts, directoryCache.ts, findReplace.ts,
-|                           # attachments.ts, attachmentStrip.ts
+|                           # attachments.ts, attachmentStrip.ts, versionStepper.ts
 |
 +-- media/                  # Everything a webview loads at runtime, plus the icons the manifest names. All of it ships
 |   +-- icon.svg            # Activity-bar icon, named by the manifest
@@ -92,8 +95,9 @@ vscode-prompt-studio/
 | Extension host | TypeScript 5.5, targeting Node 18, VSCode API `^1.85` |
 | Bundler | esbuild 0.24 - `cjs` for the host, `iife` for the template webview |
 | Sidebar, canvas, and settings views | Webviews rendering hand-written plain JS, no framework |
-| Template editor | CodeMirror 6: markdown + GFM, autocomplete, search, seven fenced-code languages |
+| Template editor | CodeMirror 6: markdown + GFM, autocomplete, search, seven fenced-code languages, a merge view for saved versions |
 | Per-entry metadata | YAML (`yaml` 2.9), one `config.yml` per root |
+| Note history | The user's own git, run on a bare repository per vault under extension storage |
 | Icons | `@vscode/codicons` font, copied into `media/` at build |
 | Packaging | `@vscode/vsce` |
 

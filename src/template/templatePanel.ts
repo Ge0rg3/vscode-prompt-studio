@@ -5,11 +5,14 @@ import * as vscode from 'vscode';
 
 import { attachmentsIn, dropAttachment, pruneAttachments, splitOutAttachments } from '../common/noteAttachments';
 import { sendToClaude } from '../common/sendToClaude';
+import { flashStatusMessage } from '../common/utils/statusBar';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
+import { NoteHistory } from '../history/noteHistory';
 import { existingPaths, listDirectory } from './mentionFilesystem';
 import { MentionIndex } from './mentionIndex';
 import { openMention } from './openMention';
 import { copyPickedFiles, MAX_ATTACHMENT_MB, resolveAttachments, storeAttachment } from './panelAttachments';
+import { PanelHistory } from './panelHistory';
 
 type InboundMessage =
   | { type: 'ready' }
@@ -17,6 +20,10 @@ type InboundMessage =
   | { type: 'dirty'; dirty: boolean }
   | { type: 'copy'; text: string }
   | { type: 'sendToClaude'; text: string }
+  | { type: 'showHistory' }
+  | { type: 'listVersions' }
+  | { type: 'readVersion'; blobId: string }
+  | { type: 'restoreVersion'; blobId: string }
   | { type: 'listDir'; id: number; dirPath: string }
   | { type: 'checkPaths'; paths: string[] }
   | { type: 'openMention'; path: string }
@@ -25,9 +32,6 @@ type InboundMessage =
   | { type: 'attachmentTooLarge'; name: string }
   | { type: 'resolveAttachments'; references: string[] }
   | { type: 'dropAttachment'; reference: string };
-
-// How long a status-bar note stays up
-const STATUS_MESSAGE_MS = 2000;
 
 export class TemplatePanel {
   static readonly viewType = 'promptStudio.template';
@@ -40,14 +44,18 @@ export class TemplatePanel {
   private isDirty = false;
   private pendingAttachmentWrites = 0;
 
+  private readonly panelHistory: PanelHistory;
+
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
     private readonly mentionIndex: MentionIndex,
+    private readonly history: NoteHistory,
     private readonly notePath: string,
     private claudeCommand: string | undefined
   ) {
-    TemplatePanel.openPanels.set(notePath, this);
+    this.panelHistory = new PanelHistory(history, notePath, panel.webview);
+    TemplatePanel.openPanels.set(TemplatePanel.keyOf(notePath), this);
     this.panel.title = TemplatePanel.titleFor(notePath);
     this.panel.webview.html = this.renderHtml();
     this.disposables.push(
@@ -58,7 +66,7 @@ export class TemplatePanel {
   }
 
   private dispose(): void {
-    TemplatePanel.openPanels.delete(this.notePath);
+    TemplatePanel.openPanels.delete(TemplatePanel.keyOf(this.notePath));
     for (const disposable of this.disposables) {
       disposable.dispose();
     }
@@ -79,10 +87,22 @@ export class TemplatePanel {
         return;
       case 'copy':
         await vscode.env.clipboard.writeText(msg.text);
-        void vscode.window.setStatusBarMessage('Copied template to clipboard.', STATUS_MESSAGE_MS);
+        flashStatusMessage('Copied template to clipboard.');
         return;
       case 'sendToClaude':
         await this.sendNote(msg.text);
+        return;
+      case 'showHistory':
+        await this.panelHistory.showPicker();
+        return;
+      case 'listVersions':
+        await this.panelHistory.postVersions();
+        return;
+      case 'readVersion':
+        await this.panelHistory.postVersionText(msg.blobId);
+        return;
+      case 'restoreVersion':
+        await this.panelHistory.restoreVersion(msg.blobId);
         return;
       case 'listDir':
         await this.panel.webview.postMessage({
@@ -117,14 +137,16 @@ export class TemplatePanel {
     }
   }
 
-  // Hand the editor the note as it sits on disk
-  private async postContent(): Promise<void> {
+  // Hand the editor the note as it sits on disk, a reload replaces whatever the editor holds
+  private async postContent(isReload = false): Promise<void> {
     const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(this.notePath));
     await this.panel.webview.postMessage({
       type: 'content',
       text: new TextDecoder('utf-8').decode(bytes),
       notePath: this.notePath,
-      claudeCommand: this.claudeCommand
+      claudeCommand: this.claudeCommand,
+      hasHistory: this.history.keepsHistoryFor(this.notePath),
+      isReload
     });
   }
 
@@ -143,7 +165,7 @@ export class TemplatePanel {
   private async saveNote(text: string): Promise<void> {
     await vscode.workspace.fs.writeFile(vscode.Uri.file(this.notePath), new TextEncoder().encode(text));
     await this.panel.webview.postMessage({ type: 'saved', text });
-    void vscode.window.setStatusBarMessage(`Saved "${path.basename(this.notePath)}".`, STATUS_MESSAGE_MS);
+    flashStatusMessage(`Saved "${path.basename(this.notePath)}".`);
 
     // A prune reads the notes on disk, so it waits until every panel here has written what it holds
     const noteDir = path.dirname(this.notePath);
@@ -247,15 +269,31 @@ export class TemplatePanel {
     };
   }
 
+  // Normalize the note path through a file uri, so a path read back off a version uri finds the same panel
+  private static keyOf(notePath: string): string {
+    return vscode.Uri.file(notePath).fsPath;
+  }
+
+  // Test whether the note's template panel holds edits that are not on disk yet
+  static hasUnsavedEdits(notePath: string): boolean {
+    return TemplatePanel.openPanels.get(TemplatePanel.keyOf(notePath))?.isDirty === true;
+  }
+
+  // Load the note into its open template panel again after something else rewrote it
+  static reloadFromDisk(notePath: string): void {
+    void TemplatePanel.openPanels.get(TemplatePanel.keyOf(notePath))?.postContent(true);
+  }
+
   // Reveal the note's template panel, creating it on first use
   static show(
     extensionUri: vscode.Uri,
     mentionIndex: MentionIndex,
+    history: NoteHistory,
     notePath: string,
     claudeCommand?: string,
     preserveFocus = false
   ): void {
-    const existing = TemplatePanel.openPanels.get(notePath);
+    const existing = TemplatePanel.openPanels.get(TemplatePanel.keyOf(notePath));
     if (existing) {
       if (claudeCommand !== undefined) {
         existing.claudeCommand = claudeCommand;
@@ -270,7 +308,7 @@ export class TemplatePanel {
       { viewColumn: vscode.ViewColumn.Active, preserveFocus },
       { ...TemplatePanel.webviewOptions(extensionUri, notePath), retainContextWhenHidden: true }
     );
-    new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);
+    new TemplatePanel(panel, extensionUri, mentionIndex, history, notePath, claudeCommand);
   }
 
   // Reattach to a template panel VSCode restored after a window reload
@@ -278,10 +316,11 @@ export class TemplatePanel {
     panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     mentionIndex: MentionIndex,
+    history: NoteHistory,
     notePath: string,
     claudeCommand?: string
   ): void {
     panel.webview.options = TemplatePanel.webviewOptions(extensionUri, notePath);
-    new TemplatePanel(panel, extensionUri, mentionIndex, notePath, claudeCommand);
+    new TemplatePanel(panel, extensionUri, mentionIndex, history, notePath, claudeCommand);
   }
 }

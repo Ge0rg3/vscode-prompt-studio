@@ -244,6 +244,19 @@ export function resolveAttachment(notePath: string, reference: string): string |
   return target;
 }
 
+// List the files in the note's attachments folder that its text names, whether or not they are on disk
+export function listNamedAttachments(notePath: string, text: string): string[] {
+  const named = new Set<string>();
+  for (const reference of attachmentReferences(text)) {
+    const target = resolveAttachment(notePath, reference);
+    if (target) {
+      named.add(target);
+    }
+  }
+
+  return [...named];
+}
+
 // Pick the spot an incoming file lands in beside the note
 export async function reserveAttachment(
   notePath: string,

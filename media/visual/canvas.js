@@ -691,6 +691,8 @@
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => postAfterSave({ type: 'openNote', node: serialize(card) }) },
         { label: alternate.label, icon: alternate.icon, action: () => postAfterSave(alternate.message) },
+        // Only a skills canvas is read-only, and skills keep no history
+        ALLOW_CRUD ? { label: 'Show History', icon: 'history', cmd: 'promptStudio.showHistory' } : null,
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',

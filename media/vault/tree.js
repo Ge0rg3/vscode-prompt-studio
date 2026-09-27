@@ -697,6 +697,7 @@
         'sep',
         { label: 'Open', icon: 'go-to-file', action: () => vscode.postMessage({ type: 'openNote', node: serialize(node) }) },
         { label: alternate.label, icon: alternate.icon, action: () => vscode.postMessage(alternate.message) },
+        { label: 'Show History', icon: 'history', cmd: 'promptStudio.showHistory' },
         'sep',
         { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
         'sep',
