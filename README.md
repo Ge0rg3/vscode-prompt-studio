@@ -6,7 +6,7 @@ An Obsidian-like storage solution for your prompt collection, with live markdown
 
 [![VSCode Marketplace version](https://vsmarketplacebadges.dev/version-short/Ge0rg3.prompt-studio.svg?style=flat&label=marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=Ge0rg3.prompt-studio) ![License: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg) ![VSCode 1.85 or newer](https://img.shields.io/badge/VS%20Code-1.85%2B-blue.svg) ![Stores plain markdown](https://img.shields.io/badge/storage-plain%20markdown-blue.svg)
 
-![The vault tree and Claude Skills in the sidebar, with a prompt open in the template editor](docs/template-editor.png)
+![A prompt filled in with an @ mention, stepped back through its history, and sent to Claude, then the vault explored as a zoomable canvas](docs/demo.gif)
 
 *Custom sidebar on the left, live md editor in center, claude on the right.*
 
