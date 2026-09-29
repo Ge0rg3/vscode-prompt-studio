@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+
+- Zooming in and out of folders on the canvas is one continuous motion. The parent's cards come into view in place around the folder you leave, and the zoom never pauses as it crosses from one folder to the next.
+- A trackpad pinch follows your fingers.
+- Clicking **Fit**, the zoom percentage, a folder card, or the parent's breadcrumb animates the view instead of jumping.
+- A canvas whose folder is deleted or renamed moves up to the nearest folder that is still there.
+
 ## 0.5.0
 
 - Notes keep a version history. The arrows in the template editor's bottom bar step back through earlier versions, each shown against the note, and restore the one you pick.

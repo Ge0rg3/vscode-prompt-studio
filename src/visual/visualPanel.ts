@@ -7,13 +7,13 @@ import { applyColorMessage, CARD_COLORS, ColorPreview, postColorPreview } from '
 import { CardLayoutStore, NotePosition } from '../common/cardLayoutStore';
 import { defaultNoteView, NoteView, onDidChangeNoteView, openNoteInView } from '../common/noteView';
 import { copyPathToClipboard } from '../common/utils/clipboard';
-import { pathExists } from '../common/utils/fs';
+import { folderExists, pathExists } from '../common/utils/fs';
 import { isWithin, relativeToRoot } from '../common/utils/paths';
 import { assetUri, renderWebviewHtml } from '../common/utils/webview';
 import { CONFIG_FILENAME } from '../common/vaultConfig';
 import { VaultNode } from '../common/vaultNode';
 import { NOTE_EXT } from '../vault/entryName';
-import { readFolder } from './folderContents';
+import { readFolder, VisualState } from './folderContents';
 
 // What one canvas is bound to
 export interface CanvasContext {
@@ -28,7 +28,7 @@ type InboundMessage =
   | { type: 'ready' }
   | { type: 'openNote'; node: VaultNode }
   | { type: 'openFile'; path: string }
-  | { type: 'navigate'; folder: string }
+  | { type: 'navigate'; folder: string; fromFolder: string; navigateNumber: number }
   | { type: 'moveCard'; path: string; x: number; y: number; z: number }
   | { type: 'resizeCard'; path: string; width: number; height: number }
   | { type: 'setColor'; path: string; color: string | null }
@@ -68,7 +68,7 @@ export class VisualPanel {
     const existing = VisualPanel.panels.get(context.root);
     if (existing) {
       existing.panel.reveal(vscode.ViewColumn.Active);
-      existing.navigate(folder);
+      void existing.navigate(folder, true);
       return;
     }
 
@@ -113,6 +113,19 @@ export class VisualPanel {
   private saveRequests = 0;
   private folder: string;
 
+  // The number on the webview's latest navigate message, sent back with every state
+  private latestNavigateNumber = 0;
+
+  // Send the parent folder's cards with the next state that can carry them.
+  // A new panel starts with this on, since the store's start-up refresh can land before the reply to ready
+  private shouldSendParent = true;
+
+  // The folder a navigate is moving to while it is checked, so saves to its notes still go through
+  private pendingTarget: string | undefined;
+
+  // The folder read last, which the panel goes back to when a folder on disk cannot be read
+  private lastReadFolder: string | undefined;
+
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
@@ -148,17 +161,49 @@ export class VisualPanel {
     }
   }
 
-  // Point the panel at a different folder inside the canvas root
-  private navigate(folder: string): void {
-    if (folder === this.folder || !isWithin(folder, this.context.root)) {
-      return;
+  // Move the panel to a folder inside the canvas root and push its state. Anything else leaves the panel where it is
+  // and pushes that folder again, parent included
+  private async navigate(folder: string, shouldIncludeParent: boolean): Promise<void> {
+    const target = path.resolve(folder);
+    if (target === this.folder || !isWithin(target, this.context.root)) {
+      return this.postState(true);
     }
 
+    // Take saves for the target while it is checked, since the webview has already moved there
+    this.pendingTarget = target;
+    const isFolder = await folderExists(vscode.Uri.file(target));
+    if (this.pendingTarget === target) {
+      this.pendingTarget = undefined;
+    }
+    if (!isFolder) {
+      return this.postState(true);
+    }
+
+    this.moveTo(target);
+    return this.postState(shouldIncludeParent);
+  }
+
+  // Move the panel to another folder, taking its title and watcher along
+  private moveTo(folder: string): void {
     this.folder = folder;
     this.panel.title = VisualPanel.titleFor(folder);
     this.rebuildWatcher();
-    void this.postState();
     this.emitActiveFolder();
+  }
+
+  // Walk up from a folder to the nearest one still on disk, stopping at the canvas root
+  private async findNearestExistingFolder(folder: string): Promise<string | undefined> {
+    let candidate = folder;
+    while (isWithin(candidate, this.context.root)) {
+      if (await folderExists(vscode.Uri.file(candidate))) {
+        return candidate;
+      }
+      if (candidate === this.context.root) {
+        return undefined;
+      }
+      candidate = path.dirname(candidate);
+    }
+    return undefined;
   }
 
   // Fire this canvas's folder while it is the active panel, undefined otherwise
@@ -221,14 +266,15 @@ export class VisualPanel {
     this.refreshScheduled = true;
     setTimeout(() => {
       this.refreshScheduled = false;
-      void this.postState();
+      void this.postState(false);
     }, REFRESH_DEBOUNCE_MS);
   }
 
-  // Test whether a path names a note card in the folder the canvas is showing
+  // Test whether a path names a note card in the folder the canvas is showing, or in the one a navigate is moving it to
   private isCardNote(absPath: string): boolean {
     const name = path.basename(absPath);
-    return path.dirname(absPath) === this.folder &&
+    const folder = path.dirname(absPath);
+    return (folder === this.folder || folder === this.pendingTarget) &&
       isWithin(absPath, this.context.root) &&
       !name.startsWith('.') &&
       name.toLowerCase().endsWith(NOTE_EXT);
@@ -272,12 +318,25 @@ export class VisualPanel {
     }
   }
 
+  // Follow a folder change the webview made, answering with the open folder when the webview asked from one the panel
+  // has since left, such as after a folder was opened from the sidebar
+  private async followNavigate(folder: string, fromFolder: string, navigateNumber: number): Promise<void> {
+    this.latestNavigateNumber = navigateNumber;
+    if (fromFolder !== this.folder) {
+      await this.postState(true);
+      return;
+    }
+
+    // Leave the parent out when the webview opened a child folder, since that parent is the level it just drew
+    await this.navigate(folder, path.dirname(path.resolve(folder)) !== fromFolder);
+  }
+
   // Act on one message from the canvas webview
   private async handle(msg: InboundMessage): Promise<void> {
     switch (msg.type) {
       case 'ready':
         this.postNoteView();
-        await this.postState();
+        await this.postState(true);
         return;
       case 'openNote':
         if (!isWithin(msg.node.absPath, this.context.root)) {
@@ -296,7 +355,13 @@ export class VisualPanel {
         await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(msg.path));
         return;
       case 'navigate':
-        this.navigate(msg.folder);
+        if (
+          typeof msg.folder === 'string' &&
+          typeof msg.fromFolder === 'string' &&
+          Number.isSafeInteger(msg.navigateNumber)
+        ) {
+          await this.followNavigate(msg.folder, msg.fromFolder, msg.navigateNumber);
+        }
         return;
       case 'moveCard':
         this.context.store.setPosition(msg.path, { x: msg.x, y: msg.y });
@@ -351,16 +416,47 @@ export class VisualPanel {
     await vscode.commands.executeCommand(command, node, position);
   }
 
-  // Read the folder and push it, dropping a read that a newer one has already overtaken
-  private async postState(): Promise<void> {
+  // Read the open folder and push it, dropping a read that a newer one has already overtaken
+  private async postState(shouldIncludeParent: boolean): Promise<void> {
+    // Remember any request for the parent's cards, since a newer read drops the read that asked
+    this.shouldSendParent ||= shouldIncludeParent;
     const requestId = ++this.stateRequests;
     await this.pendingNoteWrites;
-    const state = await readFolder(this.context.store, this.context.root, this.folder);
+
+    // Read the folder, stepping off it when the read fails
+    const folder = this.folder;
+    let state: VisualState;
+    try {
+      state = await readFolder(this.context.store, this.context.root, folder, this.shouldSendParent);
+    } catch (err) {
+      await this.leaveUnreadableFolder(folder, requestId, err);
+      return;
+    }
+    this.lastReadFolder = folder;
     if (requestId !== this.stateRequests) {
       return;
     }
 
-    await this.panel.webview.postMessage({ type: 'state', state });
+    // Keep asking for the parent's cards until a state carries them, since a parent that failed to read is left out
+    this.shouldSendParent &&= !state.parent && state.breadcrumbs.length > 1;
+    await this.panel.webview.postMessage({ type: 'state', state, navigateNumber: this.latestNavigateNumber });
+  }
+
+  // Move off a folder that failed to read, back to the last folder read if this one is still on disk, else up to the
+  // nearest folder left after a delete or a rename
+  private async leaveUnreadableFolder(folder: string, requestId: number, readError: unknown): Promise<void> {
+    const fallbackFolder = await this.findNearestExistingFolder(folder);
+    if (requestId !== this.stateRequests) {
+      return;
+    }
+
+    // Rethrow when no folder up the tree is left, or this one is still on disk with no earlier folder to go back to
+    const destination = fallbackFolder === folder ? this.lastReadFolder : fallbackFolder;
+    if (destination === undefined || destination === folder) {
+      throw readError;
+    }
+    this.moveTo(destination);
+    await this.postState(true);
   }
 
   // Pick the view a card opens in, forcing the raw file on a skills canvas so edits save to disk
@@ -385,8 +481,16 @@ export class VisualPanel {
       paletteJs: assetUri(webview, this.extensionUri, 'media/common/palette.js'),
       canvasCss: assetUri(webview, this.extensionUri, 'media/visual/canvas.css'),
       viewportJs: assetUri(webview, this.extensionUri, 'media/visual/viewport.js'),
-      folderZoomJs: assetUri(webview, this.extensionUri, 'media/visual/folderZoom.js'),
-      noteEditingJs: assetUri(webview, this.extensionUri, 'media/visual/noteEditing.js'),
+      cardBuildersJs: assetUri(webview, this.extensionUri, 'media/visual/cards/cardBuilders.js'),
+      coverageJs: assetUri(webview, this.extensionUri, 'media/visual/zoom/coverage.js'),
+      levelsJs: assetUri(webview, this.extensionUri, 'media/visual/zoom/levels.js'),
+      lookPainterJs: assetUri(webview, this.extensionUri, 'media/visual/zoom/lookPainter.js'),
+      ancestorsJs: assetUri(webview, this.extensionUri, 'media/visual/zoom/ancestors.js'),
+      folderZoomJs: assetUri(webview, this.extensionUri, 'media/visual/zoom/folderZoom.js'),
+      noteEditingJs: assetUri(webview, this.extensionUri, 'media/visual/cards/noteEditing.js'),
+      heldStatesJs: assetUri(webview, this.extensionUri, 'media/visual/heldStates.js'),
+      colorsJs: assetUri(webview, this.extensionUri, 'media/visual/colors.js'),
+      menusJs: assetUri(webview, this.extensionUri, 'media/visual/menus.js'),
       canvasJs: assetUri(webview, this.extensionUri, 'media/visual/canvas.js'),
       cardColors: JSON.stringify(CARD_COLORS),
       allowCrud: JSON.stringify(this.context.allowCrud)

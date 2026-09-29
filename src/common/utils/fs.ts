@@ -23,6 +23,15 @@ export function isDirectory(type: vscode.FileType): boolean {
   return (type & vscode.FileType.Directory) !== 0;
 }
 
+// Treat a failed stat as a missing folder
+export async function folderExists(uri: vscode.Uri): Promise<boolean> {
+  try {
+    return isDirectory((await vscode.workspace.fs.stat(uri)).type);
+  } catch {
+    return false;
+  }
+}
+
 // Read a directory's children, undefined when it cannot be read
 export async function readChildren(dir: vscode.Uri): Promise<DirectoryListing | undefined> {
   try {

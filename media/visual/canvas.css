@@ -19,7 +19,10 @@ body {
 #breadcrumbs {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
+
+  /* Keep the trail on one line, or a deeper folder would push the canvas down mid-zoom */
+  flex-wrap: nowrap;
+  overflow: hidden;
   gap: 2px;
   padding: 8px 14px;
   border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
@@ -27,6 +30,10 @@ body {
 }
 
 #breadcrumbs .crumb {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   padding: 2px 6px;
   border-radius: 4px;
   cursor: pointer;
@@ -39,6 +46,7 @@ body {
 }
 
 #breadcrumbs .crumb.current {
+  flex-shrink: 0;
   color: var(--vscode-foreground);
   font-weight: 600;
   cursor: default;
@@ -83,31 +91,75 @@ body {
   top: 0;
   left: 0;
   transform-origin: 0 0;
+
+  /* Keep the surface on its own layer with an opacity hint, since a transform hint leaves text blurry after a zoom */
+  will-change: opacity;
 }
 
-/* Give the surface its own layer while a gesture runs, so a scale repaints nothing else */
-#surface.gesturing {
-  will-change: transform;
+/* The open folder's cards, stacked apart from the parent's cards drawn around them */
+.level {
+  position: absolute;
+  top: 0;
+  left: 0;
+  isolation: isolate;
+}
+
+/* The parent folder's cards around the open one, mapped into its coordinates */
+.context {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+
+/* Hide the open folder's preview in the parent, since the live cards take its place. An empty folder keeps its glyph */
+.card.open-folder > .folder-preview:not(.empty) {
+  /* Hide it with opacity, since visibility restyles every copy inside whenever the card takes or drops the class */
+  opacity: 0;
 }
 
 .card {
+  --ps-rest-border: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   position: absolute;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   padding: 12px 14px;
-  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+  border: 1px solid var(--ps-rest-border);
   border-radius: 6px;
   background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
+  transition: border-color 150ms;
   cursor: grab;
   overflow: hidden;
   user-select: none;
 }
 
-.card:hover,
-.card:focus-within {
+/* Show the hover and focus border only while the view is still, since the preview copies have none. A colored card
+   keeps its own border */
+#surface:not(.gesturing) .card:not(.opening):not(.colored):hover,
+#surface:not(.gesturing) .card:not(.opening):not(.colored):focus-within {
   border-color: var(--vscode-focusBorder);
+}
+
+/* Drop to the resting style the moment a gesture starts, hiding the caret, selection, and cursors the preview copies
+   lack */
+#surface.gesturing .card,
+.card.opening {
+  transition: none;
+}
+
+#surface.gesturing .note-text {
+  caret-color: transparent;
+  cursor: inherit;
+}
+
+#surface.gesturing .note-text::selection {
+  background: transparent;
+}
+
+#surface.gesturing .resize-handle {
+  cursor: inherit;
 }
 
 .card.dragging {
@@ -128,31 +180,37 @@ body {
   opacity: 0;
 }
 
-.card:hover .resize-handle {
+#surface:not(.gesturing) .card:not(.opening):hover .resize-handle {
   opacity: 0.7;
 }
 
-.card .resize-handle:hover {
+#surface:not(.gesturing) .card:not(.opening) .resize-handle:hover {
   opacity: 1;
 }
 
-.card .title {
+.card .title,
+.folder-preview .mini-title {
   display: flex;
   align-items: center;
   gap: 6px;
+
+  /* Pin the row to the taller of the icon and the font's line, since a taller fallback glyph would push the preview down */
+  height: max(16px, 1lh);
   margin-bottom: 8px;
   font-weight: 600;
   overflow: hidden;
   flex-shrink: 0;
 }
 
-.card .title .label {
+.card .title .label,
+.folder-preview .mini-title .mini-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.card .title .codicon {
+.card .title .codicon,
+.folder-preview .mini-title .codicon {
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
   flex-shrink: 0;
 }
@@ -170,7 +228,8 @@ body {
   line-height: 1.4;
 }
 
-.card .preview.empty {
+.card .preview.empty,
+.mini-preview.empty {
   font-style: italic;
   opacity: 0.7;
 }
@@ -187,7 +246,10 @@ body {
   resize: none;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+
+  /* Keep the scrollbar's room whether or not the note overflows, and paint the thumb only where the rules below ask */
+  scrollbar-gutter: stable;
+  scrollbar-color: transparent transparent;
   background: transparent;
   color: var(--vscode-foreground);
   font-size: 12px;
@@ -199,7 +261,10 @@ body {
 .card .folder-preview {
   position: relative;
   flex: 1;
-  overflow: hidden;
+
+  /* Clip without turning into a scroller, leaving the cards inside room for their shadows within the card's padding */
+  overflow: clip;
+  overflow-clip-margin: 12px;
 }
 
 .card .folder-preview.empty {
@@ -207,11 +272,23 @@ body {
   align-items: center;
   justify-content: center;
   color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  opacity: 0.5;
+  --ps-empty-glyph-opacity: 0.5;
+  opacity: var(--ps-empty-glyph-opacity);
 }
 
 .card .folder-preview.empty .codicon {
   font-size: 42px;
+}
+
+/* Fade in preview content that arrived after its card was drawn */
+.folder-preview.late-content {
+  animation: late-content-fade 150ms ease-out;
+}
+
+@keyframes late-content-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 .folder-preview .mini-surface {
@@ -221,7 +298,20 @@ body {
   transform-origin: top left;
 }
 
+/* How many nesting levels a folder card's preview copies shift, from 1 as the card opens to -1 as the canvas leaves
+   for the parent */
+@property --ps-level-shift {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 .mini-card {
+  --ps-level: 1;
+  --ps-depth: calc(var(--ps-level) - var(--ps-level-shift));
+
+  /* Lighten one step per level past the first, sliding between steps as the canvas moves */
+  --ps-mini-lighten: calc(clamp(0, var(--ps-depth) - 1, 2) * 14%);
   position: absolute;
   display: flex;
   flex-direction: column;
@@ -230,47 +320,28 @@ body {
   border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   border-radius: 6px;
 
+  /* Give only the first level a live card's shadow */
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3)) calc(clamp(0, 2 - var(--ps-depth), 1) * 100%), transparent);
+
   /* Keep the fill and text neutral inside a colored folder */
   color: var(--vscode-foreground);
-  background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten, 0%), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
+  background-color: color-mix(in srgb, var(--vscode-foreground) var(--ps-mini-lighten), var(--vscode-editorWidget-background, var(--vscode-editor-background)));
   overflow: hidden;
+
+  /* Fade the deepest level out as the canvas leaves a folder, since the parent's preview of it stops a level sooner */
+  opacity: clamp(0, 4 - var(--ps-depth), 1);
 }
 
-/* Give the top level of preview cards a real card's shadow, since a zoom lands on them */
-.card > .folder-preview > .mini-surface > .mini-card {
-  box-shadow: 0 2px 6px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
-}
-
+/* Number the levels down to PREVIEW_DEPTH in cardBuilders.js. The 4 in the .mini-card opacity is PREVIEW_DEPTH + 1 */
 .mini-card .mini-card {
-  --ps-mini-lighten: 14%;
+  --ps-level: 2;
 }
 
 .mini-card .mini-card .mini-card {
-  --ps-mini-lighten: 28%;
+  --ps-level: 3;
 }
 
-.folder-preview .mini-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-  font-weight: 600;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.folder-preview .mini-title .codicon {
-  color: var(--vscode-icon-foreground, var(--vscode-foreground));
-  flex-shrink: 0;
-}
-
-.folder-preview .mini-title .mini-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.folder-preview .mini-preview {
+.mini-preview {
   flex: 1;
   white-space: pre-wrap;
   overflow: hidden;
@@ -280,9 +351,30 @@ body {
   line-height: 1.4;
 }
 
-.folder-preview .mini-preview.empty {
-  font-style: italic;
-  opacity: 0.7;
+/* Match the live text field while the cards are editable, keeping its scrollbar's room as padding */
+.editing .mini-preview {
+  box-sizing: border-box;
+  margin: 0 -14px 0 0;
+  padding: 0 calc(14px + var(--ps-field-gutter, 10px)) 0 0;
+  overflow: auto;
+  overflow-wrap: break-word;
+  scrollbar-width: none;
+  color: var(--vscode-foreground);
+}
+
+/* Stand in for a card and its text field while the title row and the scrollbar are measured */
+.metrics-probe {
+  visibility: hidden;
+}
+
+/* Reserve a scrollbar's room the way the text field does, so its width can be measured */
+.gutter-probe {
+  position: absolute;
+  width: 100px;
+  height: 10px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
 }
 
 /* Hold the readout at one width, so the zoom buttons stay put as the number changes */
@@ -300,6 +392,15 @@ body {
   justify-content: center;
   color: var(--vscode-descriptionForeground);
   pointer-events: none;
+
+  /* Fade the message in when it first appears */
+  transition: opacity 250ms;
+}
+
+@starting-style {
+  #empty {
+    opacity: 0;
+  }
 }
 
 #empty.hidden {
@@ -308,8 +409,9 @@ body {
 
 .card.colored,
 .mini-card.colored {
+  --ps-rest-border: rgba(0, 0, 0, 0.2);
   color: #1f1f1f;
-  border-color: rgba(0, 0, 0, 0.2);
+  border-color: var(--ps-rest-border);
 }
 
 .card.colored {
@@ -318,7 +420,7 @@ body {
 
 /* Lighten toward white, one step per nesting level */
 .mini-card.colored {
-  background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten, 0%), var(--ps-fill));
+  background-color: color-mix(in srgb, #ffffff var(--ps-mini-lighten), var(--ps-fill));
 }
 
 /* Darken the icon and preview text inside a colored card */
@@ -326,12 +428,18 @@ body {
 .card.colored > .preview,
 .card.colored > .note-text,
 .mini-card.colored > .mini-title > .codicon,
-.mini-card.colored > .mini-preview {
+.colored > .mini-preview {
   color: #3a3a3a;
 }
 
-/* Tint the text field's scrollbar with the card's accent color */
-.card.colored > .note-text {
+/* Show the thumb on a card being pointed at or typed into, tinted with its accent color */
+#surface:not(.gesturing) .card:not(.opening):hover > .note-text,
+#surface:not(.gesturing) .card > .note-text:focus {
+  scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+}
+
+#surface:not(.gesturing) .card.colored:not(.opening):hover > .note-text,
+#surface:not(.gesturing) .card.colored > .note-text:focus {
   scrollbar-color: var(--ps-accent) transparent;
 }
 
@@ -346,13 +454,19 @@ body {
   initial-value: 0;
 }
 
-/* Fade the card's own paint out as the canvas comes through, leaving the surface underneath */
+/* Fade the card's own paint out as the canvas comes through, down to nothing so only the fade layer is left */
 .card.opening {
-  background-color: color-mix(in srgb, var(--vscode-editorWidget-background, var(--vscode-editor-background)) calc(100% - var(--ps-open-progress) * 100%), var(--vscode-editor-background));
-  border-color: color-mix(in srgb, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)) calc(100% - var(--ps-open-progress) * 100%), transparent);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3)) calc(100% - var(--ps-open-progress) * 100%), transparent);
+  --ps-rest-fill: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  background-color: color-mix(in srgb, var(--ps-rest-fill) calc((1 - var(--ps-open-progress)) * 100%), transparent);
+  border-color: color-mix(in srgb, var(--ps-rest-border) calc((1 - var(--ps-open-progress)) * 100%), transparent);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3)) calc((1 - var(--ps-open-progress)) * 100%), transparent);
 }
 
 .card.colored.opening {
-  background-color: color-mix(in srgb, var(--ps-fill) calc(100% - var(--ps-open-progress) * 80%), var(--vscode-editor-background));
+  --ps-rest-fill: var(--ps-fill);
+}
+
+/* Fade the empty-folder glyph out with its card, using the progress lookPainter.js sets on the preview */
+.card.opening > .folder-preview.empty {
+  opacity: calc(var(--ps-empty-glyph-opacity) * (1 - var(--ps-open-progress)));
 }

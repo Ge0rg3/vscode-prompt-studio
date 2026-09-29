@@ -1,10 +1,11 @@
-// Renders the card canvas, edits note text in place, and posts moves, colors, and commands back to the host
+// Wires the canvas page together, with card drags, updates from the host, the bottom bar, and the saved view
 (function () {
   const vscode = acquireVsCodeApi();
 
   const breadcrumbsEl = document.getElementById('breadcrumbs');
   const surfaceEl = document.getElementById('surface');
   const emptyEl = document.getElementById('empty');
+  const emptyLabelEl = document.getElementById('empty-label');
   const menuEl = document.getElementById('context-menu');
   const canvasEl = document.getElementById('canvas');
   const fadeEl = document.getElementById('fade');
@@ -14,89 +15,97 @@
   const zoomInEl = document.getElementById('zoom-in');
   const zoomFitEl = document.getElementById('zoom-fit');
 
-  const DEFAULT_CARD_WIDTH = 240;
-  const DEFAULT_CARD_HEIGHT = 170;
   const MIN_CARD_WIDTH = 160;
   const MIN_CARD_HEIGHT = 100;
   const DRAG_THRESHOLD = 3;
   const VIEW_SAVE_DEBOUNCE_MS = 300;
 
-  const EMPTY_NOTE_LABEL = '(empty)';
   const CARD_COLORS = JSON.parse(document.body.dataset.cardColors || '[]');
   const ALLOW_CRUD = document.body.dataset.allowCrud === 'true';
-
-  let state = null;
-  let cards = [];
-  let cardEls = new Map();
-  let unmeasuredPreviews = [];
-  let activePreview = null;
-  let noteView = window.PromptStudioNoteOpen.INITIAL_NOTE_VIEW;
 
   // A canvas opens with its cards editable, and remembers the toggle from there
   let isEditMode = true;
 
-  // Hold a state push that lands mid-edit, so the field under the caret survives
-  let pendingState = null;
+  // The edit mode the drawn cards use, catching up with the toggle when the cards are rebuilt with the view still
+  let isDrawnInEditMode = true;
+
+  // The number on the last navigate message, taken from the host's first state so a reloaded page keeps counting
+  let lastNavigateNumber = 0;
 
   // The percentage the bar last showed, so an unchanged frame writes nothing
   let shownZoomPercent = 0;
-
-  // The folder card fading into the canvas, its title, and the color on the fade layer
-  let openingCardEl = null;
-  let openingTitleEl = null;
-  let shownFadeColor = null;
 
   // The view a reload has to come back to
   let restoredView = null;
 
   let viewSaveTimer;
 
-  const { create: createContextMenu, COPY_PATH_ITEM } = window.PromptStudioContextMenu;
-  const { applyTint } = window.PromptStudioPalette;
-  const { alternateOpen } = window.PromptStudioNoteOpen;
-  const { create: createViewport, boundsOf, rectOf } = window.PromptStudioViewport;
+  const { create: createViewport } = window.PromptStudioViewport;
+  const { create: createCardBuilders } = window.PromptStudioCardBuilders;
+  const { create: createLevels, levelDataOf, parentDataOf } = window.PromptStudioLevels;
+  const { create: createLookPainter } = window.PromptStudioLookPainter;
+  const { create: createAncestors } = window.PromptStudioAncestors;
   const { create: createFolderZoom } = window.PromptStudioFolderZoom;
   const { create: createNoteEditing } = window.PromptStudioNoteEditing;
+  const { create: createHeldStates } = window.PromptStudioHeldStates;
+  const { create: createColors } = window.PromptStudioColors;
+  const { create: createMenus, serialize } = window.PromptStudioMenus;
 
-  // Build the context menu shared by the cards and the background
-  const menu = createContextMenu(menuEl, (command, node) => postAfterSave({ type: 'command', command, node: serialize(node) }), CARD_COLORS);
-
-  const viewport = createViewport(canvasEl, surfaceEl, onViewChange);
-  const folderZoom = createFolderZoom(viewport, canvasEl, () => ({ state, cards, cardEls }), navigateTo);
+  // Move the view over the surface, handing every frame to onFrame before it is drawn
+  const camera = createViewport(canvasEl, surfaceEl, onFrame);
 
   // Own the text fields on the cards, writing what is typed into them back through the host
   const editing = createNoteEditing(
     (absPath, text) => {
       // Any state waiting to be drawn was read before this write, so it holds the older text
-      pendingState = null;
+      heldStates.drop();
+      levels.markMirrorStale();
       vscode.postMessage({ type: 'saveNote', path: absPath, text });
     },
 
     // Let the click that moved focus land before a held-back state redraws the cards
-    () => setTimeout(applyPendingState, 0)
+    () => setTimeout(() => heldStates.applyAtRest(), 0)
   );
+
+  // Build the cards and previews in the drawn edit mode, showing any swatch being hovered.
+  // Work out the fades again after a late preview fades in, since its folder card can open then
+  const cardBuilders = createCardBuilders(editing.buildField, () => isDrawnInEditMode, displayColorOf, refreshLook);
+
+  // Keep the open folder's cards live with the parent drawn around them, and paint the fades between the two
+  const levels = createLevels(surfaceEl, cardBuilders, attachCardHandlers, displayColorOf);
+  const painter = createLookPainter(canvasEl, fadeEl, emptyEl, emptyLabelEl, levels, displayColorOf);
+
+  // Color the drawn cards, and build the right-click menus with their swatches
+  const colors = createColors(levels, (message) => vscode.postMessage(message), repaint);
+  const menus = createMenus(
+    menuEl,
+    CARD_COLORS,
+    ALLOW_CRUD,
+    camera,
+    levels,
+    colors,
+    postAfterSave,
+    (message) => vscode.postMessage(message)
+  );
+
+  // Move between the two levels as the view zooms, keeping the folders above the open one to draw the parent from
+  const ancestors = createAncestors(levels, takeEditMode);
+  const folderZoom = createFolderZoom(camera, levels, ancestors, releaseEdits, onLevelEnter);
+
+  // Hold back host states that would redraw the open folder's cards while the view moves or a card is in use
+  const heldStates = createHeldStates(levels, ancestors, folderZoom, editing, refreshLook);
 
   // --- helpers ---
 
-  // Take the folder a state is showing
-  function folderOf(shownState) {
-    return shownState.breadcrumbs[shownState.breadcrumbs.length - 1].path;
-  }
-
-  // Tint the canvas background with the open folder's color
-  function applyFolderTint(color) {
-    applyTint(canvasEl, color, 'surface-tinted');
-  }
-
-  // Set the color classes on a card element
-  function applyCardColor(el, color) {
-    applyTint(el, color, 'colored');
+  // Take the color a path is drawn in from the colors, which are built after the cards that ask for it
+  function displayColorOf(absPath, savedColor) {
+    return colors.displayColorOf(absPath, savedColor);
   }
 
   // Raise a card above every other so the most recently dragged one stays on top
   function bringToFront(card, el) {
     let topZ = 0;
-    for (const other of cards) {
+    for (const other of levels.liveLevel().data.cards) {
       if (typeof other.z === 'number') {
         topZ = Math.max(topZ, other.z);
       }
@@ -105,22 +114,61 @@
     el.style.zIndex = String(card.z);
   }
 
-  // Fill an element with a note's text, standing a word in for an empty one
-  function fillNoteText(el, baseClass, text) {
-    const noteText = text || '';
-    const isEmpty = !noteText.trim();
-    el.className = isEmpty ? `${baseClass} empty` : baseClass;
-    el.textContent = isEmpty ? EMPTY_NOTE_LABEL : noteText;
-  }
-
   // Check whether a pointerdown landed on the element's scrollbar
   function isScrollbarPress(event) {
     const target = event.target;
     return event.offsetX > target.clientWidth || event.offsetY > target.clientHeight;
   }
 
+  // Follow a press on a card until it ends, however it ends, running onEnd(isRelease) once.
+  // The level stays still meanwhile, since a level change would move the card's element away
+  function trackCardPress(el, pointerId, onMove, onEnd) {
+    let isPressed = true;
+    el.setPointerCapture(pointerId);
+    folderZoom.setCardHeld(true);
+
+    const endPress = (isRelease) => {
+      if (!isPressed) {
+        return;
+      }
+
+      isPressed = false;
+      el.releasePointerCapture(pointerId);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onRelease);
+      el.removeEventListener('pointercancel', onPressCancel);
+      el.removeEventListener('lostpointercapture', onPressCancel);
+      onEnd(isRelease);
+    };
+    const onRelease = () => endPress(true);
+    const onPressCancel = () => endPress(false);
+
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onRelease);
+    el.addEventListener('pointercancel', onPressCancel);
+    el.addEventListener('lostpointercapture', onPressCancel);
+  }
+
+  // Let the level change again once a drag or resize lets go, then draw any state held back.
+  // Keep that state, since the host sends no new one after a move or a resize
+  function endInteraction(card, hasMoved) {
+    folderZoom.setCardHeld(false);
+    if (hasMoved) {
+      heldStates.rememberMovedCard(card.absPath);
+      levels.relayout();
+    }
+    refreshLook();
+    heldStates.applyAtRest();
+  }
+
   // Drag a card to a new spot, or run onClick when the pointer barely moved
   function attachDrag(el, card, onClick) {
+    // The click count of the latest press, carried only by its mouse events
+    let pressCount = 1;
+    el.addEventListener('mousedown', (event) => {
+      pressCount = event.detail;
+    });
+
     el.addEventListener('pointerdown', (event) => {
       if (event.button !== 0 || event.target.classList.contains('note-text')) {
         return;
@@ -136,10 +184,12 @@
       const originX = card.x;
       const originY = card.y;
 
+      // Count a press that sends no mouse events, such as a tap, as a single click
+      pressCount = 1;
+
       // Hold the grab in surface coordinates, so a pan or a zoom mid-drag cannot shift the card
-      const grabPoint = viewport.toSurface(event.clientX, event.clientY);
+      const grabPoint = camera.toSurface(event.clientX, event.clientY);
       let dragging = false;
-      el.setPointerCapture(event.pointerId);
 
       // Follow the pointer once it has moved past the drag threshold
       const onMove = (move) => {
@@ -149,7 +199,7 @@
           bringToFront(card, el);
         }
         if (dragging) {
-          const point = viewport.toSurface(move.clientX, move.clientY);
+          const point = camera.toSurface(move.clientX, move.clientY);
           card.x = Math.round(originX + point.x - grabPoint.x);
           card.y = Math.round(originY + point.y - grabPoint.y);
           el.style.left = card.x + 'px';
@@ -157,32 +207,24 @@
         }
       };
 
-      // Save the new position on release, or run onClick when nothing moved
-      const onUp = () => {
-        el.releasePointerCapture(event.pointerId);
-        el.removeEventListener('pointermove', onMove);
-        el.removeEventListener('pointerup', onUp);
-        el.removeEventListener('pointercancel', onUp);
+      // Save a drag, or run onClick for a single click that barely moved
+      const onEnd = (isRelease) => {
+        endInteraction(card, dragging);
         if (dragging) {
           el.classList.remove('dragging');
           vscode.postMessage({ type: 'moveCard', path: card.absPath, x: card.x, y: card.y, z: card.z });
-        } else {
+        } else if (isRelease && pressCount < 2) {
           onClick(pressedEl);
         }
       };
 
-      el.addEventListener('pointermove', onMove);
-      el.addEventListener('pointerup', onUp);
-      el.addEventListener('pointercancel', onUp);
+      trackCardPress(el, event.pointerId, onMove, onEnd);
     });
   }
 
-  // Drag the corner handle to resize the card
+  // Drag the corner handle to resize the card, scaling a folder card's preview along with it
   function attachResize(el, card) {
-    const handle = document.createElement('div');
-    handle.className = 'resize-handle';
-    el.appendChild(handle);
-
+    const handle = el.querySelector(':scope > .resize-handle');
     handle.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) {
         return;
@@ -191,30 +233,25 @@
       event.stopPropagation();
       const originWidth = card.width;
       const originHeight = card.height;
-      const grabPoint = viewport.toSurface(event.clientX, event.clientY);
-      handle.setPointerCapture(event.pointerId);
+      const grabPoint = camera.toSurface(event.clientX, event.clientY);
 
       // Resize the card as the pointer moves, measured on the surface rather than the screen
       const onMove = (move) => {
-        const point = viewport.toSurface(move.clientX, move.clientY);
+        const point = camera.toSurface(move.clientX, move.clientY);
         card.width = Math.max(MIN_CARD_WIDTH, Math.round(originWidth + point.x - grabPoint.x));
         card.height = Math.max(MIN_CARD_HEIGHT, Math.round(originHeight + point.y - grabPoint.y));
         el.style.width = card.width + 'px';
         el.style.height = card.height + 'px';
+        cardBuilders.rescalePreview(el);
       };
 
-      // Save the new size on release
-      const onUp = () => {
-        handle.releasePointerCapture(event.pointerId);
-        handle.removeEventListener('pointermove', onMove);
-        handle.removeEventListener('pointerup', onUp);
-        handle.removeEventListener('pointercancel', onUp);
+      // Save the new size once the press ends, however it ends
+      const onEnd = () => {
+        endInteraction(card, card.width !== originWidth || card.height !== originHeight);
         vscode.postMessage({ type: 'resizeCard', path: card.absPath, width: card.width, height: card.height });
       };
 
-      handle.addEventListener('pointermove', onMove);
-      handle.addEventListener('pointerup', onUp);
-      handle.addEventListener('pointercancel', onUp);
+      trackCardPress(handle, event.pointerId, onMove, onEnd);
     });
   }
 
@@ -226,193 +263,40 @@
     vscode.postMessage(message);
   }
 
-  // Draw a state that was held back while a card was being typed into
-  function applyPendingState() {
-    if (!pendingState || editing.isEditing()) {
-      return;
-    }
-
-    const next = pendingState;
-    pendingState = null;
-    render(next);
+  // Write what was typed and take the caret off its field before the level changes.
+  // The host refuses saves for notes outside its folder
+  function releaseEdits() {
+    editing.flush();
+    editing.blurActiveField();
+    heldStates.drop();
   }
 
-  // --- card builders ---
+  // --- card handlers ---
 
-  // Build the card shell shared by notes and folders, placed at its saved spot
-  function baseCard(card, iconName) {
-    const el = document.createElement('div');
-    el.className = 'card';
-    el.style.left = card.x + 'px';
-    el.style.top = card.y + 'px';
-    el.style.width = card.width + 'px';
-    el.style.height = card.height + 'px';
-    if (typeof card.z === 'number') {
-      el.style.zIndex = String(card.z);
-    }
-
-    const title = document.createElement('div');
-    title.className = 'title';
-
-    const icon = document.createElement('span');
-    icon.className = 'codicon ' + iconName;
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = card.title;
-    title.appendChild(icon);
-    title.appendChild(label);
-    el.appendChild(title);
-
+  // Wire up a live card's drag, resize, menu, and click
+  function attachCardHandlers(el, card) {
     el.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      menu.show(event.clientX, event.clientY, menuFor(card), card);
+      menus.showCardMenu(event, card);
     });
 
-    return el;
-  }
-
-  // Draw the note as it sits on disk, headings and all, so nothing shifts when a card is zoomed into
-  function notePreview(card) {
-    const preview = document.createElement('pre');
-    fillNoteText(preview, 'preview', card.text);
-    return preview;
-  }
-
-  // Build a note card, editable in place while the bar's Edit toggle is on
-  function noteCard(card) {
-    const el = baseCard(card, 'codicon-note');
-    applyCardColor(el, card.color);
-    el.appendChild(isEditMode ? editing.buildField(card) : notePreview(card));
-
-    // The title row opens the note in either mode, the body takes the caret while editing
-    attachDrag(el, card, (pressedEl) => {
-      if (isEditMode && !pressedEl.closest('.title')) {
-        return;
-      }
-
-      postAfterSave({ type: 'openNote', node: serialize(card) });
-    });
-    attachResize(el, card);
-    return el;
-  }
-
-  // Build a copy of one child card for a folder preview, with no dragging or menus
-  function miniCard(child, bounds) {
-    const el = document.createElement('div');
-    el.className = 'mini-card';
-    el.style.left = (child.x - bounds.left) + 'px';
-    el.style.top = (child.y - bounds.top) + 'px';
-    el.style.width = child.width + 'px';
-    el.style.height = child.height + 'px';
-    applyCardColor(el, child.color);
-
-    const title = document.createElement('div');
-    title.className = 'mini-title';
-    const icon = document.createElement('span');
-    icon.className = 'codicon ' + (child.kind === 'folder' ? 'codicon-folder' : 'codicon-note');
-    const label = document.createElement('span');
-    label.className = 'mini-label';
-    label.textContent = child.title;
-    title.appendChild(icon);
-    title.appendChild(label);
-    el.appendChild(title);
-
-    if (child.kind === 'note') {
-      const preview = document.createElement('div');
-      fillNoteText(preview, 'mini-preview', child.text);
-      el.appendChild(preview);
+    if (card.kind === 'folder') {
+      attachDrag(el, card, () => openFolderCard(card.absPath));
     } else {
-      el.appendChild(folderPreview(child.children || [], child.width, child.height));
+      // The title row opens the note in either mode, the body takes the caret while editing
+      attachDrag(el, card, (pressedEl) => {
+        if (isDrawnInEditMode && !pressedEl.closest('.title')) {
+          return;
+        }
+
+        postAfterSave({ type: 'openNote', node: serialize(card) });
+      });
     }
-    return el;
-  }
-
-  // Draw the children at their real canvas positions
-  function folderPreview(children, containerWidth, containerHeight) {
-    const previewBox = document.createElement('div');
-    previewBox.className = 'folder-preview';
-    if (!children.length) {
-      previewBox.classList.add('empty');
-      const glyph = document.createElement('span');
-      glyph.className = 'codicon codicon-folder';
-      previewBox.appendChild(glyph);
-      return previewBox;
-    }
-
-    // Frame the box the children fill, since a card can sit above or left of the canvas origin
-    const bounds = boundsOf(children);
-    const miniSurface = document.createElement('div');
-    miniSurface.className = 'mini-surface';
-    miniSurface.style.width = bounds.width + 'px';
-    miniSurface.style.height = bounds.height + 'px';
-
-    // Record the canvas point the preview starts at, so a zoom into the card can line the cards up
-    miniSurface.dataset.originX = String(bounds.left);
-    miniSurface.dataset.originY = String(bounds.top);
-    for (const child of children) {
-      miniSurface.appendChild(miniCard(child, bounds));
-    }
-    previewBox.appendChild(miniSurface);
-
-    unmeasuredPreviews.push({
-      previewBox,
-      miniSurface,
-      canvasWidth: bounds.width,
-      canvasHeight: bounds.height,
-      containerWidth,
-      containerHeight
-    });
-    return previewBox;
-  }
-
-  // Build a folder card with a small preview of its contents, opening the folder when clicked
-  function folderCard(card) {
-    const el = baseCard(card, 'codicon-folder');
-    applyCardColor(el, card.color);
-    el.appendChild(folderPreview(card.children || [], card.width, card.height));
-
-    attachDrag(el, card, () => navigateTo(card.absPath));
     attachResize(el, card);
-    return el;
   }
 
   // --- rendering ---
-
-  // Scale a preview against the default card size, so a bigger card reveals more of it
-  function measurePreview(preview) {
-    // A panel in a background tab has no layout, so there is nothing to measure yet
-    if (!preview.previewBox.clientWidth || !preview.previewBox.clientHeight) {
-      return false;
-    }
-
-    const boxWidth = preview.previewBox.clientWidth - (preview.containerWidth - DEFAULT_CARD_WIDTH);
-    const boxHeight = preview.previewBox.clientHeight - (preview.containerHeight - DEFAULT_CARD_HEIGHT);
-    if (boxWidth <= 0 || boxHeight <= 0) {
-      return false;
-    }
-
-    const scale = Math.min(boxWidth / preview.canvasWidth, boxHeight / preview.canvasHeight);
-    preview.miniSurface.style.transform = `scale(${scale})`;
-    return true;
-  }
-
-  // Scale every preview now the cards are laid out, waiting on the ones with no size yet
-  function measurePreviews() {
-    for (const preview of unmeasuredPreviews) {
-      if (measurePreview(preview)) {
-        continue;
-      }
-
-      const observer = new ResizeObserver(() => {
-        if (measurePreview(preview)) {
-          observer.disconnect();
-        }
-      });
-      observer.observe(preview.previewBox);
-    }
-    unmeasuredPreviews = [];
-  }
 
   // Draw the breadcrumb trail, every crumb but the last one navigates on click
   function renderBreadcrumbs(crumbs) {
@@ -431,120 +315,173 @@
       el.textContent = crumb.name;
       el.title = crumb.path;
       if (!isCurrent) {
-        el.addEventListener('click', () => navigateTo(crumb.path));
+        const isParent = index === crumbs.length - 2;
+        el.addEventListener('click', () => openCrumb(crumb.path, isParent));
       }
       breadcrumbsEl.appendChild(el);
     }
   }
 
-  // Redraw the whole canvas from a new state
-  function render(next) {
-    const isSameFolder = Boolean(state) && folderOf(next) === folderOf(state);
-
-    // Swap the new state in
-    editing.onCardsReplaced();
-    state = next;
-    cards = state.cards;
-    cardEls = new Map();
-    unmeasuredPreviews = [];
-
-    // Draw the trail and the surface the cards go on
-    renderBreadcrumbs(state.breadcrumbs);
-    applyFolderTint(state.folderColor);
-    surfaceEl.replaceChildren();
-    emptyEl.classList.toggle('hidden', cards.length > 0);
-    for (const card of cards) {
-      const el = card.kind === 'folder' ? folderCard(card) : noteCard(card);
-      cardEls.set(card.absPath, el);
-      surfaceEl.appendChild(el);
-    }
-
-    measurePreviews();
-
-    // Place the view this folder comes back to
-    const restored = restoredView;
-    restoredView = null;
-    folderZoom.placeView(folderOf(state), isSameFolder, restored);
-    reapplyPreview();
-    saveViewState();
+  // Draw the fades the folder zoom last worked out
+  function repaint() {
+    painter.paint(folderZoom.currentLook());
   }
 
-  // --- moving between folders ---
-
-  // Fade the canvas toward the folder the zoom is closing in on
-  function paintFade(fade) {
-    const opening = fade && fade.absPath ? cardEls.get(fade.absPath) : null;
-    if (openingCardEl !== opening) {
-      if (openingCardEl) {
-        openingCardEl.classList.remove('opening');
-        openingCardEl.style.removeProperty('--ps-open-progress');
-        openingTitleEl.style.opacity = '';
-      }
-
-      openingCardEl = opening;
-      openingTitleEl = opening ? opening.querySelector('.title') : null;
-      if (opening) {
-        opening.classList.add('opening');
-      }
-    }
-
-    if (!fade) {
-      fadeEl.style.opacity = '0';
-      return;
-    }
-
-    const color = fade.color || null;
-    if (color !== shownFadeColor) {
-      shownFadeColor = color;
-      applyTint(fadeEl, color, 'tinted');
-    }
-
-    fadeEl.style.opacity = String(fade.progress);
-    if (openingCardEl) {
-      openingCardEl.style.setProperty('--ps-open-progress', String(fade.progress));
-      openingTitleEl.style.opacity = String(1 - fade.progress);
-    }
+  // Work out and draw the fades and the zoom readout outside a camera frame, since a level change shifts the zoom
+  function refreshLook() {
+    folderZoom.refresh();
+    repaint();
+    showZoomReadout();
   }
 
-  // Report every pan and zoom to the bar, the saved view, and the folder zoom
-  function onViewChange(zoom, isGesture, anchor) {
-    const percent = Math.round(zoom * 100);
+  // Show the live level's zoom on the bar, where 100% is its actual size
+  function showZoomReadout() {
+    const percent = Math.round(camera.getView().zoom * 100);
     if (percent !== shownZoomPercent) {
       shownZoomPercent = percent;
       zoomLevelEl.textContent = `${percent}%`;
     }
+  }
 
-    if (isGesture && !menuEl.classList.contains('hidden')) {
-      menu.hide();
+  // Place the view over a folder the host opened, back where a reload left it or fitted to its cards
+  function placeView(folder) {
+    const restored = restoredView && restoredView.folder === folder ? restoredView : null;
+    restoredView = null;
+    if (restored) {
+      if (restored.gates) {
+        folderZoom.keepGatesForNextCut(restored.gates);
+      }
+      camera.setView(restored.zoom, restored.panX, restored.panY);
+      return;
     }
-    if (state) {
+
+    const view = folderZoom.fitLiveView();
+    camera.setView(view.zoom, view.panX, view.panY);
+  }
+
+  // --- moving between folders ---
+
+  // Hand each camera frame to the folder zoom, then draw the fades, the readout, and the saved view from it
+  function onFrame(frame) {
+    if (frame.kind === 'input' || frame.kind === 'flight') {
+      menus.hideMenu();
+    }
+
+    // Redraw from a held state on the first frame the camera rests on
+    heldStates.applyInFrame();
+
+    // Let the folder zoom move between levels, then draw the fades, the readout, and the saved view
+    const shouldRequestFrame = folderZoom.onFrame(frame);
+    repaint();
+    showZoomReadout();
+    if (levels.liveLevel()) {
       queueViewSave();
     }
 
-    paintFade(folderZoom.onViewChanged(zoom, isGesture, anchor));
+    // Ask for one more frame when this one ended a scripted move that a held state was waiting on
+    return shouldRequestFrame || heldStates.isDue();
   }
 
-  // Ask the host for a different folder, writing anything typed first
+  // Tell the host which folder is open, numbered so a state answering an older navigate can be told apart
+  function postNavigate(folder, fromFolder) {
+    lastNavigateNumber += 1;
+    vscode.postMessage({ type: 'navigate', folder, fromFolder, navigateNumber: lastNavigateNumber });
+  }
+
+  // Follow a level change the zoom made on its own, on the trail and in the host
+  function onLevelEnter(fromFolder) {
+    const live = levels.liveLevel();
+    renderBreadcrumbs(live.crumbs);
+    postNavigate(live.data.folder, fromFolder);
+    queueViewSave();
+  }
+
+  // Ask the host for another folder, and swap to it without animation when it answers
   function navigateTo(folder) {
-    pendingState = null;
-    postAfterSave({ type: 'navigate', folder });
+    releaseEdits();
+    postNavigate(folder, levels.liveLevel().data.folder);
+  }
+
+  // Open a folder card with a flight into it, or through the host when it cannot open in place
+  function openFolderCard(absPath) {
+    if (folderZoom.flyIntoCard(absPath)) {
+      refreshLook();
+    } else {
+      navigateTo(absPath);
+    }
+  }
+
+  // Fly out to the parent from its crumb, and go through the host for any other crumb or a parent not drawn yet
+  function openCrumb(folder, isParent) {
+    if (isParent && folderZoom.flyToParent()) {
+      refreshLook();
+    } else {
+      navigateTo(folder);
+    }
+  }
+
+  // --- host states ---
+
+  // Pick the parent to draw around another folder, reusing the live level when the new folder is one of its cards,
+  // since the host leaves that level out
+  function jumpParentOf(next) {
+    const live = levels.liveLevel();
+    const crumbs = next.breadcrumbs;
+    const isIntoLiveFolder = live !== null && crumbs.length > 1 && crumbs[crumbs.length - 2].path === live.data.folder;
+    return !next.parent && isIntoLiveFolder ? live.data : parentDataOf(next);
+  }
+
+  // Draw a state for another folder with no animation, its parent around it and the view placed afresh
+  function showState(next) {
+    releaseEdits();
+    renderBreadcrumbs(next.breadcrumbs);
+
+    // Measure once the trail is drawn and before the cards change, so only the trail is laid out
+    camera.measureView();
+    const data = levelDataOf(next);
+    ancestors.showLevel(data, next.breadcrumbs, jumpParentOf(next));
+    placeView(data.folder);
+    colors.reapplyPreview();
+    saveViewState();
+  }
+
+  // Take a state from the host, drawing another folder, updating the open one, or dropping it when a newer navigate
+  // overtook it
+  function receiveState(next, navigateNumber) {
+    const live = levels.liveLevel();
+    if (!live) {
+      lastNavigateNumber = navigateNumber;
+      showState(next);
+      return;
+    }
+    if (navigateNumber < lastNavigateNumber) {
+      return;
+    }
+
+    if (levelDataOf(next).folder === live.data.folder) {
+      heldStates.confirm(next);
+    } else {
+      showState(next);
+    }
   }
 
   // --- saving and restoring the view ---
 
-  // Remember the folder, the view over it, and the edit mode, so a window reload comes back to them
+  // Remember the folder, the view over it, its fades, and the edit mode, so a window reload comes back to them
   function saveViewState() {
     clearTimeout(viewSaveTimer);
-    if (!state) {
+    const live = levels.liveLevel();
+    if (!live) {
       return;
     }
 
     vscode.setState({
-      folder: folderOf(state),
-      root: state.breadcrumbs[0].path,
+      folder: live.data.folder,
+      root: live.crumbs[0].path,
       allowCrud: ALLOW_CRUD,
       isEditMode,
-      view: viewport.getView()
+      view: camera.getView(),
+      gates: folderZoom.gates()
     });
   }
 
@@ -563,226 +500,76 @@
 
     isEditMode = saved.isEditMode !== false;
     if (saved.view) {
-      restoredView = { folder: saved.folder, ...saved.view };
+      restoredView = { folder: saved.folder, ...saved.view, gates: saved.gates };
     }
   }
-
-  // --- context menu ---
-
-  // Build a node for the open folder out of the last breadcrumb
-  function currentFolderNode() {
-    const crumb = state.breadcrumbs[state.breadcrumbs.length - 1];
-    return { kind: 'folder', absPath: crumb.path, name: crumb.name };
-  }
-
-  // Find the saved color for a card path
-  function cardColorOf(absPath) {
-    const card = cards.find((entry) => entry.absPath === absPath);
-    return card ? card.color : undefined;
-  }
-
-  // Tint the card element at a path without saving the color
-  function tintCard(absPath, color) {
-    const el = cardEls.get(absPath);
-    if (el) {
-      applyCardColor(el, color);
-    }
-  }
-
-  // Tint the matching card, or the canvas background when the path is the open folder
-  function applyIncomingPreview(absPath, color) {
-    if (state && absPath === currentFolderNode().absPath) {
-      applyFolderTint(color || undefined);
-    } else {
-      tintCard(absPath, color);
-    }
-  }
-
-  // Tint this canvas, then have the host mirror it in the sidebar and other canvases
-  function previewColor(absPath, color) {
-    applyIncomingPreview(absPath, color);
-    vscode.postMessage({ type: 'previewColor', path: absPath, color: color || null });
-  }
-
-  // Look up the saved color for a path, the folder's own color when it is the open folder
-  function savedColorOf(absPath) {
-    if (state && absPath === currentFolderNode().absPath) {
-      return state.folderColor;
-    }
-    return cardColorOf(absPath);
-  }
-
-  // Remember the live preview, drop it once it matches the saved color
-  function trackPreview(absPath, color) {
-    activePreview = (savedColorOf(absPath) || null) === (color || null) ? null : { path: absPath, color };
-  }
-
-  // Re-apply the preview if it still differs from the saved color
-  function reapplyPreview() {
-    if (!activePreview) {
-      return;
-    }
-    trackPreview(activePreview.path, activePreview.color);
-    if (activePreview) {
-      applyIncomingPreview(activePreview.path, activePreview.color);
-    }
-  }
-
-  // Set the color on the card, then save it
-  function recolor(absPath, color) {
-    const card = cards.find((entry) => entry.absPath === absPath);
-    if (card) {
-      card.color = color || undefined;
-    }
-    tintCard(absPath, color);
-    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
-  }
-
-  // Set the color on the canvas background, then save it on the open folder
-  function recolorFolder(absPath, color) {
-    state.folderColor = color || undefined;
-    applyFolderTint(state.folderColor);
-    vscode.postMessage({ type: 'setColor', path: absPath, color: color || null });
-  }
-
-  // Build the swatch target that recolors a card
-  function cardColorTarget(card) {
-    return {
-      currentColor: () => cardColorOf(card.absPath),
-      preview: (color) => previewColor(card.absPath, color),
-      commit: (color) => recolor(card.absPath, color)
-    };
-  }
-
-  // Build the swatch target that recolors the open folder and its canvas background
-  function folderColorTarget() {
-    const folder = currentFolderNode();
-    return {
-      currentColor: () => state.folderColor,
-      preview: (color) => previewColor(folder.absPath, color),
-      commit: (color) => recolorFolder(folder.absPath, color)
-    };
-  }
-
-  // Drop empty entries, then leading, trailing, and doubled separators
-  function compactMenu(items) {
-    const out = [];
-    for (const entry of items) {
-      if (!entry) {
-        continue;
-      }
-      if (entry === 'sep' && (out.length === 0 || out[out.length - 1] === 'sep')) {
-        continue;
-      }
-      out.push(entry);
-    }
-    while (out.length && out[out.length - 1] === 'sep') {
-      out.pop();
-    }
-    return out;
-  }
-
-  // Build the right-click menu for a card, without Rename and Delete on a read-only canvas
-  function menuFor(card) {
-    if (card.kind === 'note') {
-      const alternate = alternateOpen(noteView, serialize(card));
-      return compactMenu([
-        { kind: 'swatches', target: cardColorTarget(card) },
-        'sep',
-        { label: 'Open', icon: 'go-to-file', action: () => postAfterSave({ type: 'openNote', node: serialize(card) }) },
-        { label: alternate.label, icon: alternate.icon, action: () => postAfterSave(alternate.message) },
-        // Only a skills canvas is read-only, and skills keep no history
-        ALLOW_CRUD ? { label: 'Show History', icon: 'history', cmd: 'promptStudio.showHistory' } : null,
-        'sep',
-        { label: 'Send to Claude', icon: 'claude', cmd: 'promptStudio.sendToClaude' },
-        'sep',
-        ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
-        { label: 'Copy Contents', icon: 'copy', cmd: 'promptStudio.copyContents' },
-        'sep',
-        { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-        COPY_PATH_ITEM,
-        'sep',
-        ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
-      ]);
-    }
-    return compactMenu([
-      { kind: 'swatches', target: cardColorTarget(card) },
-      'sep',
-      ALLOW_CRUD ? { label: 'Rename', icon: 'edit', cmd: 'promptStudio.rename' } : null,
-      'sep',
-      { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-      COPY_PATH_ITEM,
-      'sep',
-      ALLOW_CRUD ? { label: 'Delete', icon: 'trash', cmd: 'promptStudio.delete' } : null
-    ]);
-  }
-
-  // Work out the surface point that centers a new card on the click
-  function dropPoint(event) {
-    const point = viewport.toSurface(event.clientX, event.clientY);
-    return {
-      x: Math.round(point.x - DEFAULT_CARD_WIDTH / 2),
-      y: Math.round(point.y - DEFAULT_CARD_HEIGHT / 2)
-    };
-  }
-
-  // Build the right-click menu for empty canvas space, acting on the open folder
-  function backgroundMenu(dropPos) {
-    return compactMenu([
-      { kind: 'swatches', target: folderColorTarget() },
-      'sep',
-      ALLOW_CRUD ? { label: 'New Note', icon: 'new-file', action: () => vscode.postMessage({ type: 'newEntry', kind: 'note', x: dropPos.x, y: dropPos.y }) } : null,
-      ALLOW_CRUD ? { label: 'New Folder', icon: 'new-folder', action: () => vscode.postMessage({ type: 'newEntry', kind: 'folder', x: dropPos.x, y: dropPos.y }) } : null,
-      'sep',
-      { label: 'Reveal in File Manager', icon: 'folder-opened', cmd: 'promptStudio.revealInOS' },
-      COPY_PATH_ITEM
-    ]);
-  }
-
-  // Cut a node down to the fields sent with a command
-  function serialize(node) {
-    return { kind: node.kind, absPath: node.absPath, name: node.name };
-  }
-
-  // Open the background menu on a right-click in empty canvas space
-  canvasEl.addEventListener('contextmenu', (event) => {
-    if (!state) {
-      return;
-    }
-
-    event.preventDefault();
-    menu.show(event.clientX, event.clientY, backgroundMenu(dropPoint(event)), currentFolderNode());
-  });
 
   // --- bottom bar ---
 
-  // Show whether the cards are taking text
+  // Show on the bar at once whether the cards take text, while the cards themselves wait for the view to hold still
   function paintEditToggle() {
     editToggleEl.classList.toggle('active', isEditMode);
     editToggleEl.setAttribute('aria-pressed', String(isEditMode));
   }
 
-  // Turn the cards' text fields on or off, writing back whatever was typed
+  // Adopt the toggle's edit mode for the cards and preview copies only while both levels are rebuilt, so a zoom never
+  // swaps a card for a copy in the other mode
+  function takeEditMode() {
+    isDrawnInEditMode = isEditMode;
+    surfaceEl.classList.toggle('editing', isDrawnInEditMode);
+  }
+
+  // Turn the cards' text fields on or off, writing back what was typed, and rebuild the cards once the view is still
   function setEditMode(isEnabled) {
     isEditMode = isEnabled;
     paintEditToggle();
     editing.flush();
-    if (state) {
-      render(state);
+    editing.blurActiveField();
+    if (!levels.liveLevel()) {
+      takeEditMode();
+      return;
+    }
+
+    folderZoom.rebuildAtRest();
+    repaint();
+    queueViewSave();
+  }
+
+  // Fly to full size about the middle of the view
+  function showActualSize() {
+    if (levels.liveLevel()) {
+      folderZoom.flyToView(camera.actualSizeView());
+    }
+  }
+
+  // Fly to the view that frames every live card
+  function fitToCards() {
+    if (levels.liveLevel()) {
+      folderZoom.flyToView(folderZoom.fitLiveView());
     }
   }
 
   editToggleEl.addEventListener('click', () => setEditMode(!isEditMode));
-  zoomOutEl.addEventListener('click', () => viewport.zoomOut());
-  zoomInEl.addEventListener('click', () => viewport.zoomIn());
-  zoomLevelEl.addEventListener('click', () => viewport.resetZoom());
-  zoomFitEl.addEventListener('click', () => viewport.fit(cards.map(rectOf)));
+  zoomOutEl.addEventListener('click', () => camera.zoomStep(-1, false));
+  zoomInEl.addEventListener('click', () => camera.zoomStep(1, false));
+  zoomLevelEl.addEventListener('click', showActualSize);
+  zoomFitEl.addEventListener('click', fitToCards);
+
+  // Open the background menu on a right-click in empty canvas space, the parent's inert cards included
+  canvasEl.addEventListener('contextmenu', (event) => {
+    if (!levels.liveLevel()) {
+      return;
+    }
+
+    event.preventDefault();
+    menus.showBackgroundMenu(event);
+  });
 
   // Escape drops the caret, and the zoom keys only work when no card holds it
   document.addEventListener('keydown', (event) => {
     if (editing.isEditing()) {
       if (event.key === 'Escape') {
-        document.activeElement.blur();
+        editing.blurActiveField();
       }
       return;
     }
@@ -792,40 +579,50 @@
     }
 
     if (event.key === '+' || event.key === '=') {
-      viewport.zoomIn();
+      camera.zoomStep(1, event.repeat);
     } else if (event.key === '-') {
-      viewport.zoomOut();
+      camera.zoomStep(-1, event.repeat);
     } else if (event.key === '0') {
-      viewport.resetZoom();
+      showActualSize();
     }
   });
 
-  // Write pending edits before the panel loses the keyboard, goes to the background, or reloads
+  // Write pending edits before the panel loses the keyboard, goes to the background, or reloads.
+  // Save the latest view as well before a reload
   window.addEventListener('blur', () => editing.flush());
-  window.addEventListener('pagehide', () => editing.flush());
+  window.addEventListener('pagehide', () => {
+    editing.flush();
+    saveViewState();
+  });
   document.addEventListener('visibilitychange', () => editing.flush());
+
+  // Rescale the previews when a window zoom changes how far a card's preview sits in from its edges
+  window.addEventListener('resize', () => {
+    if (cardBuilders.measure() && levels.liveLevel()) {
+      cardBuilders.rescalePreviews(surfaceEl);
+      levels.remeasure();
+      refreshLook();
+    }
+
+    // Put note scroll back on a panel that was drawn with no layout
+    cardBuilders.restoreNoteScroll(surfaceEl);
+  });
 
   // --- inbound state ---
 
   window.addEventListener('message', (event) => {
     const message = event.data;
     if (message && message.type === 'state') {
-      // Hold the redraw while a card has the caret, or the caret is lost with the old field
-      if (editing.isEditing() && state && folderOf(message.state) === folderOf(state)) {
-        pendingState = message.state;
-        return;
-      }
-
-      render(message.state);
+      receiveState(message.state, message.navigateNumber);
     } else if (message && message.type === 'noteView') {
-      noteView = message.view;
+      menus.setNoteView(message.view);
     } else if (message && message.type === 'previewColor') {
-      applyIncomingPreview(message.path, message.color);
-      trackPreview(message.path, message.color);
+      colors.receivePreview(message.path, message.color);
     }
   });
 
   readSavedState();
   paintEditToggle();
+  takeEditMode();
   vscode.postMessage({ type: 'ready' });
 })();

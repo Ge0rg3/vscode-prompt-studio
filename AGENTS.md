@@ -326,6 +326,7 @@ Five things in [webview/template/](webview/template/) that read as tidy-up mater
 - **`allowCrud` gates the folder's structure, and `saveNote` is deliberately left outside it**, so a read-only skills canvas still saves what is typed into a card.
 - **`root` and `allowCrud` go into `vscode.setState` for the host, not the webview.** The renderer never reads them back, so they look like dead payload. The panel serializer needs them: without `allowCrud` a reloaded skills canvas comes back editable, and without `root` it closes.
 - **Saving a card never prunes the note's attachments**, since the canvas saves between keystrokes and would read a link the user is still typing.
+- **`.card` and `.mini-card` in [media/visual/canvas.css](media/visual/canvas.css) change together, down to the title row and the note text inside them.** Zooming into or out of a folder swaps a live card for its copy in a folder preview, so any difference between the two shows as a jump.
 
 </details>
 

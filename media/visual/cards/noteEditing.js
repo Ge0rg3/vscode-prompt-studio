@@ -60,12 +60,15 @@
       return editingPath !== null;
     }
 
-    // Removing a focused field fires no blur, so the redraw clears the editing path itself
-    function onCardsReplaced() {
-      editingPath = null;
+    // Take the caret off the focused field, so its blur saves the edits before the canvas moves to another folder.
+    // Chromium only blurs a field on its own while removing it, or a frame after it goes under an inert layer
+    function blurActiveField() {
+      if (editingPath !== null) {
+        document.activeElement.blur();
+      }
     }
 
-    return { buildField, flush, isEditing, onCardsReplaced };
+    return { buildField, flush, isEditing, blurActiveField };
   }
 
   window.PromptStudioNoteEditing = { create };

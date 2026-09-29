@@ -37,7 +37,7 @@ vscode-prompt-studio/
 +-- tsconfig.json           # Extension host: ES2022 target, Node16 modules, no DOM
 +-- .vscode/                # launch.json for the F5 debug flow, plus the npm: watch build task
 +-- .github/workflows/      # publish.yml, the release workflow for a push to main
-+-- docs/                   # README screenshots served from GitHub, plus the marketplace icon art. Not packaged
++-- docs/                   # README screenshots and demo GIF served from GitHub, plus the marketplace icon art. Not packaged
 +-- demo/                   # The demo project the screenshots are shot against
 |
 +-- src/                    # Extension host source (node)
@@ -76,9 +76,12 @@ vscode-prompt-studio/
 |   +-- common/             # contextMenu + noteOpen + palette + toolbar + tree.css, shared by more than one webview
 |   +-- vault/              # tree.html/.js for the Vault sidebar
 |   +-- skills/             # tree.html/.js for the Claude Skills sidebar
-|   +-- visual/             # canvas.html/.css/.js for the card canvas, viewport.js for its pan and
-|   |                       # zoom, folderZoom.js for moving between folders, noteEditing.js for
-|   |                       # the text fields on its cards
+|   +-- visual/             # canvas.html/.css/.js for the card canvas, viewport.js for its pan and zoom,
+|   |   |                   # heldStates.js for holding back host updates mid-zoom, colors.js for card colors,
+|   |   |                   # menus.js for the right-click menus
+|   |   +-- cards/          # cardBuilders.js and noteEditing.js for the cards and their text fields
+|   |   +-- zoom/           # folderZoom.js, levels.js, ancestors.js, lookPainter.js, and coverage.js for
+|   |                       # zooming between folders
 |   +-- template/           # template.html/.css plus the generated template.js bundle
 |   +-- settings/           # settings.html/.css/.js for the settings page
 |   +-- codicons/           # VSCode icon font, copied from node_modules at build time

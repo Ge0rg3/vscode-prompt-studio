@@ -21,6 +21,8 @@ export interface VisualCard {
   z?: number;
   width: number;
   height: number;
+
+  // Left out for a folder that was not read, and empty for an empty folder
   children?: VisualCard[];
 }
 
@@ -29,20 +31,26 @@ export interface Breadcrumb {
   name: string;
 }
 
-export interface VisualState {
-  breadcrumbs: Breadcrumb[];
+// One folder's cards and its color
+export interface VisualLevel {
   cards: VisualCard[];
   folderColor?: string;
-  parentColor?: string;
+}
+
+export interface VisualState extends VisualLevel {
+  breadcrumbs: Breadcrumb[];
+  parent?: VisualLevel;
 }
 
 const NOTE_EXT = '.md';
 const HEADING = /^\s*#{1,6}\s+(.+?)\s*$/;
 
-// Nest folder card previews this many layers deep
+// Nest folder card previews this many layers deep, at least as deep as PREVIEW_DEPTH in
+// media/visual/cards/cardBuilders.js
 const PREVIEW_DEPTH = 3;
 
-// Fall back to this card size and step the auto-placement grid by it
+// Fall back to this card size and step the auto-placement grid by it. EMPTY_FOLDER_BOUNDS in
+// media/visual/cards/cardBuilders.js copies the size and the margin
 const CARD_W = 240;
 const CARD_H = 170;
 const GRID_MARGIN = 24;
@@ -157,13 +165,31 @@ function placeCards(store: CardLayoutStore, cards: VisualCard[]): void {
   }
 }
 
+// Read a note file into an unplaced card, titled by its first heading
+async function readNoteCard(store: CardLayoutStore, absPath: string, name: string): Promise<VisualCard> {
+  const raw = await readTextFile(absPath);
+  const stem = name.slice(0, -NOTE_EXT.length);
+  return {
+    kind: 'note',
+    absPath,
+    name,
+    title: deriveTitle(raw, stem),
+    text: raw,
+    color: store.getColor(absPath),
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0
+  };
+}
+
 // Read a folder's direct children as placed cards, folders first then notes
 async function readEntries(store: CardLayoutStore, folder: string): Promise<VisualCard[]> {
   const entries = await vscode.workspace.fs.readDirectory(vscode.Uri.file(folder));
 
-  // Turn each folder and markdown file into a card, skipping hidden ones
+  // Turn each folder and markdown file into a card, skipping hidden ones and reading the notes together
   const folders: VisualCard[] = [];
-  const notes: VisualCard[] = [];
+  const noteReads: Promise<VisualCard>[] = [];
   for (const [name, type] of entries) {
     if (name.startsWith('.')) {
       continue;
@@ -182,22 +208,10 @@ async function readEntries(store: CardLayoutStore, folder: string): Promise<Visu
         height: 0
       });
     } else if (type === vscode.FileType.File && name.toLowerCase().endsWith(NOTE_EXT)) {
-      const raw = await readTextFile(absPath);
-      const stem = name.slice(0, -NOTE_EXT.length);
-      notes.push({
-        kind: 'note',
-        absPath,
-        name,
-        title: deriveTitle(raw, stem),
-        text: raw,
-        color: store.getColor(absPath),
-        x: 0,
-        y: 0,
-        width: 0,
-        height: 0
-      });
+      noteReads.push(readNoteCard(store, absPath, name));
     }
   }
+  const notes = await Promise.all(noteReads);
 
   // Sort each group by title and lay the cards out
   folders.sort(byTitle);
@@ -217,33 +231,57 @@ async function attachPreviews(
     return;
   }
 
+  // Read the subfolders together
+  const folderReads: Promise<void>[] = [];
   for (const card of cards) {
     if (card.kind === 'folder') {
-      card.children = await readEntries(store, card.absPath);
-      await attachPreviews(store, card.children, layers - 1);
+      folderReads.push(attachChildren(store, card, layers));
     }
+  }
+  await Promise.all(folderReads);
+}
+
+// Fill one folder card's children, and theirs below them `layers - 1` folders deep
+async function attachChildren(store: CardLayoutStore, card: VisualCard, layers: number): Promise<void> {
+  card.children = await readEntries(store, card.absPath);
+  await attachPreviews(store, card.children, layers - 1);
+}
+
+// Read a folder's cards with nested previews, leaving out the subtree of the card at skipPath
+async function readLevel(store: CardLayoutStore, folder: string, skipPath?: string): Promise<VisualLevel> {
+  const cards = await readEntries(store, folder);
+  await attachPreviews(store, cards.filter((card) => card.absPath !== skipPath), PREVIEW_DEPTH);
+  return { cards, folderColor: store.getColor(folder) };
+}
+
+// Read the parent folder's level, skipping the open folder's subtree since its own read covers it
+async function readParentLevel(
+  store: CardLayoutStore,
+  parentFolder: string,
+  openFolder: string
+): Promise<VisualLevel | undefined> {
+  try {
+    return await readLevel(store, parentFolder, openFolder);
+  } catch {
+    // Leave the level out when a folder in it cannot be read, since the open folder still shows without it
+    return undefined;
   }
 }
 
 // --- exports ---
 
-// Read one folder's cards and breadcrumb trail, each folder card carrying a nested preview
+// Read one folder's cards with nested previews and its breadcrumb trail, plus the parent's cards when asked for
 export async function readFolder(
   store: CardLayoutStore,
   root: string,
-  folder: string
+  folder: string,
+  shouldIncludeParent: boolean
 ): Promise<VisualState> {
-  const cards = await readEntries(store, folder);
-  await attachPreviews(store, cards, PREVIEW_DEPTH);
-
-  // Read the color of the folder one crumb up as well
   const breadcrumbs = buildBreadcrumbs(root, folder);
-  const parent = breadcrumbs.length > 1 ? breadcrumbs[breadcrumbs.length - 2].path : undefined;
+  const parentCrumb = breadcrumbs.at(-2);
 
-  return {
-    breadcrumbs,
-    cards,
-    folderColor: store.getColor(folder),
-    parentColor: parent ? store.getColor(parent) : undefined
-  };
+  // Read the folder and its parent together, leaving the parent out at the root or when it was not asked for
+  const parentRead = shouldIncludeParent && parentCrumb ? readParentLevel(store, parentCrumb.path, folder) : undefined;
+  const [level, parentLevel] = await Promise.all([readLevel(store, folder), parentRead]);
+  return { breadcrumbs, ...level, parent: parentLevel };
 }
