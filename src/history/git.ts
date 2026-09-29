@@ -70,7 +70,7 @@ function buildIsolatedEnv(): NodeJS.ProcessEnv {
   env.GIT_CONFIG_GLOBAL = '/dev/null';
   env.GIT_CONFIG_NOSYSTEM = '1';
 
-  // Never wait on a prompt, and keep git's messages in English so the lock check can read them
+  // Never wait on a prompt, and keep git's messages in English so the code can match on them
   env.GIT_TERMINAL_PROMPT = '0';
   env.LC_ALL = 'C';
   return env;

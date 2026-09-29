@@ -20,6 +20,9 @@ const NOTES_PATHSPEC = ':(icase)*.md';
 // Snapshot each note's attachments folder too, to bring its files back with a restored note
 const ATTACHMENTS_PATHSPEC = ':(glob)**/.attachments/*';
 
+// Match git's error for a pathspec that finds no file, on disk or in the last snapshot
+const UNMATCHED_PATHSPEC = /pathspec '.*' did not match any files/;
+
 // Match the commits that leave a file with content, the ones that add, copy, edit, or move it in
 const ADDED_OR_CHANGED_FILTER = '--diff-filter=ACMR';
 
@@ -83,13 +86,20 @@ export class ShadowRepo implements vscode.Disposable {
       return;
     }
 
-    // Carry on past any file git cannot read
-    const add = await this.run(['add', '--all', '--ignore-errors', '--', NOTES_PATHSPEC, ATTACHMENTS_PATHSPEC]);
+    // Add notes and attachments
+    let addFailure: string | undefined;
+    for (const pathspec of [NOTES_PATHSPEC, ATTACHMENTS_PATHSPEC]) {
+      // Carry on past any file git cannot read
+      const add = await this.run(['add', '--all', '--ignore-errors', '--', pathspec]);
+      if (add.exitCode !== 0 && !UNMATCHED_PATHSPEC.test(add.stderr)) {
+        addFailure ??= this.readFailureLine(add);
+      }
+    }
 
     // Report a failed add only when it staged nothing, a partial add still gets committed
     const hasStaged = await this.hasStagedChanges();
-    if (hasStaged === false && add.exitCode !== 0) {
-      this.reportFailure(this.readFailureLine(add));
+    if (hasStaged === false && addFailure !== undefined) {
+      this.reportFailure(addFailure);
     }
     if (!hasStaged) {
       return;

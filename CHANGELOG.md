@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Note history no longer fails to save in a vault with no attached files.
+
 ## 0.5.1
 
 - Zooming in and out of folders on the canvas is one continuous motion. The parent's cards come into view in place around the folder you leave, and the zoom never pauses as it crosses from one folder to the next.
